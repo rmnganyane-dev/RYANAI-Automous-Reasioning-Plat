@@ -1,9 +1,16 @@
 ﻿$ErrorActionPreference = "Stop"
 $env:Path += ";$env:USERPROFILE\.cargo\bin"
 
-Write-Host "=== 0. Stopping Running Instances of RyanAI ===" -ForegroundColor Cyan
+Write-Host "=== 0. Stopping Running Instances & Forcibly Removing Locks ===" -ForegroundColor Cyan
 Get-Process -Name "app", "ryan-gateway-x86_64-pc-windows-msvc" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 1
+Start-Sleep -Seconds 2
+
+# Aggressive Windows file deletion to break lock handles
+$TargetExe = "src-tauri\target\release\app.exe"
+if (Test-Path $TargetExe) {
+    cmd /c "del /f /q ""$TargetExe"" 2>nul"
+    Start-Sleep -Seconds 1
+}
 
 Write-Host "=== 1. Building Vite Frontend ===" -ForegroundColor Cyan
 npm run build

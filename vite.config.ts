@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
-  base: '/',
+  base: './', // Crucial for Tauri production builds so assets load via relative paths
   plugins: [react()],
   resolve: {
     alias: {
