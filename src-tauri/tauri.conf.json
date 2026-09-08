@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "RyanAI",
   "version": "0.1.0",
-  "identifier": "com.ryanai.app",
+  "identifier": "com.ryanai.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",

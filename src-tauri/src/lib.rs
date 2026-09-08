@@ -1,4 +1,5 @@
-// src-tauri/src/lib.rs
+use tauri_plugin_shell::ShellExt;
+
 pub struct AppState {
     pub client: reqwest::Client,
     pub gateway_url: String,
@@ -19,6 +20,9 @@ async fn dispatch_inference(prompt: String, state: tauri::State<'_, AppState>) -
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .manage(AppState {
             client: reqwest::Client::new(),
