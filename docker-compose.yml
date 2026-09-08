@@ -7,6 +7,8 @@ services:
     image: ryanai-web:local
     container_name: ryanai-web-app
     restart: unless-stopped
+    environment:
+      - PORT=80
     ports:
       - "8080:80"
     healthcheck:
