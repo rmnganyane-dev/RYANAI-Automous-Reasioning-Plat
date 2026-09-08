@@ -1,11 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "enables the default permissions",
+  "description": "Default capabilities for Ryan-app desktop client",
   "windows": [
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:event:default",
+    "core:window:default",
+    "core:webview:default",
+    "http:default"
   ]
 }
