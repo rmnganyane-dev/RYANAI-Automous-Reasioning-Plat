@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: ryanai-web
+    env: docker
+    region: frankfurt
+    plan: free
+    dockerfilePath: Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 80
