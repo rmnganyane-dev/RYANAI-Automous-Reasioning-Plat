@@ -1,0 +1,1 @@
+import Modal from "./Modal"; interface AboutModalProps { isOpen: boolean; onClose: () => void; } export default function AboutModal({ isOpen, onClose }: AboutModalProps) { return (<Modal isOpen={isOpen} onClose={onClose} title="About RYANAI Platform"><p className="text-sm text-gray-300">RYANAI Autonomous Reasoning Platform.</p></Modal>); }

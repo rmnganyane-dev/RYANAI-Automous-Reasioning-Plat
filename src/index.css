@@ -1,0 +1,244 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== RyanAI Global HUD Theme ===== */
+:root {
+  --hud-bg: #020617;
+  --hud-panel: rgba(15, 23, 42, 0.72);
+  --hud-border: rgba(34, 211, 238, 0.22);
+  --hud-glow: rgba(34, 211, 238, 0.35);
+  --hud-text: #cbd5e1;
+  --hud-text-dim: #64748b;
+  --hud-cyan: #22d3ee;
+  --hud-emerald: #34d399;
+  --hud-amber: #fbbf24;
+  --hud-rose: #fb7185;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 211, 238, 0.3) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(34, 211, 238, 0.25);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 211, 238, 0.45);
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: var(--hud-bg);
+  color: var(--hud-text);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* Radial gradient backdrop */
+.hud-radial {
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(6, 182, 212, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(16, 185, 129, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(8, 51, 68, 0.15) 0%, transparent 70%),
+    #020617;
+}
+
+/* Grid overlay */
+.hud-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(34, 211, 238, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Scanline overlay */
+.hud-scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 3px,
+    rgba(0, 0, 0, 0.15) 3px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Glass panel */
+.glass {
+  background: var(--hud-panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--hud-border);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.05),
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(34, 211, 238, 0.08);
+}
+
+.glass-hover {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.glass-hover:hover {
+  border-color: rgba(34, 211, 238, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.1),
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(34, 211, 238, 0.1),
+    inset 0 1px 0 rgba(34, 211, 238, 0.12);
+}
+
+/* Glow text */
+.glow-cyan {
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.5), 0 0 20px rgba(34, 211, 238, 0.2);
+}
+.glow-emerald {
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.5), 0 0 20px rgba(52, 211, 153, 0.2);
+}
+
+/* Animated scan line */
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--hud-cyan), transparent);
+  opacity: 0.6;
+  animation: scan 6s linear infinite;
+  pointer-events: none;
+}
+
+/* Corner brackets */
+.corner-brackets {
+  position: relative;
+}
+.corner-brackets::before,
+.corner-brackets::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: var(--hud-cyan);
+  border-style: solid;
+  pointer-events: none;
+}
+.corner-brackets::before {
+  top: -1px;
+  left: -1px;
+  border-width: 1px 0 0 1px;
+}
+.corner-brackets::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 1px 1px 0;
+}
+
+/* Status dot */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.online {
+  background: var(--hud-emerald);
+  box-shadow: 0 0 8px var(--hud-emerald);
+  animation: flicker 4s linear infinite;
+}
+.status-dot.thinking {
+  background: var(--hud-cyan);
+  box-shadow: 0 0 8px var(--hud-cyan);
+  animation: pulse 1s ease-in-out infinite;
+}
+.status-dot.offline {
+  background: var(--hud-rose);
+  box-shadow: 0 0 8px var(--hud-rose);
+}
+
+/* Typing cursor */
+.typing-cursor::after {
+  content: '▊';
+  animation: flicker 0.8s steps(1) infinite;
+  color: var(--hud-cyan);
+  margin-left: 2px;
+}
+
+/* Shimmer effect for loading */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(34, 211, 238, 0.08) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Button glow */
+.btn-glow {
+  transition: all 0.2s;
+  position: relative;
+}
+.btn-glow:hover {
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.3);
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Fade in animation */
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Slide in animation */
+.slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Code rain canvas */
+.code-rain {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.12;
+  pointer-events: none;
+}
