@@ -8,5 +8,6 @@ RUN npm run build
 FROM nginx:alpine AS production
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
+EXPOSE 10000
+CMD /bin/sh -c "envsubst '\$PORT' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"
