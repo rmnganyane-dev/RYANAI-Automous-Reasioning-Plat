@@ -2,28 +2,32 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  base: './', // Ensures relative asset loading in production containers
   plugins: [react()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-  clearScreen: false,
-  server: {
-    port: 5173,
-    strictPort: false,
-    watch: {
-      ignored: ['**/src-tauri/target/**'],
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('framer-motion') || id.includes('lucide-react')) {
+              return 'vendor-ui';
+            }
+            if (id.includes('@supabase')) {
+              return 'vendor-supabase';
+            }
+            return 'vendor-core';
+          }
+        },
+      },
     },
-  },
-  preview: {
-    host: true,
-    port: 4173,
-  },
-  optimizeDeps: {
-    exclude: ['lucide-react'],
   },
 });

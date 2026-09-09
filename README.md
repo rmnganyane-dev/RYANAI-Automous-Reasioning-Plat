@@ -151,3 +151,57 @@ An enterprise-grade, multi-model agentic reasoning engine engineered for dynamic
 ---
 
 ## Architecture Flow
+
+<FollowUp label="Want me to save this directly as README.md or add specific env variable specs?" query="Help me format the .env template and save this as README.md in the project."/>
+
+## Key Features
+
+* **LangGraph ReAct Orchestration:** State-machine architecture executing deterministic intent parsing, tool routing, observation loops, and autonomous task execution.
+* **Multi-Model Gateway Routing:** Configurable model provider fallback supporting high-tier profiles (e.g., Nvidia Nemotron 3 Ultra, Qwen) with local fallback guarantees via `src/config/models.ts`.
+* **Model Context Protocol (MCP) Native:** Integrates external tools and cloud providers via HTTP/SSE transports (e.g., Render MCP).
+* **Type-Safe Pipeline:** Strict TypeScript compilation with Vite client typing, Node runtime declarations, and automated build verifications.
+* **Automated Production Shipping:** Built-in `npm run ship` pipeline enforcing type checking, production bundle minification, Git commit automation, and remote synchronization.
+
+---
+
+## Quick Start
+
+### 1. Installation
+
+\`\`\`bash
+git clone https://github.com/rmnganyane-dev/RYANAI-Automous-Reasioning-Plat.git
+cd RYANAI-Automous-Reasioning-Plat
+npm install
+\`\`\`
+
+### 2. Environment Configuration
+
+Copy `.env.example` to `.env` and configure your API keys:
+
+\`\`\`bash
+cp .env.example .env
+\`\`\`
+
+### 3. MCP Integrations
+
+\`\`\`bash
+claude mcp add --transport http render https://mcp.render.com/mcp --header "Authorization: Bearer YOUR_ACTUAL_API_KEY"
+\`\`\`
+
+---
+
+## Development & Production Pipeline
+
+| Command | Action |
+| :--- | :--- |
+| \`npm run dev\` | Starts the Vite local development server with HMR. |
+| \`npm run typecheck\` | Validates TypeScript types strictly via \`tsconfig.app.json\`. |
+| \`npm run build\` | Compiles TypeScript binaries and builds optimized production bundles into \`/dist\`. |
+| \`npm run ship\` | Runs \`typecheck\` ➔ \`build\` ➔ \`git add .\` ➔ \`git commit\` ➔ \`git push origin main\`. |
+
+---
+
+## License & Ownership
+
+Proprietary Software — Developed and maintained by **RMN Ganyane (Pty) Ltd**. All rights reserved.
+"@
