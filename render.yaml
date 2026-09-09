@@ -1,12 +1,11 @@
 services:
   - type: web
-    name: ryanai-web
-    env: docker
-    region: frankfurt
-    plan: free
-    dockerfilePath: Dockerfile
-    autoDeploy: true
-    healthCheckPath: /health
+    name: ryanai-sovereign-nexus
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: node mcp-server/index.js
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: PORT
-        value: 80
+        value: 9090
