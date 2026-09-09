@@ -1,15 +1,23 @@
-Set-Content -Path render.yaml -Value @"
 services:
   - type: web
-    name: ryanai-reasoning-platform
+    name: ryanai-web
     runtime: static
+    repo: https://github.com/YOUR_GITHUB_USERNAME/RYANAI-Autonomous-Reasoning-Platform
+    branch: main
     buildCommand: npm run build
     staticPublishPath: ./dist
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
+
+  - type: web
+    name: ryanai-api
+    runtime: docker
+    repo: https://github.com/YOUR_GITHUB_USERNAME/RYANAI-Autonomous-Reasoning-Platform
+    branch: main
+    dockerfilePath: ./Dockerfile.api
+    plan: free
     envVars:
-      - key: VITE_APP_ENV
-        value: production
-"@
+      - key: PORT
+        value: 3000
