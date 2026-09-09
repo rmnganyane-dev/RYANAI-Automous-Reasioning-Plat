@@ -19,6 +19,8 @@ src-tauri/              Tauri Rust shell and desktop configuration
 supabase/migrations/    Auth, profiles, conversations, messages, and memory schema
 agentskills/            Autonomous agent rules and MCP capability configuration
 mcp-server/             Stdio MCP diagnostics and release manager
+native/local-inference/ Offline C++17/CUDA bridge stub and build contract
+agentskills/            Agent roles, sentinel policy, and MCP capability rules
 Dockerfile              Production web image
 docker-compose.yml      Local web deployment on port 9090
 build-installer.ps1     Windows release build and packaging script
@@ -92,6 +94,16 @@ Stop the deployment with:
 ```bash
 npm run docker:down
 ```
+
+## Local-First Closure Layers
+
+- **Dual-brain routing:** `src/config/models.ts` selects the configured Nemotron and Qwen profiles. Provider credentials remain server-side and are never bundled into the browser.
+- **Offline inference bridge:** `native/local-inference/` contains a C++17 stdin/stdout stub with an optional CUDA build switch. Signed model weights and kernels must be supplied separately before production CUDA inference.
+- **Sentinel policy:** `agentskills/sentinel-policy.json` is audit-only by default. Kernel-level eBPF enforcement requires a reviewed, signed Linux attachment; Windows does not silently install or block with a kernel driver.
+- **Air-gap vector cache:** `src/lib/airGapCache.ts` stores AES-GCM encrypted vector records in IndexedDB for browser-local persistence. A native deployment should move the key into OS-backed secure storage before treating it as a hardware security boundary.
+- **Installer:** `packaging/installer/ryan-ai-setup.iss` packages the actual Tauri executable. PostgreSQL, Redis, CUDA weights, and kernel programs are intentionally not bundled because no verified artifacts exist in this repository.
+
+To configure the dual-brain browser routing, copy `.env.example` to `.env.local` and set the `VITE_PRIMARY_REASONING_MODEL`, `VITE_SECONDARY_REASONING_MODEL`, and endpoint values. Keep API keys in a server-side secret store.
 
 ## Windows Installers
 
