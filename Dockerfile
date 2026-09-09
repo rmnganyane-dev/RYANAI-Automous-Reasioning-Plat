@@ -1,19 +1,29 @@
-# Build the Vite frontend with the lockfile for reproducible images.
+# Stage 1: Build the Vite frontend
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
+
+# Copy lockfiles first to leverage Docker layer caching
+COPY package.json package-lock.json* ./
 RUN npm ci --no-audit --no-fund
+
+# Copy source code and produce production build
 COPY . .
 RUN npm run build
 
-# Serve the compiled SPA with Nginx.
+# Stage 2: Serve static files with Nginx
 FROM nginx:alpine AS production
-ENV PORT=80
 
+# Copy built assets to Nginx default document root
 COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/nginx.conf
+
+# Override default virtual host configuration instead of replacing main nginx.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
+# Monitor Nginx process health
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-	CMD wget --quiet --tries=1 --spider http://127.0.0.1:80/health || exit 1
+    CMD wget --quiet --tries=1 --spider http://127.0.0.1:80/ || exit 1
+
+# Run Nginx in the foreground
+CMD ["nginx", "-g", "daemon off;"]
