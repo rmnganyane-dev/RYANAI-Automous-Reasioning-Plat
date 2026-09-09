@@ -1,0 +1,14 @@
+{
+  "name": "ryanai-mcp-manager",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP diagnostics and release manager for RyanAI",
+  "scripts": {
+    "start": "node index.js",
+    "check": "node --check index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}
