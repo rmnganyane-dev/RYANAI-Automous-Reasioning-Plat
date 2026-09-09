@@ -1,8 +1,15 @@
+
+
+// Initialize dotenv if running in a Node.js environment
+if (typeof process !== 'undefined' && process.env) {
+  
+}
+
 /**
- * Helper to safely extract environment variables across Vite (import.meta.env)
+ * Safely extracts environment variables across Vite (import.meta.env)
  * and Node.js (process.env) runtimes.
  */
-function getEnv(key: string, defaultValue = ''): string {
+export function getEnv(key: string, defaultValue = ''): string {
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key] !== undefined) {
     return import.meta.env[key] as string;
   }
@@ -16,7 +23,7 @@ function getEnv(key: string, defaultValue = ''): string {
 // Types & Interfaces
 // ==========================================
 
-export type ModelProvider = 'nvidia' | 'qwen' | 'openrouter' | 'gateway' | 'together';
+export type ModelProvider = 'nvidia' | 'qwen' | 'together' | 'openrouter' | 'gateway' | 'local';
 
 export interface ModelCapabilities {
   tools: boolean;
@@ -50,18 +57,58 @@ export interface RoutingProfile {
   fallback: string;
 }
 
-export interface RyanBrain {
+export interface ModelProfile {
   id: string;
   name: string;
+  provider: ModelProvider;
   role: string;
+  endpoint: string;
   contextWindow: number;
   temperature: number;
-  endpoint: string;
-  provider: ModelProvider;
+  apiKey?: string;
 }
 
+export type RyanBrain = ModelProfile;
+
 // ==========================================
-// Model Inventory & Gateways
+// Provider Gateways Configuration
+// ==========================================
+
+export const PROVIDER_GATEWAYS: Record<ModelProvider, GatewayConfig> = {
+  nvidia: {
+    baseUrl: getEnv('VITE_NVIDIA_API_ENDPOINT') || getEnv('NVIDIA_API_ENDPOINT') || 'https://integrate.api.nvidia.com/v1',
+    apiKeyEnvVar: 'NVIDIA_API_KEY',
+    timeoutMs: 60000,
+  },
+  qwen: {
+    baseUrl: getEnv('VITE_QWEN_API_ENDPOINT') || getEnv('QWEN_API_ENDPOINT') || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    apiKeyEnvVar: 'DASHSCOPE_API_KEY',
+    timeoutMs: 60000,
+  },
+  together: {
+    baseUrl: getEnv('VITE_TOGETHER_API_ENDPOINT') || getEnv('TOGETHER_API_ENDPOINT') || 'https://api.together.xyz/v1',
+    apiKeyEnvVar: 'TOGETHER_API_KEY',
+    timeoutMs: 60000,
+  },
+  openrouter: {
+    baseUrl: getEnv('VITE_OPENROUTER_API_ENDPOINT') || getEnv('OPENROUTER_API_ENDPOINT') || 'https://openrouter.ai/api/v1',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    timeoutMs: 60000,
+  },
+  gateway: {
+    baseUrl: getEnv('VITE_MODEL_GATEWAY_URL') || getEnv('MODEL_GATEWAY_URL') || 'http://localhost:8000/v1',
+    apiKeyEnvVar: 'MODEL_GATEWAY_API_KEY',
+    timeoutMs: 30000,
+  },
+  local: {
+    baseUrl: getEnv('VITE_LOCAL_MODEL_URL') || getEnv('LOCAL_MODEL_URL') || 'http://localhost:8080/v1',
+    apiKeyEnvVar: 'LOCAL_API_KEY',
+    timeoutMs: 120000,
+  },
+};
+
+// ==========================================
+// Model Inventory
 // ==========================================
 
 export const AVAILABLE_MODELS: Record<string, ModelDefinition> = {
@@ -72,13 +119,8 @@ export const AVAILABLE_MODELS: Record<string, ModelDefinition> = {
     provider: 'nvidia',
     contextWindow: 128000,
     maxOutputTokens: 8192,
-    role: 'Primary autonomous reasoning and code synthesis',
-    capabilities: {
-      tools: true,
-      vision: false,
-      jsonMode: true,
-      streaming: true,
-    },
+    role: 'Primary Autonomous Reasoning & Code Synthesis',
+    capabilities: { tools: true, vision: false, jsonMode: true, streaming: true },
     defaultTemperature: 0.2,
   },
   'nemotron-70b-instruct': {
@@ -87,13 +129,8 @@ export const AVAILABLE_MODELS: Record<string, ModelDefinition> = {
     provider: 'nvidia',
     contextWindow: 131072,
     maxOutputTokens: 4096,
-    role: 'General autonomous reasoning',
-    capabilities: {
-      tools: true,
-      vision: false,
-      jsonMode: true,
-      streaming: true,
-    },
+    role: 'General Autonomous Reasoning',
+    capabilities: { tools: true, vision: false, jsonMode: true, streaming: true },
     defaultTemperature: 0.6,
   },
 
@@ -104,13 +141,8 @@ export const AVAILABLE_MODELS: Record<string, ModelDefinition> = {
     provider: 'together',
     contextWindow: 64000,
     maxOutputTokens: 8192,
-    role: 'Secondary multi-agent validation and context caching',
-    capabilities: {
-      tools: true,
-      vision: false,
-      jsonMode: true,
-      streaming: true,
-    },
+    role: 'Secondary Multi-Agent Validation & Context Caching',
+    capabilities: { tools: true, vision: false, jsonMode: true, streaming: true },
     defaultTemperature: 0.1,
   },
   'qwen-2.5-72b-instruct': {
@@ -119,13 +151,8 @@ export const AVAILABLE_MODELS: Record<string, ModelDefinition> = {
     provider: 'qwen',
     contextWindow: 131072,
     maxOutputTokens: 8192,
-    role: 'General inference and orchestration',
-    capabilities: {
-      tools: true,
-      vision: false,
-      jsonMode: true,
-      streaming: true,
-    },
+    role: 'General Inference & Orchestration',
+    capabilities: { tools: true, vision: false, jsonMode: true, streaming: true },
     defaultTemperature: 0.7,
   },
   'qwen-2.5-coder-32b': {
@@ -134,42 +161,21 @@ export const AVAILABLE_MODELS: Record<string, ModelDefinition> = {
     provider: 'qwen',
     contextWindow: 131072,
     maxOutputTokens: 8192,
-    role: 'Fast code generation and refactoring',
-    capabilities: {
-      tools: true,
-      vision: false,
-      jsonMode: true,
-      streaming: true,
-    },
+    role: 'Fast Code Generation & Refactoring',
+    capabilities: { tools: true, vision: false, jsonMode: true, streaming: true },
     defaultTemperature: 0.2,
   },
-};
 
-export const PROVIDER_GATEWAYS: Record<ModelProvider, GatewayConfig> = {
-  nvidia: {
-    baseUrl: getEnv('VITE_NVIDIA_API_ENDPOINT') || getEnv('NVIDIA_NIM_GATEWAY_URL') || 'https://integrate.api.nvidia.com/v1',
-    apiKeyEnvVar: 'NVIDIA_API_KEY',
-    timeoutMs: 60000,
-  },
-  qwen: {
-    baseUrl: getEnv('VITE_QWEN_API_ENDPOINT') || getEnv('QWEN_GATEWAY_URL') || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    apiKeyEnvVar: 'DASHSCOPE_API_KEY',
-    timeoutMs: 60000,
-  },
-  together: {
-    baseUrl: getEnv('VITE_TOGETHER_API_ENDPOINT') || getEnv('TOGETHER_GATEWAY_URL') || 'https://api.together.xyz/v1',
-    apiKeyEnvVar: 'TOGETHER_API_KEY',
-    timeoutMs: 60000,
-  },
-  openrouter: {
-    baseUrl: getEnv('VITE_OPENROUTER_API_ENDPOINT') || getEnv('OPENROUTER_GATEWAY_URL') || 'https://openrouter.ai/api/v1',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    timeoutMs: 60000,
-  },
-  gateway: {
-    baseUrl: getEnv('VITE_MODEL_GATEWAY_URL') || getEnv('MODEL_GATEWAY_URL') || 'http://localhost:8000/v1',
-    apiKeyEnvVar: 'MODEL_GATEWAY_API_KEY',
-    timeoutMs: 30000,
+  // --- Local Fallback ---
+  'local-deterministic': {
+    id: 'ryanai-local-stub',
+    name: 'RyanAI C++ Local Fallback',
+    provider: 'local',
+    contextWindow: 8192,
+    maxOutputTokens: 2048,
+    role: 'Offline Deterministic Execution Guardrail',
+    capabilities: { tools: true, vision: false, jsonMode: true, streaming: false },
+    defaultTemperature: 0.0,
   },
 };
 
@@ -178,52 +184,117 @@ export const DEFAULT_ROUTING_PROFILE: RoutingProfile = {
   codeGeneration: 'qwen-2.5-coder-32b',
   generalInference: 'qwen-2.5-72b-instruct',
   fastInference: 'qwen-3.6-27b',
-  fallback: 'qwen-2.5-72b-instruct',
+  fallback: 'local-deterministic',
 };
 
 // ==========================================
-// RyanBrain High-Level Abstraction
+// RyanAI Brain Abstractions
 // ==========================================
 
-export const RYANAI_BRAINS = {
+export const RYANAI_BRAINS: Record<string, ModelProfile> = {
   nemotronUltra: {
     id: AVAILABLE_MODELS['nemotron-3-ultra'].id,
     name: AVAILABLE_MODELS['nemotron-3-ultra'].name,
+    provider: AVAILABLE_MODELS['nemotron-3-ultra'].provider,
     role: AVAILABLE_MODELS['nemotron-3-ultra'].role!,
+    endpoint: PROVIDER_GATEWAYS.nvidia.baseUrl,
     contextWindow: AVAILABLE_MODELS['nemotron-3-ultra'].contextWindow,
     temperature: AVAILABLE_MODELS['nemotron-3-ultra'].defaultTemperature,
-    endpoint: PROVIDER_GATEWAYS.nvidia.baseUrl,
-    provider: 'nvidia',
+    apiKey: getEnv('NVIDIA_API_KEY') || getEnv('VITE_NVIDIA_API_KEY'),
   },
   qwen27b: {
     id: AVAILABLE_MODELS['qwen-3.6-27b'].id,
     name: AVAILABLE_MODELS['qwen-3.6-27b'].name,
+    provider: AVAILABLE_MODELS['qwen-3.6-27b'].provider,
     role: AVAILABLE_MODELS['qwen-3.6-27b'].role!,
+    endpoint: PROVIDER_GATEWAYS.together.baseUrl,
     contextWindow: AVAILABLE_MODELS['qwen-3.6-27b'].contextWindow,
     temperature: AVAILABLE_MODELS['qwen-3.6-27b'].defaultTemperature,
-    endpoint: PROVIDER_GATEWAYS.together.baseUrl,
-    provider: 'together',
+    apiKey: getEnv('TOGETHER_API_KEY') || getEnv('QWEN_API_KEY') || getEnv('VITE_TOGETHER_API_KEY'),
   },
-} satisfies Record<string, RyanBrain>;
+  localDeterministic: {
+    id: AVAILABLE_MODELS['local-deterministic'].id,
+    name: AVAILABLE_MODELS['local-deterministic'].name,
+    provider: AVAILABLE_MODELS['local-deterministic'].provider,
+    role: AVAILABLE_MODELS['local-deterministic'].role!,
+    endpoint: PROVIDER_GATEWAYS.local.baseUrl,
+    contextWindow: AVAILABLE_MODELS['local-deterministic'].contextWindow,
+    temperature: AVAILABLE_MODELS['local-deterministic'].defaultTemperature,
+  },
+};
 
-const configuredPrimary = getEnv('VITE_PRIMARY_REASONING_MODEL');
-const configuredSecondary = getEnv('VITE_SECONDARY_REASONING_MODEL');
+// ==========================================
+// Provider Gateway Class
+// ==========================================
 
-export function getPrimaryBrain(): RyanBrain {
-  return configuredPrimary === RYANAI_BRAINS.qwen27b.id
-    ? RYANAI_BRAINS.qwen27b
-    : RYANAI_BRAINS.nemotronUltra;
-}
+export class ProviderGateway {
+  /**
+   * Retrieves the primary reasoning engine.
+   * Route to Nemotron Ultra if API key is present; falls back to local deterministic execution otherwise.
+   */
+  static getPrimaryBrain(): ModelProfile {
+    const overrideId = getEnv('VITE_PRIMARY_REASONING_MODEL') || getEnv('PRIMARY_REASONING_MODEL');
+    let brain = RYANAI_BRAINS.nemotronUltra;
 
-export function getSecondaryBrain(): RyanBrain {
-  return configuredSecondary === RYANAI_BRAINS.nemotronUltra.id
-    ? RYANAI_BRAINS.nemotronUltra
-    : RYANAI_BRAINS.qwen27b;
+    if (overrideId === RYANAI_BRAINS.qwen27b.id) {
+      brain = RYANAI_BRAINS.qwen27b;
+    }
+
+    if (!brain.apiKey) {
+      console.warn(`[Gateway] Key missing for ${brain.name}. Bypassing live inference -> Routing to local fallback.`);
+      return RYANAI_BRAINS.localDeterministic;
+    }
+
+    console.log(`[Gateway] Primary Brain Activated: ${brain.name}`);
+    return brain;
+  }
+
+  /**
+   * Retrieves the secondary validation engine.
+   */
+  static getSecondaryBrain(): ModelProfile {
+    const overrideId = getEnv('VITE_SECONDARY_REASONING_MODEL') || getEnv('SECONDARY_REASONING_MODEL');
+    let brain = RYANAI_BRAINS.qwen27b;
+
+    if (overrideId === RYANAI_BRAINS.nemotronUltra.id) {
+      brain = RYANAI_BRAINS.nemotronUltra;
+    }
+
+    if (!brain.apiKey) {
+      console.warn(`[Gateway] Key missing for ${brain.name}. Bypassing secondary live inference -> Routing to local fallback.`);
+      return RYANAI_BRAINS.localDeterministic;
+    }
+
+    console.log(`[Gateway] Secondary Brain Activated: ${brain.name}`);
+    return brain;
+  }
+
+  /**
+   * Constructs request headers for API calls.
+   */
+  static buildHeaders(profile: ModelProfile): HeadersInit {
+    if (profile.provider === 'local' || !profile.apiKey) {
+      return { 'Content-Type': 'application/json' };
+    }
+
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${profile.apiKey}`,
+    };
+  }
 }
 
 // ==========================================
 // Task & Gateway Resolvers
 // ==========================================
+
+export function getPrimaryBrain(): ModelProfile {
+  return ProviderGateway.getPrimaryBrain();
+}
+
+export function getSecondaryBrain(): ModelProfile {
+  return ProviderGateway.getSecondaryBrain();
+}
 
 export function getModelForTask(
   task: keyof RoutingProfile,
