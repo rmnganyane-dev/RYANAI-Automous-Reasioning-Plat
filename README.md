@@ -17,6 +17,8 @@ RyanAI is a desktop and web autonomous reasoning platform. It combines a React/T
 src/                    React application and UI components
 src-tauri/              Tauri Rust shell and desktop configuration
 supabase/migrations/    Auth, profiles, conversations, messages, and memory schema
+agentskills/            Autonomous agent rules and MCP capability configuration
+mcp-server/             Stdio MCP diagnostics and release manager
 Dockerfile              Production web image
 docker-compose.yml      Local web deployment on port 9090
 build-installer.ps1     Windows release build and packaging script
@@ -45,6 +47,17 @@ For the Tauri desktop shell:
 ```bash
 npm run tauri dev
 ```
+
+## MCP Agent Manager
+
+The repository includes a scoped MCP server for repeatable RyanAI diagnostics and release operations. It does not run arbitrary shell input; tools invoke the repository's allowlisted npm, Cargo, Docker Compose, and Git commands.
+
+```bash
+npm run mcp:check
+npm run mcp:start
+```
+
+The server communicates over stdio for MCP clients. Available tools are `diagnose_and_patch`, `repository_status`, and `sync_repository`. Deployment and Git synchronization remain explicit tool actions, and `.env` is excluded from staging.
 
 ## Validate and Build
 

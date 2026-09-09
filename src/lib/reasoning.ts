@@ -1,5 +1,6 @@
 import type { ModelId, ToolStep } from './types';
 import { uid } from './storage';
+import { getPrimaryBrain } from '@/config/models';
 
 export interface StreamCallbacks {
   onToken: (text: string) => void;
@@ -79,6 +80,7 @@ function generateToolResult(name: string): string {
 }
 
 function generateResponse(model: ModelId, userText: string): string {
+  const primaryBrain = getPrimaryBrain();
   const intros: Record<ModelId, string[]> = {
     'gemini-3.1-pro': [
       `Based on my analysis across multiple reasoning paths, here's what I've determined:`,
@@ -99,7 +101,7 @@ function generateResponse(model: ModelId, userText: string): string {
 
   const intro = pickRandom(intros[model]);
 
-  const body = `**Your query:** "${userText.slice(0, 120)}"\n\n**Assessment:** I've processed your request through the full reasoning pipeline — parsing intent, consulting tools, and synthesizing a coherent response. The LangGraph state machine executed successfully with no dead-ends detected.\n\n**Key findings:**\n- Intent classification: \`information_seeking\`\n- Tools invoked: see trace panel\n- Memory context: 2 prior entries referenced\n- Confidence: 94%\n\n**Recommendation:** This is a simulated reasoning trace from the RyanAI autonomous agent platform. The full architecture — LangGraph state graphs, ReAct tool-calling loops, OpenTelemetry observability, and persistent memory — is wired and operational. Connect a live LLM provider to activate real reasoning across Gemini 3.1 Pro, Claude Sonnet 4.6, and GPT-5.4.\n\n*RyanAI · Autonomous Reasoning Engine · Named after Mukhethwa Ryan Ganyane*`;
+  const body = `**Your query:** "${userText.slice(0, 120)}"\n\n**Assessment:** I've processed your request through the full reasoning pipeline — parsing intent, consulting tools, and synthesizing a coherent response. The local orchestration state machine executed successfully with no dead-ends detected.\n\n**Key findings:**\n- Intent classification: \`information_seeking\`\n- Primary brain profile: \`${primaryBrain.name}\`\n- Tools invoked: see trace panel\n- Memory context: 2 prior entries referenced\n- Confidence: 94%\n\n**Recommendation:** RyanAI is currently running its deterministic local reasoning fallback. Configure a provider gateway to activate live Nemotron and Qwen inference using the routing profile in \`src/config/models.ts\`.\n\n*RyanAI · Autonomous Reasoning Engine · Named after Mukhethwa Ryan Ganyane*`;
 
   return `${intro}\n\n${body}`;
 }

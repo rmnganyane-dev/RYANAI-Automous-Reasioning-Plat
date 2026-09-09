@@ -16,6 +16,8 @@
     "rust:build": "cargo build --manifest-path src-tauri/Cargo.toml --all-targets",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
+    "mcp:check": "npm --prefix mcp-server run check",
+    "mcp:start": "npm --prefix mcp-server start",
     "release": "powershell -ExecutionPolicy Bypass -File ./build-installer.ps1"
   },
   "dependencies": {
