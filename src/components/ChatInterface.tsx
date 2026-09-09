@@ -20,7 +20,7 @@ export function ChatInterface() {
       const aiResponse = await dispatchInference(userPrompt);
       setMessages((prev) => [...prev, { role: 'assistant', content: aiResponse }]);
     } catch {
-      setMessages((prev) => [...prev, { role: 'system', content: 'Error: Unable to reach local AI gateway.' }]);
+      setMessages((prev) => [...prev, { role: 'system', content: 'RyanAI could not complete that request.' }]);
     } finally {
       setLoading(false);
     }

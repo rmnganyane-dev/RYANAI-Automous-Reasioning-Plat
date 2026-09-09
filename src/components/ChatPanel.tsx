@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, ChevronDown, Download, Menu, PanelRightOpen, User, Cpu, Mic, Square } from 'lucide-react';
 import type { Message, ModelId } from '@/lib/types';
 import { MODEL_LIST, modelMeta } from '@/lib/models';
+import Model from './Model';
+import { Greeting } from './Greeting';
 
 interface ChatPanelProps {
   messages: Message[];
@@ -174,28 +176,15 @@ export default function ChatPanel({
                 className="absolute right-0 top-full mt-2 w-64 glass rounded-xl overflow-hidden z-50 shadow-2xl"
               >
                 {MODEL_LIST.map((m) => (
-                  <button
+                  <Model
                     key={m.id}
-                    onClick={() => {
+                    model={m}
+                    selected={model === m.id}
+                    onSelect={() => {
                       onModelChange(m.id);
                       setModelOpen(false);
                     }}
-                    className={`w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-cyan-500/10 transition-colors border-b border-cyan-500/10 last:border-0 ${
-                      model === m.id ? 'bg-cyan-500/5' : ''
-                    }`}
-                  >
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                      style={{ backgroundColor: m.color + '20', border: `1px solid ${m.color}40` }}
-                    >
-                      <Cpu size={14} style={{ color: m.color }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-ink-200">{m.label}</p>
-                      <p className="text-[10px] text-ink-500 mt-0.5">{m.vendor}</p>
-                      <p className="text-[9px] text-ink-600 mt-0.5">{m.description}</p>
-                    </div>
-                  </button>
+                  />
                 ))}
               </motion.div>
             )}
@@ -235,11 +224,10 @@ export default function ChatPanel({
                 </div>
               </div>
             </motion.div>
-            <h3 className="font-display font-bold text-lg text-cyan-200 mb-2 glow-cyan">RYANAI</h3>
-            <p className="text-sm text-ink-400 max-w-md leading-relaxed">
-              Autonomous reasoning engine initialized. I plan, execute tools, and resolve
-              complex multi-step workflows with persistent memory and full observability.
-            </p>
+            <Greeting
+              name="RYANAI"
+              subtitle="Autonomous reasoning engine initialized. I plan, execute tools, and resolve complex multi-step workflows with persistent memory and full observability."
+            />
             <p className="text-[11px] text-ink-600 mt-4 font-mono">
               Ask me anything to begin the reasoning pipeline
             </p>

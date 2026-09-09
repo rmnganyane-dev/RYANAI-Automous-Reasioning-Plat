@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { isSupabaseConfigured, supabase } from './supabase';
 
 export interface Profile {
   id: string;
@@ -30,12 +30,20 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         loadProfile(session.user.id);
       }
+      setLoading(false);
+    }).catch((error: unknown) => {
+      console.error('Failed to restore auth session:', error);
       setLoading(false);
     });
 

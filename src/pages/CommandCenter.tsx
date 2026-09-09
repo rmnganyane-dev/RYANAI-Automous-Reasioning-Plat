@@ -10,7 +10,7 @@ import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import Sidebar from '@/components/Sidebar';
 import ChatPanel from '@/components/ChatPanel';
 import TelemetryPanel from '@/components/TelemetryPanel';
-import AboutModal from '@/components/AboutModal';
+import AboutModal from '@/components/AboutModel';
 import MemoryVault from '@/components/MemoryVault';
 import GithubModal from '@/components/GithubModal';
 import CodeRain from '@/components/CodeRain';

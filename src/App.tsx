@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { LogOut } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
-import AuthPage from '@/pages/AuthPage';
+import AuthModal from '@/components/AuthModal';
 import CommandCenter from '@/pages/CommandCenter';
 
 export function App() {
@@ -19,6 +19,9 @@ export function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      setLoading(false);
+    }).catch((error: unknown) => {
+      console.error('Failed to restore auth session:', error);
       setLoading(false);
     });
 
@@ -37,6 +40,12 @@ export function App() {
     setSession(null);
     setUser(null);
   };
+
+  const handleAuthSuccess = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    setSession(session);
+    setUser(session?.user ?? null);
+  }, []);
 
   if (loading) {
     return (
@@ -61,13 +70,11 @@ export function App() {
 
   if (!session || !user) {
     return (
-      <AuthPage
-        onAuthSuccess={() => {
-          supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-          });
-        }}
+      <AuthModal
+        isOpen
+        onClose={() => undefined}
+        onSuccess={handleAuthSuccess}
+        dismissible={false}
       />
     );
   }

@@ -1,12 +1,15 @@
-// src/services/inference.ts
-import { invoke } from '@tauri-apps/api/core';
+import { streamReasoning } from '@/lib/reasoning';
 
 export async function dispatchInference(prompt: string): Promise<string> {
-  try {
-    const response = await invoke<string>('dispatch_inference', { prompt });
-    return response;
-  } catch (error) {
-    console.error('Failed to dispatch inference via Tauri IPC:', error);
-    throw new Error(typeof error === 'string' ? error : 'Inference dispatch failed');
-  }
+  let response = '';
+
+  await streamReasoning(prompt, 'claude-sonnet-4.6', {
+    onToken: (token) => { response += token; },
+    onStep: () => undefined,
+    onTitle: () => undefined,
+    onDone: () => undefined,
+    onError: (message) => { throw new Error(message); },
+  });
+
+  return response;
 }

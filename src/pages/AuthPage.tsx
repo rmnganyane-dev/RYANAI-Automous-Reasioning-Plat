@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, Eye, EyeOff, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, AlertCircle, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import CodeRain from '@/components/CodeRain';
 
@@ -12,40 +12,52 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) onAuthSuccess();
-    });
+    }).catch(() => setError('Unable to restore your session. Please try again.'));
   }, [onAuthSuccess]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       if (mode === 'signup') {
         if (password.length < 6) {
           throw new Error('Password must be at least 6 characters');
         }
+        if (password !== confirmPassword) {
+          throw new Error('Passwords do not match');
+        }
         const { error } = await supabase.auth.signUp({
-          email,
+          email: normalizedEmail,
           password,
           options: { data: { full_name: fullName || undefined } },
         });
         if (error) throw error;
-        // After signup, sign in immediately (email confirmation is off)
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInError) throw signInError;
-        onAuthSuccess();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          onAuthSuccess();
+        } else {
+          setSuccess('Account created. Check your email to confirm your account, then sign in.');
+          setMode('signin');
+          setPassword('');
+          setConfirmPassword('');
+        }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
         if (error) throw error;
         onAuthSuccess();
       }
@@ -59,6 +71,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
   const handleGoogle = async () => {
     setError('');
+    setSuccess('');
     setGoogleLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -66,10 +79,10 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         options: { redirectTo: window.location.origin },
       });
       if (error) throw error;
-      // OAuth redirects — no need to call onAuthSuccess here
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Google sign-in failed';
       setError(msg);
+    } finally {
       setGoogleLoading(false);
     }
   };
@@ -111,7 +124,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
           <div className="px-8 pb-4">
             <div className="flex gap-1 p-1 bg-ink-800/50 rounded-xl border border-cyan-500/15">
               <button
-                onClick={() => { setMode('signin'); setError(''); }}
+                onClick={() => { setMode('signin'); setError(''); setSuccess(''); }}
                 className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
                   mode === 'signin'
                     ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
@@ -121,7 +134,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                 Sign In
               </button>
               <button
-                onClick={() => { setMode('signup'); setError(''); }}
+                onClick={() => { setMode('signup'); setError(''); setSuccess(''); }}
                 className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
                   mode === 'signup'
                     ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
@@ -188,6 +201,27 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
               </button>
             </div>
 
+            <AnimatePresence>
+              {mode === 'signup' && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="relative overflow-hidden"
+                >
+                  <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-600" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm password"
+                    required
+                    className="w-full bg-ink-800/50 border border-cyan-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm text-ink-200 placeholder:text-ink-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Error message */}
             <AnimatePresence>
               {error && (
@@ -199,6 +233,20 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                 >
                   <AlertCircle size={13} className="shrink-0" />
                   <span>{error}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {success && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs"
+                >
+                  <CheckCircle2 size={13} className="shrink-0" />
+                  <span>{success}</span>
                 </motion.div>
               )}
             </AnimatePresence>
