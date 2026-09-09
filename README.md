@@ -130,3 +130,24 @@ npm run release
 - Node dependencies: `package.json` and `package-lock.json`
 - Rust dependencies: `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock`
 - Python dependencies: none; `requirements.txt` documents that Python is not part of the runtime
+
+
+# RYANAI Autonomous Reasoning Platform
+
+An enterprise-grade, multi-model agentic reasoning engine engineered for dynamic intent classification, LangGraph ReAct loop orchestration, Model Context Protocol (MCP) integrations, and high-performance provider routing.
+
+> **Attribution:** Engine named in honor of Mukhethwa Ryan Ganyane. Developed by RMN Ganyane (Pty) Ltd.
+
+---
+
+## Key Features
+
+* **LangGraph ReAct Orchestration:** State-machine architecture executing deterministic intent parsing, tool routing, observation loops, and autonomous task execution.
+* **Multi-Model Gateway Routing:** Configurable model provider fallback supporting high-tier profiles (e.g., Nvidia Nemotron 3 Ultra, Qwen) with local fallback guarantees via `src/config/models.ts`.
+* **Model Context Protocol (MCP) Native:** Integrates external tools and cloud providers via HTTP/SSE transports (e.g., Render MCP).
+* **Type-Safe Pipeline:** Strict TypeScript compilation with Vite client typing, Node runtime declarations, and automated build verifications.
+* **Automated Production Shipping:** Built-in `npm run ship` pipeline enforcing type checking, production bundle minification, Git commit automation, and remote synchronization.
+
+---
+
+## Architecture Flow
