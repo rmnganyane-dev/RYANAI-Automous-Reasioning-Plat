@@ -15,7 +15,9 @@ FROM nginx:alpine AS production
 
 # Copy built assets to Nginx default document root
 COPY --from=builder /app/dist /usr/share/nginx/html
-
+COPY nginx.conf.template /etc/nginx/conf.d/default.conf.template
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Override default virtual host configuration instead of replacing main nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
