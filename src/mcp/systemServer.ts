@@ -45,32 +45,29 @@ export class SystemMcpServer {
       ],
     }));
 
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
-      if (name === "get_container_logs") {
-        const container = (args as { container?: string })?.container || "ryanai-runtime";
-        try {
-          const { stdout } = await execAsync(`docker logs --tail 50 ${container}`);
-          return {
-            content: [
-              {
-                type: "text",
-                text: stdout || `No logs found for container: ${container}`,
-              },
-            ],
-          };
-        } catch (err: any) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Error fetching logs for container ${container}: ${err.message}`,
-              },
-            ],
-          };
-        }
+    this.server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
+      const args = request.params.arguments as { container?: string };
+      const container = args?.container || "ryanai-runtime";
+      try {
+        const { stdout } = await execAsync(`docker logs --tail 50 ${container}`);
+        return {
+          content: [
+            {
+              type: "text",
+              text: stdout || `No logs found for container: ${container}`,
+            },
+          ],
+        };
+      } catch (err: any) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error fetching logs for container ${container}: ${err.message}`,
+            },
+          ],
+        };
       }
-      throw new Error(`Unknown tool: ${name}`);
     });
   }
 
