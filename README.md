@@ -1,75 +1,107 @@
-```markdown
 # RyanAI: Autonomous Reasoning Platform
 
-RyanAI is a high-performance autonomous reasoning agent system designed for desktop and web execution. It pairs a responsive React/TypeScript frontend with a secure Rust Tauri shell, optional Supabase authentication and persistence, and a local reasoning fallback for development.
+RyanAI is a desktop and web autonomous reasoning platform. It combines a React/TypeScript interface, a Tauri v2 desktop shell, optional Supabase authentication and persistence, and a local reasoning fallback that works without external credentials.
 
----
+## Architecture
 
-## **Architecture & Tech Stack**
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS
+- **Desktop:** Tauri v2 with Rust
+- **Authentication and persistence:** Supabase Auth, PostgreSQL, and row-level security
+- **Reasoning:** Local streaming reasoning workflow with model and tool trace interfaces
+- **Web runtime:** Multi-stage Docker image served by Nginx
+- **Distribution:** Windows MSI and NSIS installers
 
-* **Desktop Shell:** Tauri v2 (Rust backend & native webview)
-* **Frontend:** React, TypeScript, Vite
-* **Authentication & Persistence:** Supabase Auth, PostgreSQL, and row-level security
-* **Orchestration & AI:** Local reasoning workflow with modular provider integration points
-* **Packaging & Distribution:** Native Windows NSIS and MSI installers via Tauri bundler
-
----
-
-## **Project Structure**
+## Project Structure
 
 ```text
-├── src/                  # React frontend application (Vite + TypeScript)
-├── src-tauri/            # Tauri v2 Rust core, configurations, and native bindings
-│   └── src/              # Rust application code and native bindings
-├── supabase/migrations/  # Auth, profiles, conversations, messages, and memory schema
-└── build-installer.ps1   # Automated PowerShell release build & packaging script
-
+src/                    React application and UI components
+src-tauri/              Tauri Rust shell and desktop configuration
+supabase/migrations/    Auth, profiles, conversations, messages, and memory schema
+Dockerfile              Production web image
+docker-compose.yml      Local web deployment on port 9090
+build-installer.ps1     Windows release build and packaging script
+requirements.txt        Python dependency declaration; currently none required
 ```
 
----
+## Prerequisites
 
-## **Getting Started & Development**
+- Node.js 20+ and npm
+- Rust toolchain (`rustc`, `cargo`)
+- Docker Desktop for web deployment
+- PowerShell for Windows installers
 
-### **Prerequisites**
-
-* Node.js (v18+) & npm
-* Rust toolchain (`rustc`, `cargo`)
-
-### **Local Development**
-
-Launch the development environment with hot-reloading:
+## Install and Develop
 
 ```bash
-npm install
-npm run tauri dev
-
+npm install --no-fund --no-audit
+npm run rust:fetch
+npm run dev
 ```
 
-### **Supabase Authentication**
+Open the Vite URL printed in the terminal. Port `5173` is preferred; if it is busy, Vite automatically selects the next available port.
 
-1. Copy `.env.example` to `.env.local` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-2. Apply the migration in `supabase/migrations/` to your Supabase project.
-3. Enable Email and Google providers in Supabase Authentication.
-4. Add `http://localhost:5173`, `http://localhost:4173`, and your deployed origin to the Supabase redirect URL allowlist.
-5. Create Google OAuth credentials and use the Supabase callback URL shown in the Google provider settings.
+For the Tauri desktop shell:
 
-Without Supabase variables, RyanAI starts in local mode and stores conversations in the browser. Email/password accounts and Google sign-in become available automatically when the variables are configured.
+```bash
+npm run tauri dev
+```
 
-### **Building Native Installers**
+## Validate and Build
 
-Execute the automated PowerShell build script to install dependencies, validate the frontend, compile the Tauri binary, and generate native release packages:
+```bash
+npm run check       # typecheck, lint, and frontend production build
+npm run build       # frontend production build only
+npm run rust:check  # Rust backend check
+npm run rust:build  # all Rust targets
+```
+
+## Supabase Authentication
+
+1. Copy `.env.example` to `.env.local`.
+2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+3. Apply the SQL migration in `supabase/migrations/`.
+4. Enable Email and Google providers in Supabase Authentication.
+5. Add `http://localhost:5173`, `http://localhost:4173`, and the deployed origin to the Supabase redirect URL allowlist.
+6. Configure Google OAuth credentials using the Supabase callback URL shown in the provider settings.
+
+When Supabase variables are absent, RyanAI runs in local mode and stores conversations in browser storage. Authentication activates automatically when valid values are configured.
+
+## Web Deployment
+
+```bash
+npm run docker:up
+```
+
+Open `http://localhost:9090`. The container serves the SPA through Nginx and exposes `http://localhost:9090/health` for health checks.
+
+Stop the deployment with:
+
+```bash
+npm run docker:down
+```
+
+## Windows Installers
+
+Run the complete release pipeline:
 
 ```powershell
 .\build-installer.ps1
-
 ```
 
-Generated installation bundles are output to:
+The script installs dependencies, fetches Rust crates, runs typecheck/lint/build, and creates:
 
-* **NSIS Setup Installer:** `src-tauri/target/release/bundle/nsis/RyanAI_0.1.0_x64-setup.exe`
-* **MSI Package:** `src-tauri/target/release/bundle/msi/RyanAI_0.1.0_x64_en-US.msi`
-* **Standalone Executable:** `src-tauri/target/release/ryan-app.exe`
+- `src-tauri/target/release/bundle/nsis/RyanAI_0.1.0_x64-setup.exe`
+- `src-tauri/target/release/bundle/msi/RyanAI_0.1.0_x64_en-US.msi`
+- `src-tauri/target/release/ryan-app.exe`
 
+The equivalent npm command is:
+
+```bash
+npm run release
 ```
 
-```
+## Dependency Manifests
+
+- Node dependencies: `package.json` and `package-lock.json`
+- Rust dependencies: `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock`
+- Python dependencies: none; `requirements.txt` documents that Python is not part of the runtime

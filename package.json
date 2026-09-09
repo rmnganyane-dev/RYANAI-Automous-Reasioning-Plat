@@ -7,9 +7,16 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "check": "npm run typecheck && npm run lint && npm run build",
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "rust:fetch": "cargo fetch --manifest-path src-tauri/Cargo.toml",
+    "rust:check": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "rust:build": "cargo build --manifest-path src-tauri/Cargo.toml --all-targets",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "release": "powershell -ExecutionPolicy Bypass -File ./build-installer.ps1"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
