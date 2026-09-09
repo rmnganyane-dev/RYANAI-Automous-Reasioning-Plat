@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
+    "build": "tsc -b && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "check": "npm run typecheck && npm run lint && npm run build",
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
@@ -18,7 +18,8 @@
     "docker:down": "docker compose down",
     "mcp:check": "npm --prefix mcp-server run check",
     "mcp:start": "npm --prefix mcp-server start",
-    "release": "powershell -ExecutionPolicy Bypass -File ./build-installer.ps1"
+    "release": "powershell -ExecutionPolicy Bypass -File ./build-installer.ps1",
+    "ship": "npm run typecheck && npm run build && git add . && git commit -m \"ship: production build update\" && git push origin main"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@eslint/js": "^9.9.1",
     "@tauri-apps/cli": "^2.11.4",
+    "@types/node": "^26.5.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.4",

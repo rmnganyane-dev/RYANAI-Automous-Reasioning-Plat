@@ -16,6 +16,7 @@ FROM nginx:alpine AS production
 # Copy built assets to Nginx default document root
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+
 # Override default virtual host configuration instead of replacing main nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
