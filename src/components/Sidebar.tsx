@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, MessageSquare, Trash2, Info, Brain, Github } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, Info, Brain, Github, Terminal } from 'lucide-react';
 import type { Conversation } from '@/lib/types';
 import { modelMeta } from '@/lib/models';
 
@@ -11,6 +11,7 @@ interface SidebarProps {
   onDelete: (id: string) => void;
   onAbout: () => void;
   onMemory: () => void;
+  onConsole: () => void;
   onGithub: () => void;
   githubConnected: boolean;
 }
@@ -23,6 +24,7 @@ export default function Sidebar({
   onDelete,
   onAbout,
   onMemory,
+  onConsole,
   onGithub,
   githubConnected,
 }: SidebarProps) {
@@ -109,6 +111,13 @@ export default function Sidebar({
         >
           <Brain size={15} />
           Memory Vault
+        </button>
+        <button
+          onClick={onConsole}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-ink-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-all text-xs"
+        >
+          <Terminal size={15} />
+          Inference Console
         </button>
         <button
           onClick={onGithub}

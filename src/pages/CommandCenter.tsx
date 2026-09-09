@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, LogOut } from 'lucide-react';
+import { Menu, LogOut, Terminal } from 'lucide-react';
 import type { Conversation, ModelId, ToolStep, SystemStatus } from '@/lib/types';
 import { modelMeta } from '@/lib/models';
 import { createConversation, createMessage, generateTitle, loadConversations as loadLocalConversations, saveConversations } from '@/lib/storage';
@@ -14,6 +14,8 @@ import AboutModal from '@/components/AboutModel';
 import MemoryVault from '@/components/MemoryVault';
 import GithubModal from '@/components/GithubModal';
 import CodeRain from '@/components/CodeRain';
+import { ChatInterface } from '@/components/ChatInterface';
+import Modal from '@/components/Modal';
 
 const DEFAULT_MODEL: ModelId = 'claude-sonnet-4.6';
 
@@ -33,6 +35,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
   const [liveModel, setLiveModel] = useState<ModelId>(DEFAULT_MODEL);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [memoryOpen, setMemoryOpen] = useState(false);
+  const [consoleOpen, setConsoleOpen] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
   const [githubConnected, setGithubConnected] = useState(false);
   const [leftOpen, setLeftOpen] = useState(false);
@@ -393,6 +396,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
       onDelete={deleteConversation}
       onAbout={() => setAboutOpen(true)}
       onMemory={() => setMemoryOpen(true)}
+      onConsole={() => setConsoleOpen(true)}
       onGithub={() => setGithubOpen(true)}
       githubConnected={githubConnected}
     />
@@ -531,6 +535,11 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
       {/* Modals */}
       <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <MemoryVault open={memoryOpen} onClose={() => setMemoryOpen(false)} />
+      <Modal open={consoleOpen} onClose={() => setConsoleOpen(false)} title="Inference Console" icon={<Terminal size={16} />}>
+        <div className="h-[26rem] -m-2 overflow-hidden rounded-lg">
+          <ChatInterface />
+        </div>
+      </Modal>
       <GithubModal open={githubOpen} onClose={() => setGithubOpen(false)} connected={githubConnected} />
     </div>
   );
