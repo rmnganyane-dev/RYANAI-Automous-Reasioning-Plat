@@ -1,11 +1,15 @@
+Set-Content -Path render.yaml -Value @"
 services:
   - type: web
-    name: ryanai-sovereign-nexus
-    env: node
-    buildCommand: npm install && npm run build
-    startCommand: node mcp-server/index.js
+    name: ryanai-reasoning-platform
+    runtime: static
+    buildCommand: npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
-      - key: NODE_ENV
+      - key: VITE_APP_ENV
         value: production
-      - key: PORT
-        value: 9090
+"@
