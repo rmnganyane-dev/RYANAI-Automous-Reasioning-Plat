@@ -19,7 +19,7 @@ export default defineConfig({
       },
     },
     watch: {
-      ignored: ['**/src-tauri/target/**'],
+      ignored: ['**/src-tauri/target/**', '**/node_modules/**'],
     },
   },
   build: {

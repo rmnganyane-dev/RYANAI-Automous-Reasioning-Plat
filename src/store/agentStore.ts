@@ -1,27 +1,25 @@
-// File path: ./src/store/agentStore.ts
-
 import { create } from "zustand";
 
-interface Message {
+export interface Message {
   role: "user" | "assistant" | "system";
   content: string;
-  timestamp: string;
+  timestamp?: string;
 }
 
-interface AgentState {
+export interface AgentState {
   sessionId: string;
   messages: Message[];
   isProcessing: boolean;
   activeTool: string | null;
-  setSessionId: (id: string) => void;
+  setSessionId: (sessionId: string) => void;
   addMessage: (message: Message) => void;
-  setProcessing: (status: boolean) => void;
-  setActiveTool: (tool: string | null) => void;
+  setProcessing: (isProcessing: boolean) => void;
+  setActiveTool: (activeTool: string | null) => void;
   clearSession: () => void;
 }
 
 export const useAgentStore = create<AgentState>((set) => ({
-  sessionId: crypto.randomUUID(),
+  sessionId: crypto.randomUUID ? crypto.randomUUID() : "default-session",
   messages: [],
   isProcessing: false,
   activeTool: null,
@@ -29,5 +27,5 @@ export const useAgentStore = create<AgentState>((set) => ({
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
   setProcessing: (isProcessing) => set({ isProcessing }),
   setActiveTool: (activeTool) => set({ activeTool }),
-  clearSession: () => set({ messages: [], sessionId: crypto.randomUUID() }),
+  clearSession: () => set({ messages: [], sessionId: crypto.randomUUID ? crypto.randomUUID() : "default-session" }),
 }));

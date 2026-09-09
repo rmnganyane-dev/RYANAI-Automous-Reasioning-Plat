@@ -1,10 +1,8 @@
-// File path: ./src/services/agentOrchestrator.ts
-
 import { Pool } from "pg";
 
 interface AgentState {
   sessionId: string;
-  messages: Array<{ role: string; content: string }>;
+  messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
   currentStep: number;
   maxSteps: number;
 }
@@ -17,19 +15,22 @@ export class AgentOrchestrator {
   }
 
   async initializeSession(sessionId: string): Promise<AgentState> {
-    const query = `SELECT role, content FROM agent_memory WHERE sessionId = $1 ORDER BY timestamp ASC;`;
+    const query = `SELECT role, content FROM agent_memory WHERE session_id = $1 ORDER BY timestamp ASC;`;
     const result = await this.pgPool.query(query, [sessionId]);
     
     return {
       sessionId,
-      messages: result.rows.map((row) => ({ role: row.role, content: row.content })),
+      messages: result.rows.map((row: { role: "user" | "assistant" | "system"; content: string }) => ({ 
+        role: row.role, 
+        content: row.content 
+      })),
       currentStep: 0,
       maxSteps: 5,
     };
   }
 
   async persistMemory(sessionId: string, role: string, content: string): Promise<void> {
-    const query = `INSERT INTO agent_memory (sessionId, role, content) VALUES ($1, $2, $3);`;
+    const query = `INSERT INTO agent_memory (session_id, role, content) VALUES ($1, $2, $3);`;
     await this.pgPool.query(query, [sessionId, role, content]);
   }
 
