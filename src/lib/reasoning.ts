@@ -1,6 +1,7 @@
 import type { ModelId, ToolStep } from './types';
 import { uid } from './storage';
 import { getPrimaryBrain } from '@/config/models';
+import { AUTONOMOUS_REASONING_SKILL } from '@/config/reasoningSkill';
 
 export interface StreamCallbacks {
   onToken: (text: string) => void;
@@ -111,7 +112,7 @@ export async function streamReasoning(
   model: ModelId,
   callbacks: StreamCallbacks,
 ): Promise<void> {
-  const templates = REASONING_TEMPLATES[model];
+  const templates = [...AUTONOMOUS_REASONING_SKILL, ...REASONING_TEMPLATES[model]];
   const fullResponse = generateResponse(model, userText);
 
   // Emit title early

@@ -17,7 +17,18 @@
 - **Capabilities:** Route diagnostics to the frontend, Rust, deployment, or repository workflow; preserve command output as an operational trace; and expose a single health summary to agent clients.
 - **Execution vector:** MCP tools provide deterministic checks and deployment actions that can be composed by a reasoning agent.
 
-## 4. Deployment Readiness
+## 4. Autonomous Reasoning Skill
+
+Every reasoning request follows this observable sequence:
+
+1. Parsing intent and constructing a reasoning chain.
+2. Evaluating tool requirements against available capabilities.
+3. Executing the ReAct loop: observation, thought, and action.
+4. Synthesizing and validating the final response.
+
+The skill is defined in `src/config/reasoningSkill.ts` and is used by the local fallback as well as the optional provider router.
+
+## 5. Deployment Readiness
 
 - **Capabilities:** Build the frontend, validate the native shell, build the Docker image, start the web service, and verify `/health`.
 - **Exit criteria:** All requested checks return exit code zero and the web health endpoint returns HTTP 200.

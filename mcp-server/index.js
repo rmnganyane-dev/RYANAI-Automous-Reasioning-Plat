@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import process from 'node:process';
+import { routeReasoning } from './provider-router.js';
 
 const execFileAsync = promisify(execFile);
 const projectRoot = path.resolve(process.env.RYANAI_PROJECT_ROOT || path.join(import.meta.dirname, '..'));
@@ -41,6 +42,18 @@ const tools = [
         commitMessage: { type: 'string', description: 'Commit summary message.' },
       },
       required: ['commitMessage'],
+    },
+  },
+  {
+    name: 'reasoning_route',
+    description: 'Route a prompt to the configured Nemotron or Qwen OpenAI-compatible provider, or return the local fallback status when no key is configured.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Prompt to process.' },
+        brain: { type: 'string', enum: ['nemotron', 'qwen'], description: 'Provider brain.' },
+      },
+      required: ['prompt'],
     },
   },
 ];
@@ -85,6 +98,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const commit = await run('git', ['commit', '-m', commitMessage]);
       const push = await run('git', ['push', 'origin', 'main']);
       return textResult(`Repository synchronized.\n\n${commit}\n${push}`);
+    }
+
+    if (request.params.name === 'reasoning_route') {
+      const prompt = String(args.prompt || '').trim();
+      if (!prompt) throw new Error('prompt is required.');
+      const result = await routeReasoning(prompt, String(args.brain || 'nemotron'));
+      return textResult(JSON.stringify(result, null, 2));
     }
 
     throw new Error(`Unknown tool: ${request.params.name}`);
