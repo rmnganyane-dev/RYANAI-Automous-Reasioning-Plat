@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity, Cpu, Zap, Clock, Database, Terminal,
-  Search, Calculator, Brain, Code, CheckCircle2, Loader2, ArrowRight,
+  Search, Calculator, Brain, Code, CheckCircle2, Loader2,
 } from 'lucide-react';
 import type { ToolStep, SystemStatus } from '@/lib/types';
 import { modelMeta } from '@/lib/models';

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, MessageSquare, Trash2, Info, Brain, Github, X, Menu } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, Info, Brain, Github } from 'lucide-react';
 import type { Conversation } from '@/lib/types';
 import { modelMeta } from '@/lib/models';
 

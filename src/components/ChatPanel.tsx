@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, ChevronDown, Download, Menu, PanelRightOpen, User, Cpu, Mic, MicOff, Square } from 'lucide-react';
+import { Send, ChevronDown, Download, Menu, PanelRightOpen, User, Cpu, Mic, Square } from 'lucide-react';
 import type { Message, ModelId } from '@/lib/types';
 import { MODEL_LIST, modelMeta } from '@/lib/models';
 

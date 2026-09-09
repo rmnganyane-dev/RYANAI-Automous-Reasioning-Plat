@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, LogOut } from 'lucide-react';
-import type { Conversation, Message, ModelId, ToolStep, SystemStatus } from '@/lib/types';
+import type { Conversation, ModelId, ToolStep, SystemStatus } from '@/lib/types';
 import { modelMeta } from '@/lib/models';
-import { createMessage, generateTitle, uid } from '@/lib/storage';
+import { createConversation, createMessage, generateTitle, loadConversations as loadLocalConversations, saveConversations } from '@/lib/storage';
 import { streamReasoning } from '@/lib/reasoning';
 import { useVoiceRecognition, VOICE_COMMANDS } from '@/lib/useVoiceRecognition';
-import { supabase } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import Sidebar from '@/components/Sidebar';
 import ChatPanel from '@/components/ChatPanel';
 import TelemetryPanel from '@/components/TelemetryPanel';
@@ -42,14 +42,19 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     uptime: '00:00:00', model: DEFAULT_MODEL, state: 'idle',
   });
   const startTimeRef = useRef(Date.now());
-
-  // Load conversations from Supabase on mount
-  useEffect(() => {
-    loadConversations();
-    setGithubConnected(localStorage.getItem('ryanai_github_connected') === 'true');
-  }, []);
+  const voiceStopRef = useRef<() => void>(() => undefined);
 
   const loadConversations = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      const localConversations = loadLocalConversations();
+      setConversations(localConversations);
+      if (localConversations.length > 0) {
+        setActiveId(localConversations[0].id);
+        setModel(localConversations[0].model);
+      }
+      return;
+    }
+
     const { data, error } = await supabase
       .from('conversations')
       .select('*')
@@ -99,6 +104,11 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     }
   }, []);
 
+  useEffect(() => {
+    loadConversations();
+    setGithubConnected(localStorage.getItem('ryanai_github_connected') === 'true');
+  }, [loadConversations]);
+
   // Simulated telemetry ticker
   useEffect(() => {
     const interval = setInterval(() => {
@@ -125,6 +135,20 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
   const activeMessages = activeConversation?.messages ?? [];
 
   const newConversation = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      const conv = createConversation(model);
+      setConversations((prev) => {
+        const next = [conv, ...prev];
+        saveConversations(next);
+        return next;
+      });
+      setActiveId(conv.id);
+      setLiveText('');
+      setLiveSteps([]);
+      setLeftOpen(false);
+      return conv.id;
+    }
+
     const { data, error } = await supabase
       .from('conversations')
       .insert({ title: 'New Thread', model })
@@ -163,9 +187,12 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
   }, [conversations]);
 
   const deleteConversation = useCallback(async (id: string) => {
-    await supabase.from('conversations').delete().eq('id', id);
+    if (isSupabaseConfigured) {
+      await supabase.from('conversations').delete().eq('id', id);
+    }
     setConversations((prev) => {
       const remaining = prev.filter((c) => c.id !== id);
+      if (!isSupabaseConfigured) saveConversations(remaining);
       if (activeId === id) {
         if (remaining.length > 0) {
           setActiveId(remaining[0].id);
@@ -186,24 +213,31 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     }
 
     const userMsg = createMessage('user', text);
-    setConversations((prev) => prev.map((c) =>
-      c.id === convId
-        ? { ...c, messages: [...c.messages, userMsg], updatedAt: Date.now(), title: c.messages.length === 0 ? generateTitle(text) : c.title }
-        : c
-    ));
-
-    // Persist user message to Supabase
-    await supabase.from('messages').insert({
-      conversation_id: convId,
-      role: 'user',
-      content: text,
+    setConversations((prev) => {
+      const next = prev.map((c) =>
+        c.id === convId
+          ? { ...c, messages: [...c.messages, userMsg], updatedAt: Date.now(), title: c.messages.length === 0 ? generateTitle(text) : c.title }
+          : c
+      );
+      if (!isSupabaseConfigured) saveConversations(next);
+      return next;
     });
+
+    if (isSupabaseConfigured) {
+      await supabase.from('messages').insert({
+        conversation_id: convId,
+        role: 'user',
+        content: text,
+      });
+    }
 
     // Update conversation title if first message
     const conv = conversations.find((c) => c.id === convId);
     if (conv && conv.messages.length === 0) {
       const title = generateTitle(text);
-      await supabase.from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', convId);
+      if (isSupabaseConfigured) {
+        await supabase.from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', convId);
+      }
     }
 
     setSending(true);
@@ -225,29 +259,38 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
           setLiveSteps([...accSteps]);
         },
         onTitle: (title) => {
-          setConversations((prev) => prev.map((c) =>
-            c.id === convId ? { ...c, title } : c
-          ));
-          supabase.from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', convId);
+          setConversations((prev) => {
+            const next = prev.map((c) => c.id === convId ? { ...c, title } : c);
+            if (!isSupabaseConfigured) saveConversations(next);
+            return next;
+          });
+          if (isSupabaseConfigured) {
+            supabase.from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', convId);
+          }
         },
         onDone: () => {
           const assistantMsg = createMessage('assistant', accText, model, accSteps);
-          setConversations((prev) => prev.map((c) =>
-            c.id === convId
-              ? { ...c, messages: [...c.messages, assistantMsg], updatedAt: Date.now() }
-              : c
-          ));
+          setConversations((prev) => {
+            const next = prev.map((c) =>
+              c.id === convId
+                ? { ...c, messages: [...c.messages, assistantMsg], updatedAt: Date.now() }
+                : c
+            );
+            if (!isSupabaseConfigured) saveConversations(next);
+            return next;
+          });
           setLiveText('');
           setLiveSteps([]);
 
-          // Persist assistant message to Supabase
-          supabase.from('messages').insert({
-            conversation_id: convId,
-            role: 'assistant',
-            content: accText,
-            model,
-            steps: accSteps.length > 0 ? accSteps : null,
-          });
+          if (isSupabaseConfigured) {
+            supabase.from('messages').insert({
+              conversation_id: convId,
+              role: 'assistant',
+              content: accText,
+              model,
+              steps: accSteps.length > 0 ? accSteps : null,
+            });
+          }
 
           setStatus((prev) => ({
             ...prev,
@@ -269,10 +312,14 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
   const changeModel = useCallback((m: ModelId) => {
     setModel(m);
     if (activeId) {
-      setConversations((prev) => prev.map((c) =>
-        c.id === activeId ? { ...c, model: m } : c
-      ));
-      supabase.from('conversations').update({ model: m }).eq('id', activeId);
+      setConversations((prev) => {
+        const next = prev.map((c) => c.id === activeId ? { ...c, model: m } : c);
+        if (!isSupabaseConfigured) saveConversations(next);
+        return next;
+      });
+      if (isSupabaseConfigured) {
+        supabase.from('conversations').update({ model: m }).eq('id', activeId);
+      }
     }
   }, [activeId]);
 
@@ -302,7 +349,8 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
   }, [activeId, conversations]);
 
   // Voice command handler
-  const handleVoiceCommand = useCallback((command: string, _args: string) => {
+  const handleVoiceCommand = useCallback((command: string, args: string) => {
+    void args;
     switch (command) {
       case 'new_thread': newConversation(); break;
       case 'switch_gemini': changeModel('gemini-3.1-pro'); break;
@@ -312,7 +360,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
       case 'open_memory': setMemoryOpen(true); break;
       case 'open_about': setAboutOpen(true); break;
       case 'open_github': setGithubOpen(true); break;
-      case 'stop': voice.stop(); break;
+      case 'stop': voiceStopRef.current(); break;
     }
   }, [newConversation, changeModel, exportThread]);
 
@@ -331,6 +379,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     onTranscript: handleVoiceTranscript,
     onCommand: handleVoiceCommand,
   });
+  voiceStopRef.current = voice.stop;
 
   const lastAssistant = [...activeMessages].reverse().find((m) => m.role === 'assistant');
   const traceSteps = sending ? liveSteps : (lastAssistant?.steps ?? []);

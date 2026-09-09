@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LogOut } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
 import AuthPage from '@/pages/AuthPage';
 import CommandCenter from '@/pages/CommandCenter';
@@ -11,6 +11,11 @@ export function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -27,6 +32,7 @@ export function App() {
   }, []);
 
   const handleSignOut = async () => {
+    if (!isSupabaseConfigured) return;
     await supabase.auth.signOut();
     setSession(null);
     setUser(null);
@@ -41,6 +47,14 @@ export function App() {
             <span className="font-display font-black text-2xl text-cyan-400">R</span>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="relative h-screen bg-slate-950 text-slate-100 overflow-hidden">
+        <CommandCenter onSignOut={() => undefined} userEmail="local@ryanai.local" userFullName="Local Operator" />
       </div>
     );
   }

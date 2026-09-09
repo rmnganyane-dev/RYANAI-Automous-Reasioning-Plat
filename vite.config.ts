@@ -2,17 +2,20 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 
+// https://vitejs.dev/config/
 export default defineConfig({
-  base: './', // Crucial for Tauri production builds so assets load via relative paths
+  base: './', // Ensures relative asset loading in production containers
   plugins: [react()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  clearScreen: false,
   server: {
+    strictPort: true,
     watch: {
-      ignored: ["**/src-tauri/target/**"],
+      ignored: ['**/src-tauri/target/**'],
     },
   },
   preview: {

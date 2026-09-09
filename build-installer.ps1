@@ -1,30 +1,30 @@
 ﻿$ErrorActionPreference = "Stop"
+$root = $PSScriptRoot
+Push-Location $root
 $env:Path += ";$env:USERPROFILE\.cargo\bin"
 
-Write-Host "=== 0. Stopping Running Instances & Forcibly Removing Locks ===" -ForegroundColor Cyan
-Get-Process -Name "app", "ryan-gateway-x86_64-pc-windows-msvc" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
+try {
+    Write-Host "=== 1. Preparing build dependencies ===" -ForegroundColor Cyan
+    npm ci --no-fund --no-audit
+    if ($LASTEXITCODE -ne 0) { throw "npm ci failed with exit code $LASTEXITCODE" }
+    cargo fetch --manifest-path src-tauri/Cargo.toml
+    if ($LASTEXITCODE -ne 0) { throw "cargo fetch failed with exit code $LASTEXITCODE" }
 
-# Aggressive Windows file deletion to break lock handles
-$TargetExe = "src-tauri\target\release\app.exe"
-if (Test-Path $TargetExe) {
-    cmd /c "del /f /q ""$TargetExe"" 2>nul"
-    Start-Sleep -Seconds 1
+    Write-Host "=== 2. Validating frontend ===" -ForegroundColor Cyan
+    npm run typecheck
+    if ($LASTEXITCODE -ne 0) { throw "TypeScript validation failed with exit code $LASTEXITCODE" }
+    npm run lint
+    if ($LASTEXITCODE -ne 0) { throw "ESLint failed with exit code $LASTEXITCODE" }
+    npm run build
+    if ($LASTEXITCODE -ne 0) { throw "Frontend build failed with exit code $LASTEXITCODE" }
+
+    Write-Host "=== 3. Building Tauri installers ===" -ForegroundColor Cyan
+    npm run tauri build
+    if ($LASTEXITCODE -ne 0) { throw "Tauri installer build failed with exit code $LASTEXITCODE" }
+
+    Write-Host "=== Build complete ===" -ForegroundColor Green
+    Write-Host "Installers: $root\src-tauri\target\release\bundle\" -ForegroundColor Yellow
 }
-
-Write-Host "=== 1. Building Vite Frontend ===" -ForegroundColor Cyan
-npm run build
-
-Write-Host "=== 2. Compiling Tauri Release Binary & Native Bundles ===" -ForegroundColor Cyan
-npm run tauri build
-
-Write-Host "=== 3. Ensuring Sidecar Binary Exists ===" -ForegroundColor Cyan
-$SidecarSource = "src-tauri\binaries\ryan-gateway-x86_64-pc-windows-msvc.exe"
-if (-not (Test-Path $SidecarSource)) {
-    Write-Warning "Sidecar binary not found at $SidecarSource. Ensure your Fastify gateway is compiled and placed correctly."
-} else {
-    Write-Host "Sidecar binary found at $SidecarSource." -ForegroundColor Green
+finally {
+    Pop-Location
 }
-
-Write-Host "=== 4. Build Complete Successfully! ===" -ForegroundColor Green
-Write-Host "Installers are located at: src-tauri/target/release/bundle/" -ForegroundColor Yellow

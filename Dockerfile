@@ -1,19 +1,19 @@
-# Stage 1: Build the Vite frontend
+# Build the Vite frontend with the lockfile for reproducible images.
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
-# Stage 2: Production nginx server
+# Serve the compiled SPA with Nginx.
 FROM nginx:alpine AS production
+ENV PORT=80
 
-# Copy built assets to Nginx web root
 COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
 
-# Place the template in Nginx's automatic template directory
-COPY nginx.conf /etc/nginx/templates/default.conf.template
+EXPOSE 80
 
-# Render injects $PORT dynamically; default documentation port
-EXPOSE 10000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+	CMD wget --quiet --tries=1 --spider http://127.0.0.1:80/health || exit 1

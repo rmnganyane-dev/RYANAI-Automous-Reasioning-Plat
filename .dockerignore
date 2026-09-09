@@ -3,3 +3,7 @@ dist
 .git
 .dockerignore
 Dockerfile
+src-tauri/target
+src-tauri/binaries
+src-tauri/gen
+src-tauri/icons
