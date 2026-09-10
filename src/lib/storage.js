@@ -1,10 +1,10 @@
-var STORAGE_KEY = 'ryanai_conversations';
-var MEMORY_KEY = 'ryanai_memory';
+const STORAGE_KEY = 'ryanai_conversations';
+const MEMORY_KEY = 'ryanai_memory';
 function isStorageAvailable() {
     try {
         return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
     }
-    catch (_a) {
+    catch {
         return false;
     }
 }
@@ -12,12 +12,12 @@ export function loadConversations() {
     if (!isStorageAvailable())
         return [];
     try {
-        var raw = localStorage.getItem(STORAGE_KEY);
+        const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw)
             return [];
         return JSON.parse(raw);
     }
-    catch (_a) {
+    catch {
         return [];
     }
 }
@@ -35,12 +35,12 @@ export function loadMemory() {
     if (!isStorageAvailable())
         return [];
     try {
-        var raw = localStorage.getItem(MEMORY_KEY);
+        const raw = localStorage.getItem(MEMORY_KEY);
         if (!raw)
             return [];
         return JSON.parse(raw);
     }
-    catch (_a) {
+    catch {
         return [];
     }
 }
@@ -54,20 +54,19 @@ export function saveMemory(entries) {
         console.warn('[Storage] Failed to save memory to localStorage:', error);
     }
 }
-export function uid(prefix) {
-    if (prefix === void 0) { prefix = 'id'; }
+export function uid(prefix = 'id') {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return "".concat(prefix, "_").concat(crypto.randomUUID().slice(0, 8));
+        return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
     }
-    return "".concat(prefix, "_").concat(Date.now().toString(36), "_").concat(Math.random().toString(36).slice(2, 8));
+    return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 export function createConversation(model) {
-    var now = Date.now();
+    const now = Date.now();
     return {
         id: uid('conv'),
         title: 'New Thread',
         messages: [],
-        model: model,
+        model,
         createdAt: now,
         updatedAt: now,
     };
@@ -75,18 +74,18 @@ export function createConversation(model) {
 export function createMessage(role, content, model, steps) {
     return {
         id: uid('msg'),
-        role: role,
-        content: content,
-        model: model,
-        steps: steps,
+        role,
+        content,
+        model,
+        steps,
         timestamp: Date.now(),
     };
 }
 export function generateTitle(text) {
-    var clean = text.trim().replace(/\s+/g, ' ');
+    const clean = text.trim().replace(/\s+/g, ' ');
     if (!clean)
         return 'New Thread';
     if (clean.length <= 48)
         return clean;
-    return "".concat(clean.slice(0, 45), "...");
+    return `${clean.slice(0, 45)}...`;
 }

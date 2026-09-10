@@ -1,5 +1,5 @@
-export var DEFAULT_MODEL_ID = 'claude-sonnet-4.6';
-export var MODELS = {
+export const DEFAULT_MODEL_ID = 'claude-sonnet-4.6';
+export const MODELS = {
     'gemini-3.1-pro': {
         id: 'gemini-3.1-pro',
         label: 'Gemini 3.1 Pro',
@@ -28,7 +28,7 @@ export var MODELS = {
         description: 'Advanced reasoning with adaptive compute allocation',
     },
 };
-export var MODEL_LIST = Object.values(MODELS);
+export const MODEL_LIST = Object.values(MODELS);
 export function isModelId(id) {
     return id in MODELS;
 }

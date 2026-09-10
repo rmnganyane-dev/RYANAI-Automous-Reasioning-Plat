@@ -1,17 +1,24 @@
-type VoiceState = 'idle' | 'listening' | 'error' | 'unsupported';
+export type VoiceState = 'idle' | 'listening' | 'error' | 'unsupported';
 
-interface UseVoiceOptions {
+export interface UseVoiceOptions {
     onTranscript?: (text: string, isFinal: boolean) => void;
     onCommand?: (command: string, args: string) => void;
     lang?: string;
 }
 
-declare const VOICE_COMMANDS: Record<string, {
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
+export declare const VOICE_COMMANDS: Record<string, {
     keywords: string[];
     description: string;
 }>;
 
-export declare function useVoiceRecognition({ onTranscript, onCommand, lang }?: UseVoiceOptions): {
+export declare function useVoiceRecognition(options?: UseVoiceOptions): {
     state: VoiceState;
     interimText: string;
     isSupported: boolean;
@@ -23,5 +30,3 @@ export declare function useVoiceRecognition({ onTranscript, onCommand, lang }?: 
         description: string;
     }>;
 };
-
-export { VOICE_COMMANDS };

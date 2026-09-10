@@ -34,10 +34,14 @@ server.post('/api/reason', async (request) => {
   };
 });
 
-try {
-  await server.listen({ port: PORT, host: '0.0.0.0' });
-  console.log(`RyanAI API Gateway listening on http://0.0.0.0:${PORT}`);
-} catch (err) {
-  server.log.error(err);
-  process.exit(1);
+async function startServer() {
+  try {
+    await server.listen({ port: PORT, host: '0.0.0.0' });
+    console.log(`RyanAI API Gateway listening on http://0.0.0.0:${PORT}`);
+  } catch (err) {
+    server.log.error(err);
+    process.exit(1);
+  }
 }
+
+startServer();

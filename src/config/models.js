@@ -1,23 +1,11 @@
-var __assign = (this && this.__assign) || function () {
-    __assign = Object.assign || function(t) {
-        for (var s, i = 1, n = arguments.length; i < n; i++) {
-            s = arguments[i];
-            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-                t[p] = s[p];
-        }
-        return t;
-    };
-    return __assign.apply(this, arguments);
-};
 /**
  * Safely extracts environment variables across Vite (import.meta.env)
  * and Node.js (process.env) runtimes, auto-prefixing VITE_ where needed.
  */
-export function getEnv(key, defaultValue) {
-    if (defaultValue === void 0) { defaultValue = ''; }
-    var viteKey = key.startsWith('VITE_') ? key : "VITE_".concat(key);
+export function getEnv(key, defaultValue = '') {
+    const viteKey = key.startsWith('VITE_') ? key : `VITE_${key}`;
     if (typeof import.meta !== 'undefined' && import.meta.env) {
-        var env = import.meta.env;
+        const env = import.meta.env;
         if (env[viteKey] !== undefined)
             return env[viteKey];
         if (env[key] !== undefined)
@@ -34,7 +22,7 @@ export function getEnv(key, defaultValue) {
 // ==========================================
 // Provider Gateways Configuration
 // ==========================================
-export var PROVIDER_GATEWAYS = {
+export const PROVIDER_GATEWAYS = {
     nvidia: {
         baseUrl: getEnv('VITE_NVIDIA_API_ENDPOINT') || getEnv('NVIDIA_API_ENDPOINT') || 'https://integrate.api.nvidia.com/v1',
         apiKeyEnvVar: 'NVIDIA_API_KEY',
@@ -69,7 +57,7 @@ export var PROVIDER_GATEWAYS = {
 // ==========================================
 // Model Inventory
 // ==========================================
-export var AVAILABLE_MODELS = {
+export const AVAILABLE_MODELS = {
     // --- NVIDIA Nemotron Series ---
     'nemotron-3-ultra': {
         id: 'nvidia/nemotron-3-ultra',
@@ -134,7 +122,7 @@ export var AVAILABLE_MODELS = {
         defaultTemperature: 0.0,
     },
 };
-export var DEFAULT_ROUTING_PROFILE = {
+export const DEFAULT_ROUTING_PROFILE = {
     autonomousReasoning: 'nemotron-3-ultra',
     codeGeneration: 'qwen-2.5-coder-32b',
     generalInference: 'qwen-2.5-72b-instruct',
@@ -144,7 +132,7 @@ export var DEFAULT_ROUTING_PROFILE = {
 // ==========================================
 // RyanAI Brain Abstractions
 // ==========================================
-export var RYANAI_BRAINS = {
+export const RYANAI_BRAINS = {
     nemotronUltra: {
         id: AVAILABLE_MODELS['nemotron-3-ultra'].id,
         name: AVAILABLE_MODELS['nemotron-3-ultra'].name,
@@ -178,57 +166,53 @@ export var RYANAI_BRAINS = {
 // ==========================================
 // Provider Gateway Class
 // ==========================================
-var ProviderGateway = /** @class */ (function () {
-    function ProviderGateway() {
-    }
+export class ProviderGateway {
     /**
      * Retrieves the primary reasoning engine.
      * Route to Nemotron Ultra if API key is present; falls back to local deterministic execution otherwise.
      */
-    ProviderGateway.getPrimaryBrain = function () {
-        var overrideId = getEnv('VITE_PRIMARY_REASONING_MODEL') || getEnv('PRIMARY_REASONING_MODEL');
-        var brain = RYANAI_BRAINS.nemotronUltra;
+    static getPrimaryBrain() {
+        const overrideId = getEnv('VITE_PRIMARY_REASONING_MODEL') || getEnv('PRIMARY_REASONING_MODEL');
+        let brain = RYANAI_BRAINS.nemotronUltra;
         if (overrideId === RYANAI_BRAINS.qwen27b.id) {
             brain = RYANAI_BRAINS.qwen27b;
         }
         if (!brain.apiKey) {
-            console.warn("[Gateway] Key missing for ".concat(brain.name, ". Bypassing live inference -> Routing to local fallback."));
+            console.warn(`[Gateway] Key missing for ${brain.name}. Bypassing live inference -> Routing to local fallback.`);
             return RYANAI_BRAINS.localDeterministic;
         }
-        console.log("[Gateway] Primary Brain Activated: ".concat(brain.name));
+        console.log(`[Gateway] Primary Brain Activated: ${brain.name}`);
         return brain;
-    };
+    }
     /**
      * Retrieves the secondary validation engine.
      */
-    ProviderGateway.getSecondaryBrain = function () {
-        var overrideId = getEnv('VITE_SECONDARY_REASONING_MODEL') || getEnv('SECONDARY_REASONING_MODEL');
-        var brain = RYANAI_BRAINS.qwen27b;
+    static getSecondaryBrain() {
+        const overrideId = getEnv('VITE_SECONDARY_REASONING_MODEL') || getEnv('SECONDARY_REASONING_MODEL');
+        let brain = RYANAI_BRAINS.qwen27b;
         if (overrideId === RYANAI_BRAINS.nemotronUltra.id) {
             brain = RYANAI_BRAINS.nemotronUltra;
         }
         if (!brain.apiKey) {
-            console.warn("[Gateway] Key missing for ".concat(brain.name, ". Bypassing secondary live inference -> Routing to local fallback."));
+            console.warn(`[Gateway] Key missing for ${brain.name}. Bypassing secondary live inference -> Routing to local fallback.`);
             return RYANAI_BRAINS.localDeterministic;
         }
-        console.log("[Gateway] Secondary Brain Activated: ".concat(brain.name));
+        console.log(`[Gateway] Secondary Brain Activated: ${brain.name}`);
         return brain;
-    };
+    }
     /**
      * Constructs request headers for API calls.
      */
-    ProviderGateway.buildHeaders = function (profile) {
+    static buildHeaders(profile) {
         if (profile.provider === 'local' || !profile.apiKey) {
             return { 'Content-Type': 'application/json' };
         }
         return {
             'Content-Type': 'application/json',
-            'Authorization': "Bearer ".concat(profile.apiKey),
+            'Authorization': `Bearer ${profile.apiKey}`,
         };
-    };
-    return ProviderGateway;
-}());
-export { ProviderGateway };
+    }
+}
 // ==========================================
 // Task & Gateway Resolvers
 // ==========================================
@@ -239,19 +223,19 @@ export function getSecondaryBrain() {
     return ProviderGateway.getSecondaryBrain();
 }
 export function getModelForTask(task, profileOverride) {
-    var profile = __assign(__assign({}, DEFAULT_ROUTING_PROFILE), profileOverride);
-    var modelKey = profile[task] || profile.fallback;
-    var model = AVAILABLE_MODELS[modelKey];
+    const profile = { ...DEFAULT_ROUTING_PROFILE, ...profileOverride };
+    const modelKey = profile[task] || profile.fallback;
+    const model = AVAILABLE_MODELS[modelKey];
     if (!model) {
-        throw new Error("Model key '".concat(modelKey, "' mapped to task '").concat(task, "' is not defined in AVAILABLE_MODELS."));
+        throw new Error(`Model key '${modelKey}' mapped to task '${task}' is not defined in AVAILABLE_MODELS.`);
     }
     return model;
 }
 export function getGatewayForModel(model) {
-    var gateway = PROVIDER_GATEWAYS[model.provider];
+    const gateway = PROVIDER_GATEWAYS[model.provider];
     return {
         baseUrl: gateway.baseUrl,
-        apiKey: getEnv(gateway.apiKeyEnvVar) || getEnv("VITE_".concat(gateway.apiKeyEnvVar)),
+        apiKey: getEnv(gateway.apiKeyEnvVar) || getEnv(`VITE_${gateway.apiKeyEnvVar}`),
         timeoutMs: gateway.timeoutMs,
     };
 }
