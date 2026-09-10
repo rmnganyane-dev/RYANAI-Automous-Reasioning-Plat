@@ -1,4 +1,5 @@
 export type ModelId = 'gemini-3.1-pro' | 'claude-sonnet-4.6' | 'gpt-5.4';
+
 export interface ModelMeta {
     id: ModelId;
     label: string;
@@ -8,6 +9,7 @@ export interface ModelMeta {
     accent: string;
     description: string;
 }
+
 export interface ToolStep {
     id: string;
     type: 'tool_start' | 'tool_result';
@@ -16,6 +18,7 @@ export interface ToolStep {
     result?: string;
     status?: 'running' | 'done' | 'error';
 }
+
 export interface Message {
     id: string;
     role: 'user' | 'assistant';
@@ -24,6 +27,7 @@ export interface Message {
     steps?: ToolStep[];
     timestamp: number;
 }
+
 export interface Conversation {
     id: string;
     title: string;
@@ -32,6 +36,7 @@ export interface Conversation {
     createdAt: number;
     updatedAt: number;
 }
+
 export interface MemoryEntry {
     id: string;
     key: string;
@@ -39,6 +44,7 @@ export interface MemoryEntry {
     category: 'preference' | 'fact' | 'project' | 'skill';
     createdAt: number;
 }
+
 export interface SystemStatus {
     cpu: number;
     memory: number;
