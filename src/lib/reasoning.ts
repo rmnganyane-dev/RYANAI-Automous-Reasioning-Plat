@@ -36,14 +36,16 @@ const REASONING_TEMPLATES: Record<ModelId, string[]> = {
 };
 
 const TOOL_NAMES = ['web_search', 'calculator', 'memory_recall', 'code_executor'] as const;
-const TOOL_LABELS: Record<string, string> = {
+type ToolName = (typeof TOOL_NAMES)[number];
+
+const TOOL_LABELS: Record<ToolName, string> = {
   web_search: 'Web Search',
   calculator: 'Calculator',
   memory_recall: 'Memory Recall',
   code_executor: 'Code Executor',
 };
 
-function pickRandom<T>(arr: T[]): T {
+function pickRandom<T>(arr: T[] | readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
@@ -100,7 +102,8 @@ function generateResponse(model: ModelId, userText: string): string {
     ],
   };
 
-  const intro = pickRandom(intros[model]);
+  const modelIntros = intros[model] ?? intros['claude-sonnet-4.6'];
+  const intro = pickRandom(modelIntros);
 
   const body = `**Your query:** "${userText.slice(0, 120)}"\n\n**Assessment:** I've processed your request through the full reasoning pipeline — parsing intent, consulting tools, and synthesizing a coherent response. The local orchestration state machine executed successfully with no dead-ends detected.\n\n**Key findings:**\n- Intent classification: \`information_seeking\`\n- Primary brain profile: \`${primaryBrain.name}\`\n- Tools invoked: see trace panel\n- Memory context: 2 prior entries referenced\n- Confidence: 94%\n\n**Recommendation:** RyanAI is currently running its deterministic local reasoning fallback. Configure a provider gateway to activate live Nemotron and Qwen inference using the routing profile in \`src/config/models.ts\`.\n\n*RyanAI · Autonomous Reasoning Engine · Named after Mukhethwa Ryan Ganyane*`;
 
@@ -112,65 +115,70 @@ export async function streamReasoning(
   model: ModelId,
   callbacks: StreamCallbacks,
 ): Promise<void> {
-  const templates = [...AUTONOMOUS_REASONING_SKILL, ...REASONING_TEMPLATES[model]];
-  const fullResponse = generateResponse(model, userText);
+  try {
+    const modelTemplates = REASONING_TEMPLATES[model] ?? REASONING_TEMPLATES['claude-sonnet-4.6'];
+    const skillTemplates = Array.isArray(AUTONOMOUS_REASONING_SKILL) ? AUTONOMOUS_REASONING_SKILL : [];
+    const templates = [...skillTemplates, ...modelTemplates];
+    const fullResponse = generateResponse(model, userText);
 
-  // Emit title early
-  const title = userText.trim().slice(0, 48) || 'New Thread';
-  callbacks.onTitle(title);
+    // Emit title early
+    const title = userText.trim().slice(0, 48) || 'New Thread';
+    callbacks.onTitle(title);
 
-  // Phase 1: Reasoning steps (visible thinking trace)
-  const numSteps = 3 + Math.floor(Math.random() * 2);
-  for (let i = 0; i < numSteps; i++) {
-    const template = templates[i % templates.length].replace('{n}', String(2 + Math.floor(Math.random() * 4)));
-    // Stream the reasoning text token by token
-    const words = template.split(' ');
-    for (const word of words) {
-      callbacks.onToken(word + ' ');
-      await sleep(30 + Math.random() * 40);
+    // Phase 1: Reasoning steps (visible thinking trace)
+    const numSteps = 3 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < numSteps; i++) {
+      const template = templates[i % templates.length].replace('{n}', String(2 + Math.floor(Math.random() * 4)));
+      const words = template.split(' ');
+      for (const word of words) {
+        callbacks.onToken(word + ' ');
+        await sleep(30 + Math.random() * 40);
+      }
+      callbacks.onToken('\n');
+      await sleep(100);
     }
-    callbacks.onToken('\n');
-    await sleep(100);
-  }
 
-  // Phase 2: Tool calling (if applicable)
-  if (shouldUseTools(userText)) {
-    const numTools = 1 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < numTools; i++) {
-      const toolName = pickRandom([...TOOL_NAMES]);
-      const step: ToolStep = {
-        id: uid('step'),
-        type: 'tool_start',
-        name: toolName,
-        args: { query: userText.slice(0, 60) },
-        status: 'running',
-      };
-      callbacks.onStep(step);
-      await sleep(400 + Math.random() * 600);
+    // Phase 2: Tool calling (if applicable)
+    if (shouldUseTools(userText)) {
+      const numTools = 1 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < numTools; i++) {
+        const toolName = pickRandom(TOOL_NAMES);
+        const step: ToolStep = {
+          id: uid('step'),
+          type: 'tool_start',
+          name: toolName,
+          args: { query: userText.slice(0, 60) },
+          status: 'running',
+        };
+        callbacks.onStep(step);
+        await sleep(400 + Math.random() * 600);
 
-      const resultStep: ToolStep = {
-        ...step,
-        type: 'tool_result',
-        result: generateToolResult(toolName),
-        status: 'done',
-      };
-      callbacks.onStep(resultStep);
-      await sleep(200);
+        const resultStep: ToolStep = {
+          ...step,
+          type: 'tool_result',
+          result: generateToolResult(toolName),
+          status: 'done',
+        };
+        callbacks.onStep(resultStep);
+        await sleep(200);
+      }
     }
+
+    // Phase 3: Clear reasoning buffer, stream final response
+    callbacks.onToken('\n---\n\n');
+    await sleep(200);
+
+    // Stream the final response word by word
+    const tokens = fullResponse.split(/(\s+)/);
+    for (const token of tokens) {
+      callbacks.onToken(token);
+      await sleep(15 + Math.random() * 35);
+    }
+
+    callbacks.onDone();
+  } catch (err) {
+    callbacks.onError(err instanceof Error ? err.message : 'An error occurred during reasoning execution.');
   }
-
-  // Phase 3: Clear reasoning buffer, stream final response
-  callbacks.onToken('\n---\n\n');
-  await sleep(200);
-
-  // Stream the final response word by word
-  const tokens = fullResponse.split(/(\s+)/);
-  for (const token of tokens) {
-    callbacks.onToken(token);
-    await sleep(15 + Math.random() * 35);
-  }
-
-  callbacks.onDone();
 }
 
 function sleep(ms: number): Promise<void> {

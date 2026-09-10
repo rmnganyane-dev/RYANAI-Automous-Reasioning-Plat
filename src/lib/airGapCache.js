@@ -1,8 +1,22 @@
+export interface VectorCacheEntry {
+  id: string;
+  embedding: number[];
+  text: string;
+  metadata?: Record<string, string>;
+  updatedAt: number;
+}
+
+interface StoredVectorRecord {
+  id: string;
+  iv: Uint8Array;
+  ciphertext: ArrayBuffer;
+}
+
 const DATABASE_NAME = 'ryanai-airgap-cache';
 const STORE_NAME = 'vectors';
 const KEY_NAME = 'encryption-key';
 
-async function openDatabase() {
+async function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME, 1);
 
@@ -21,8 +35,8 @@ async function openDatabase() {
   });
 }
 
-async function getKey(database) {
-  const existing = await new Promise((resolve, reject) => {
+async function getKey(database: IDBDatabase): Promise<CryptoKey> {
+  const existing = await new Promise<CryptoKey | undefined>((resolve, reject) => {
     const request = database.transaction(KEY_NAME, 'readonly').objectStore(KEY_NAME).get(KEY_NAME);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -31,7 +45,7 @@ async function getKey(database) {
   if (existing) return existing;
 
   const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const request = database.transaction(KEY_NAME, 'readwrite').objectStore(KEY_NAME).put(key, KEY_NAME);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
@@ -40,7 +54,7 @@ async function getKey(database) {
   return key;
 }
 
-export async function saveVector(entry) {
+export async function saveVector(entry: VectorCacheEntry): Promise<void> {
   const database = await openDatabase();
   try {
     const key = await getKey(database);
@@ -48,8 +62,8 @@ export async function saveVector(entry) {
     const payload = new TextEncoder().encode(JSON.stringify(entry));
     const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, payload);
 
-    await new Promise((resolve, reject) => {
-      const record = { id: entry.id, iv, ciphertext };
+    await new Promise<void>((resolve, reject) => {
+      const record: StoredVectorRecord = { id: entry.id, iv, ciphertext };
       const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(record);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
@@ -59,10 +73,10 @@ export async function saveVector(entry) {
   }
 }
 
-export async function loadVector(id) {
+export async function loadVector(id: string): Promise<VectorCacheEntry | null> {
   const database = await openDatabase();
   try {
-    const record = await new Promise((resolve, reject) => {
+    const record = await new Promise<StoredVectorRecord | undefined>((resolve, reject) => {
       const request = database.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(id);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -77,16 +91,16 @@ export async function loadVector(id) {
       record.ciphertext
     );
 
-    return JSON.parse(new TextDecoder().decode(plaintext));
+    return JSON.parse(new TextDecoder().decode(plaintext)) as VectorCacheEntry;
   } finally {
     database.close();
   }
 }
 
-export async function deleteVector(id) {
+export async function deleteVector(id: string): Promise<void> {
   const database = await openDatabase();
   try {
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(id);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
@@ -96,10 +110,10 @@ export async function deleteVector(id) {
   }
 }
 
-export async function clearVectorCache() {
+export async function clearVectorCache(): Promise<void> {
   const database = await openDatabase();
   try {
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).clear();
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);

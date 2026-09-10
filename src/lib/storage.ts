@@ -3,7 +3,16 @@ import type { Conversation, Message, ModelId, ToolStep, MemoryEntry } from './ty
 const STORAGE_KEY = 'ryanai_conversations';
 const MEMORY_KEY = 'ryanai_memory';
 
+function isStorageAvailable(): boolean {
+  try {
+    return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+  } catch {
+    return false;
+  }
+}
+
 export function loadConversations(): Conversation[] {
+  if (!isStorageAvailable()) return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
@@ -14,14 +23,16 @@ export function loadConversations(): Conversation[] {
 }
 
 export function saveConversations(conversations: Conversation[]): void {
+  if (!isStorageAvailable()) return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
-  } catch {
-    /* quota */
+  } catch (error) {
+    console.warn('[Storage] Failed to save conversations to localStorage:', error);
   }
 }
 
 export function loadMemory(): MemoryEntry[] {
+  if (!isStorageAvailable()) return [];
   try {
     const raw = localStorage.getItem(MEMORY_KEY);
     if (!raw) return [];
@@ -32,14 +43,18 @@ export function loadMemory(): MemoryEntry[] {
 }
 
 export function saveMemory(entries: MemoryEntry[]): void {
+  if (!isStorageAvailable()) return;
   try {
     localStorage.setItem(MEMORY_KEY, JSON.stringify(entries));
-  } catch {
-    /* quota */
+  } catch (error) {
+    console.warn('[Storage] Failed to save memory to localStorage:', error);
   }
 }
 
 export function uid(prefix: string = 'id'): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
+  }
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
@@ -55,7 +70,12 @@ export function createConversation(model: ModelId): Conversation {
   };
 }
 
-export function createMessage(role: 'user' | 'assistant', content: string, model?: ModelId, steps?: ToolStep[]): Message {
+export function createMessage(
+  role: 'user' | 'assistant',
+  content: string,
+  model?: ModelId,
+  steps?: ToolStep[]
+): Message {
   return {
     id: uid('msg'),
     role,
@@ -67,7 +87,8 @@ export function createMessage(role: 'user' | 'assistant', content: string, model
 }
 
 export function generateTitle(text: string): string {
-  const clean = text.trim().replace(/\n/g, ' ');
+  const clean = text.trim().replace(/\s+/g, ' ');
+  if (!clean) return 'New Thread';
   if (clean.length <= 48) return clean;
-  return clean.slice(0, 45) + '...';
+  return `${clean.slice(0, 45)}...`;
 }

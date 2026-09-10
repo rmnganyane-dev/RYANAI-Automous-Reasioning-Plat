@@ -1,0 +1,1 @@
+export declare const getEnvVar: (key: string, defaultValue?: string) => string;

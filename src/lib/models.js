@@ -1,8 +1,4 @@
-import type { ModelId, ModelMeta } from './types';
-
-export const DEFAULT_MODEL_ID: ModelId = 'claude-sonnet-4.6';
-
-export const MODELS: Record<ModelId, ModelMeta> = {
+export const MODELS = {
   'gemini-3.1-pro': {
     id: 'gemini-3.1-pro',
     label: 'Gemini 3.1 Pro',
@@ -32,13 +28,11 @@ export const MODELS: Record<ModelId, ModelMeta> = {
   },
 };
 
-export const MODEL_LIST: ModelMeta[] = Object.values(MODELS);
+export const MODEL_LIST = Object.values(MODELS);
 
-export function isModelId(id: string): id is ModelId {
-  return id in MODELS;
-}
-
-export function modelMeta(id?: string | ModelId): ModelMeta {
-  if (id && isModelId(id)) return MODELS[id];
-  return MODELS[DEFAULT_MODEL_ID];
+export function modelMeta(id) {
+  if (id && MODELS[id]) {
+    return MODELS[id];
+  }
+  return MODELS['claude-sonnet-4.6'];
 }

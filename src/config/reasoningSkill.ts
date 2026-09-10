@@ -1,6 +1,5 @@
-export const AUTONOMOUS_REASONING_SKILL = [
-  'Parsing intent and constructing reasoning chain...',
-  'Evaluating tool requirements against available capabilities...',
-  'Executing ReAct loop — observation → thought → action...',
-  'Synthesizing and validating the final response...',
-] as const;
+export const AUTONOMOUS_REASONING_SKILL = {
+  version: '1.0.0',
+  mode: 'react-autonomous',
+  systemPrompt: 'You are RyanAI, an advanced autonomous reasoning agent. Analyze requests systematically, invoke tools when necessary, and provide definitive outputs.'
+};

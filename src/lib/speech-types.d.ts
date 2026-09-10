@@ -1,31 +1,31 @@
-// Ambient type declarations for the Web Speech API (not in standard TS lib)
+// Ambient declarations for the Web Speech API
 
 interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-  message: string;
+  readonly error: string;
+  readonly message: string;
 }
 
 interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
+  readonly transcript: string;
+  readonly confidence: number;
 }
 
 interface SpeechRecognitionResult {
-  isFinal: boolean;
-  length: number;
+  readonly isFinal: boolean;
+  readonly length: number;
   item(index: number): SpeechRecognitionAlternative;
   [index: number]: SpeechRecognitionAlternative;
 }
 
 interface SpeechRecognitionResultList {
-  length: number;
+  readonly length: number;
   item(index: number): SpeechRecognitionResult;
   [index: number]: SpeechRecognitionResult;
 }
 
 interface SpeechRecognitionEvent extends Event {
-  resultIndex: number;
-  results: SpeechRecognitionResultList;
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
 }
 
 interface SpeechRecognition extends EventTarget {
@@ -46,7 +46,11 @@ interface SpeechRecognitionStatic {
   new (): SpeechRecognition;
 }
 
-interface Window {
-  SpeechRecognition?: SpeechRecognitionStatic;
-  webkitSpeechRecognition?: SpeechRecognitionStatic;
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionStatic;
+    webkitSpeechRecognition?: SpeechRecognitionStatic;
+  }
 }
+
+export {};
