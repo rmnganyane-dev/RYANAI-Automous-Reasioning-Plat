@@ -1,4 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
+import { getEnvVar } from '../config/env';
+
+export const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || '';
+export const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || '';
 
 const configuredUrl = import.meta.env.VITE_SUPABASE_URL;
 const configuredAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -10,6 +14,7 @@ const supabaseAnonKey = typeof configuredAnonKey === 'string' && configuredAnonK
   ? configuredAnonKey
   : null;
 
+  
 export const isSupabaseConfigured = supabaseUrl !== null && supabaseAnonKey !== null;
 
 export const supabase = createClient(

@@ -1,4 +1,4 @@
-version: '3.8'
+# File path: ./docker-compose.yml
 
 services:
   ryanai-api:
@@ -12,8 +12,16 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ryanai
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/dist # Anonymous volume masking prevents host filesystem sync from wiping built dist files
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - ryanai-net
     restart: always
@@ -43,9 +51,23 @@ services:
     ports:
       - "5432:5432"
     command: postgres -c shared_preload_libraries=pg_stat_statements
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ryanai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./prisma/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - ryanai-net
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: ryanai-redis
+    ports:
+      - "6379:6379"
     networks:
       - ryanai-net
     restart: always

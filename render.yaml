@@ -2,8 +2,6 @@ services:
   - type: web
     name: ryanai-web
     runtime: static
-    repo: https://github.com/YOUR_GITHUB_USERNAME/RYANAI-Autonomous-Reasoning-Platform
-    branch: main
     buildCommand: npm run build
     staticPublishPath: ./dist
     routes:
@@ -14,10 +12,10 @@ services:
   - type: web
     name: ryanai-api
     runtime: docker
-    repo: https://github.com/YOUR_GITHUB_USERNAME/RYANAI-Autonomous-Reasoning-Platform
-    branch: main
     dockerfilePath: ./Dockerfile.api
     plan: free
     envVars:
       - key: PORT
         value: 3000
+      - key: NODE_ENV
+        value: production

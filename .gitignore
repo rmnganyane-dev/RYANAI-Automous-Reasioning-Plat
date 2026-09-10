@@ -25,3 +25,8 @@ dist-ssr
 mcp-server/node_modules
 build
 native/local-inference/build
+
+node_modules
+dist
+.git
+.env
