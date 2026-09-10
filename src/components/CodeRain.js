@@ -1,3 +1,4 @@
+import { jsx as _jsx } from "react/jsx-runtime";
 import { useEffect, useRef } from 'react';
 export default function CodeRain() {
     const canvasRef = useRef(null);
@@ -54,5 +55,5 @@ export default function CodeRain() {
             window.removeEventListener('resize', resize);
         };
     }, []);
-    return <canvas ref={canvasRef} className="code-rain"/>;
+    return _jsx("canvas", { ref: canvasRef, className: "code-rain" });
 }

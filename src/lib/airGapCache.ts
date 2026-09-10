@@ -1,110 +1,105 @@
-const DATABASE_NAME = 'ryanai-airgap-cache';
+const DB_NAME = 'ryan_ai_airgap_cache';
 const STORE_NAME = 'vectors';
-const KEY_NAME = 'encryption-key';
+const DB_VERSION = 1;
 
-async function openDatabase() {
+function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, 1);
-
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        database.createObjectStore(STORE_NAME, { keyPath: 'id' });
-      }
-      if (!database.objectStoreNames.contains(KEY_NAME)) {
-        database.createObjectStore(KEY_NAME);
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
       }
     };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Unable to open air-gap cache'));
   });
 }
 
-async function getKey(database) {
-  const existing = await new Promise((resolve, reject) => {
-    const request = database.transaction(KEY_NAME, 'readonly').objectStore(KEY_NAME).get(KEY_NAME);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+async function getKey(): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    enc.encode('RYANAI-AIRGAP-STATIC-SALT-KEY-2026'),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: enc.encode('ryan-salt'),
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
 
-  if (existing) return existing;
+export async function saveVector(entry: { id: string; vector: number[]; metadata?: any }): Promise<void> {
+  const database = await openDB();
+  const key = await getKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const payload = new TextEncoder().encode(JSON.stringify(entry.vector));
+  
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, payload);
 
-  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
-  await new Promise((resolve, reject) => {
-    const request = database.transaction(KEY_NAME, 'readwrite').objectStore(KEY_NAME).put(key, KEY_NAME);
+  return new Promise<void>((resolve, reject) => {
+    const record = { id: entry.id, iv, ciphertext, metadata: entry.metadata || {} };
+    const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(record);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
+  }).finally(() => {
+    database.close();
+  });
+}
+
+export async function loadVector(id: string): Promise<any> {
+  const database = await openDB();
+  const key = await getKey();
+
+  const record: any = await new Promise((resolve, reject) => {
+    const request = database.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(id);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
   });
 
-  return key;
+  if (!record) {
+    database.close();
+    return null;
+  }
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: record.iv },
+    key,
+    record.ciphertext
+  );
+
+  database.close();
+  return JSON.parse(new TextDecoder().decode(decrypted));
 }
 
-export async function saveVector(entry) {
-  const database = await openDatabase();
-  try {
-    const key = await getKey(database);
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const payload = new TextEncoder().encode(JSON.stringify(entry));
-    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, payload);
-
-    await new Promise((resolve, reject) => {
-      const record = { id: entry.id, iv, ciphertext };
-      const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(record);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  } finally {
+export async function deleteVector(id: string): Promise<void> {
+  const database = await openDB();
+  return new Promise<void>((resolve, reject) => {
+    const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  }).finally(() => {
     database.close();
-  }
+  });
 }
 
-export async function loadVector(id) {
-  const database = await openDatabase();
-  try {
-    const record = await new Promise((resolve, reject) => {
-      const request = database.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(id);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-
-    if (!record) return null;
-
-    const key = await getKey(database);
-    const plaintext = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: record.iv },
-      key,
-      record.ciphertext
-    );
-
-    return JSON.parse(new TextDecoder().decode(plaintext));
-  } finally {
+export async function clearCache(): Promise<void> {
+  const database = await openDB();
+  return new Promise<void>((resolve, reject) => {
+    const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).clear();
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  }).finally(() => {
     database.close();
-  }
-}
-
-export async function deleteVector(id) {
-  const database = await openDatabase();
-  try {
-    await new Promise((resolve, reject) => {
-      const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(id);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  } finally {
-    database.close();
-  }
-}
-
-export async function clearVectorCache() {
-  const database = await openDatabase();
-  try {
-    await new Promise((resolve, reject) => {
-      const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).clear();
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  } finally {
-    database.close();
-  }
+  });
 }

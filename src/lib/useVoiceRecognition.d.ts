@@ -13,6 +13,10 @@ declare global {
   }
 }
 
+type SpeechRecognition = any;
+type SpeechRecognitionEvent = any;
+type SpeechRecognitionErrorEvent = any;
+
 export declare const VOICE_COMMANDS: Record<string, {
     keywords: string[];
     description: string;

@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import { jsx as _jsx } from "react/jsx-runtime";
+import { useEffect, useState, useCallback } from "react";
 import { ArrowDown } from "lucide-react";
 export const ScrollControl = ({ containerRef, className = "", threshold = 100, }) => {
     const [showButton, setShowButton] = useState(false);
@@ -51,10 +52,6 @@ export const ScrollControl = ({ containerRef, className = "", threshold = 100, }
     }, [containerRef, isAtBottom, scrollToBottom]);
     if (!showButton)
         return null;
-    return (<div className={`absolute bottom-6 right-6 z-20 ${className}`}>
-      <button onClick={() => scrollToBottom("smooth")} aria-label="Scroll to bottom" className="flex items-center justify-center w-10 h-10 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-full shadow-lg border border-neutral-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-500">
-        <ArrowDown className="w-5 h-5"/>
-      </button>
-    </div>);
+    return (_jsx("div", { className: `absolute bottom-6 right-6 z-20 ${className}`, children: _jsx("button", { onClick: () => scrollToBottom("smooth"), "aria-label": "Scroll to bottom", className: "flex items-center justify-center w-10 h-10 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-full shadow-lg border border-neutral-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-500", children: _jsx(ArrowDown, { className: "w-5 h-5" }) }) }));
 };
 export default ScrollControl;

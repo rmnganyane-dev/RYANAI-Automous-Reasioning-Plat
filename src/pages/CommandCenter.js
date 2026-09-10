@@ -1,3 +1,4 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, LogOut, Terminal } from 'lucide-react';
@@ -366,8 +367,8 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }) {
     voiceStopRef.current = voice.stop;
     const lastAssistant = [...activeMessages].reverse().find((m) => m.role === 'assistant');
     const traceSteps = sending ? liveSteps : (lastAssistant?.steps ?? []);
-    const sidebar = (<Sidebar conversations={conversations} activeId={activeId} onSelect={selectConversation} onNew={newConversation} onDelete={deleteConversation} onAbout={() => setAboutOpen(true)} onMemory={() => setMemoryOpen(true)} onConsole={() => setConsoleOpen(true)} onGithub={() => setGithubOpen(true)} githubConnected={githubConnected}/>);
-    const telemetry = (<TelemetryPanel status={status} steps={traceSteps} sending={sending}/>);
+    const sidebar = (_jsx(Sidebar, { conversations: conversations, activeId: activeId, onSelect: selectConversation, onNew: newConversation, onDelete: deleteConversation, onAbout: () => setAboutOpen(true), onMemory: () => setMemoryOpen(true), onConsole: () => setConsoleOpen(true), onGithub: () => setGithubOpen(true), githubConnected: githubConnected }));
+    const telemetry = (_jsx(TelemetryPanel, { status: status, steps: traceSteps, sending: sending }));
     const chatPanelProps = {
         messages: activeMessages,
         model,
@@ -386,73 +387,5 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }) {
         onVoiceToggle: voice.toggle,
         onVoiceCommand: handleVoiceCommand,
     };
-    return (<div className="h-screen hud-radial hud-grid hud-scanlines overflow-hidden relative">
-      <CodeRain />
-
-      {/* Desktop layout */}
-      <div className="h-full hidden lg:grid lg:grid-cols-12 gap-4 p-4 relative z-10">
-        <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5 }} className="lg:col-span-3 h-full">
-          {sidebar}
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="lg:col-span-6 h-full">
-          <ChatPanel {...chatPanelProps}/>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className="lg:col-span-3 h-full">
-          {telemetry}
-        </motion.div>
-      </div>
-
-      {/* Mobile layout */}
-      <div className="h-full lg:hidden flex flex-col relative z-10">
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-cyan-500/15 glass">
-          <button onClick={() => setLeftOpen(true)} className="p-1.5 rounded-lg hover:bg-cyan-500/10 text-ink-400">
-            <Menu size={18}/>
-          </button>
-          <div className="flex items-center gap-2 flex-1">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center">
-              <span className="font-display font-black text-ink-950 text-xs">R</span>
-            </div>
-            <span className="font-display font-bold text-cyan-300 text-sm tracking-wider">RYANAI</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {userEmail && (<span className="text-[10px] text-ink-500 font-mono hidden sm:inline">{userFullName || userEmail}</span>)}
-            <button onClick={onSignOut} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-ink-400 hover:text-rose-400 transition-colors">
-              <LogOut size={16}/>
-            </button>
-          </div>
-          <button onClick={() => setRightOpen(true)} className="p-1.5 rounded-lg hover:bg-cyan-500/10 text-ink-400">
-            <Menu size={18} className="rotate-180"/>
-          </button>
-        </div>
-        <div className="flex-1 p-3">
-          <ChatPanel {...chatPanelProps}/>
-        </div>
-      </div>
-
-      {/* Mobile drawers */}
-      <AnimatePresence>
-        {leftOpen && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 lg:hidden" onClick={() => setLeftOpen(false)}>
-            <div className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm"/>
-            <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} transition={{ type: 'tween', duration: 0.25 }} onClick={(e) => e.stopPropagation()} className="absolute left-0 top-0 bottom-0 w-[280px] p-3">
-              {sidebar}
-            </motion.div>
-          </motion.div>)}
-        {rightOpen && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 lg:hidden" onClick={() => setRightOpen(false)}>
-            <div className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm"/>
-            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'tween', duration: 0.25 }} onClick={(e) => e.stopPropagation()} className="absolute right-0 top-0 bottom-0 w-[300px] p-3">
-              {telemetry}
-            </motion.div>
-          </motion.div>)}
-      </AnimatePresence>
-
-      {/* Modals */}
-      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)}/>
-      <MemoryVault open={memoryOpen} onClose={() => setMemoryOpen(false)}/>
-      <Modal open={consoleOpen} onClose={() => setConsoleOpen(false)} title="Inference Console" icon={<Terminal size={16}/>}>
-        <div className="h-[26rem] -m-2 overflow-hidden rounded-lg">
-          <ChatInterface />
-        </div>
-      </Modal>
-      <GithubModal open={githubOpen} onClose={() => setGithubOpen(false)} connected={githubConnected}/>
-    </div>);
+    return (_jsxs("div", { className: "h-screen hud-radial hud-grid hud-scanlines overflow-hidden relative", children: [_jsx(CodeRain, {}), _jsxs("div", { className: "h-full hidden lg:grid lg:grid-cols-12 gap-4 p-4 relative z-10", children: [_jsx(motion.div, { initial: { opacity: 0, x: -30 }, animate: { opacity: 1, x: 0 }, transition: { duration: 0.5 }, className: "lg:col-span-3 h-full", children: sidebar }), _jsx(motion.div, { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5, delay: 0.1 }, className: "lg:col-span-6 h-full", children: _jsx(ChatPanel, { ...chatPanelProps }) }), _jsx(motion.div, { initial: { opacity: 0, x: 30 }, animate: { opacity: 1, x: 0 }, transition: { duration: 0.5, delay: 0.2 }, className: "lg:col-span-3 h-full", children: telemetry })] }), _jsxs("div", { className: "h-full lg:hidden flex flex-col relative z-10", children: [_jsxs("div", { className: "flex items-center gap-2 px-3 py-2.5 border-b border-cyan-500/15 glass", children: [_jsx("button", { onClick: () => setLeftOpen(true), className: "p-1.5 rounded-lg hover:bg-cyan-500/10 text-ink-400", children: _jsx(Menu, { size: 18 }) }), _jsxs("div", { className: "flex items-center gap-2 flex-1", children: [_jsx("div", { className: "w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center", children: _jsx("span", { className: "font-display font-black text-ink-950 text-xs", children: "R" }) }), _jsx("span", { className: "font-display font-bold text-cyan-300 text-sm tracking-wider", children: "RYANAI" })] }), _jsxs("div", { className: "flex items-center gap-2", children: [userEmail && (_jsx("span", { className: "text-[10px] text-ink-500 font-mono hidden sm:inline", children: userFullName || userEmail })), _jsx("button", { onClick: onSignOut, className: "p-1.5 rounded-lg hover:bg-rose-500/10 text-ink-400 hover:text-rose-400 transition-colors", children: _jsx(LogOut, { size: 16 }) })] }), _jsx("button", { onClick: () => setRightOpen(true), className: "p-1.5 rounded-lg hover:bg-cyan-500/10 text-ink-400", children: _jsx(Menu, { size: 18, className: "rotate-180" }) })] }), _jsx("div", { className: "flex-1 p-3", children: _jsx(ChatPanel, { ...chatPanelProps }) })] }), _jsxs(AnimatePresence, { children: [leftOpen && (_jsxs(motion.div, { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, className: "fixed inset-0 z-40 lg:hidden", onClick: () => setLeftOpen(false), children: [_jsx("div", { className: "absolute inset-0 bg-ink-950/80 backdrop-blur-sm" }), _jsx(motion.div, { initial: { x: '-100%' }, animate: { x: 0 }, exit: { x: '-100%' }, transition: { type: 'tween', duration: 0.25 }, onClick: (e) => e.stopPropagation(), className: "absolute left-0 top-0 bottom-0 w-[280px] p-3", children: sidebar })] })), rightOpen && (_jsxs(motion.div, { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, className: "fixed inset-0 z-40 lg:hidden", onClick: () => setRightOpen(false), children: [_jsx("div", { className: "absolute inset-0 bg-ink-950/80 backdrop-blur-sm" }), _jsx(motion.div, { initial: { x: '100%' }, animate: { x: 0 }, exit: { x: '100%' }, transition: { type: 'tween', duration: 0.25 }, onClick: (e) => e.stopPropagation(), className: "absolute right-0 top-0 bottom-0 w-[300px] p-3", children: telemetry })] }))] }), _jsx(AboutModal, { open: aboutOpen, onClose: () => setAboutOpen(false) }), _jsx(MemoryVault, { open: memoryOpen, onClose: () => setMemoryOpen(false) }), _jsx(Modal, { open: consoleOpen, onClose: () => setConsoleOpen(false), title: "Inference Console", icon: _jsx(Terminal, { size: 16 }), children: _jsx("div", { className: "h-[26rem] -m-2 overflow-hidden rounded-lg", children: _jsx(ChatInterface, {}) }) }), _jsx(GithubModal, { open: githubOpen, onClose: () => setGithubOpen(false), connected: githubConnected })] }));
 }
