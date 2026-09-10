@@ -1,9 +1,10 @@
-export interface VectorCacheEntry {
+const DATABASE_NAME = 'ryanai-airgap-cache';
+const STORE_NAME = 'vectors';
+const KEY_NAME = 'encryption-key';
+
+export interface VectorEntry {
   id: string;
-  embedding: number[];
-  text: string;
-  metadata?: Record<string, string>;
-  updatedAt: number;
+  [key: string]: any;
 }
 
 interface StoredVectorRecord {
@@ -12,14 +13,9 @@ interface StoredVectorRecord {
   ciphertext: ArrayBuffer;
 }
 
-const DATABASE_NAME = 'ryanai-airgap-cache';
-const STORE_NAME = 'vectors';
-const KEY_NAME = 'encryption-key';
-
-async function openDatabase(): Promise<IDBDatabase> {
+function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, 1);
-
+    const request: IDBOpenDBRequest = indexedDB.open(DATABASE_NAME, 1);
     request.onupgradeneeded = () => {
       const database = request.result;
       if (!database.objectStoreNames.contains(STORE_NAME)) {
@@ -29,39 +25,39 @@ async function openDatabase(): Promise<IDBDatabase> {
         database.createObjectStore(KEY_NAME);
       }
     };
-
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error('Unable to open air-gap cache'));
   });
 }
 
-async function getKey(database: IDBDatabase): Promise<CryptoKey> {
-  const existing = await new Promise<CryptoKey | undefined>((resolve, reject) => {
+function getKey(database: IDBDatabase): Promise<CryptoKey> {
+  return new Promise<CryptoKey>((resolve, reject) => {
     const request = database.transaction(KEY_NAME, 'readonly').objectStore(KEY_NAME).get(KEY_NAME);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
+  }).then(async (existing: CryptoKey | undefined) => {
+    if (existing) return existing;
+    
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+    
+    await new Promise<void>((resolve, reject) => {
+      const request = database.transaction(KEY_NAME, 'readwrite').objectStore(KEY_NAME).put(key, KEY_NAME);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+
+    return key;
   });
-
-  if (existing) return existing;
-
-  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
-  await new Promise<void>((resolve, reject) => {
-    const request = database.transaction(KEY_NAME, 'readwrite').objectStore(KEY_NAME).put(key, KEY_NAME);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-
-  return key;
 }
 
-export async function saveVector(entry: VectorCacheEntry): Promise<void> {
+export async function saveVector(entry: VectorEntry): Promise<void> {
   const database = await openDatabase();
   try {
     const key = await getKey(database);
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const payload = new TextEncoder().encode(JSON.stringify(entry));
     const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, payload);
-
+    
     await new Promise<void>((resolve, reject) => {
       const record: StoredVectorRecord = { id: entry.id, iv, ciphertext };
       const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(record);
@@ -73,7 +69,7 @@ export async function saveVector(entry: VectorCacheEntry): Promise<void> {
   }
 }
 
-export async function loadVector(id: string): Promise<VectorCacheEntry | null> {
+export async function loadVector(id: string): Promise<VectorEntry | null> {
   const database = await openDatabase();
   try {
     const record = await new Promise<StoredVectorRecord | undefined>((resolve, reject) => {
@@ -85,13 +81,8 @@ export async function loadVector(id: string): Promise<VectorCacheEntry | null> {
     if (!record) return null;
 
     const key = await getKey(database);
-    const plaintext = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: record.iv },
-      key,
-      record.ciphertext
-    );
-
-    return JSON.parse(new TextDecoder().decode(plaintext)) as VectorCacheEntry;
+    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: record.iv }, key, record.ciphertext);
+    return JSON.parse(new TextDecoder().decode(plaintext)) as VectorEntry;
   } finally {
     database.close();
   }

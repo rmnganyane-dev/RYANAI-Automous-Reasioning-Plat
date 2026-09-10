@@ -1,6 +1,5 @@
-export declare const AUTONOMOUS_REASONING_SKILL: readonly [
-  "Parsing intent and constructing reasoning chain...",
-  "Evaluating tool requirements against available capabilities...",
-  "Executing ReAct loop — observation → thought → action...",
-  "Synthesizing and validating the final response..."
-];
+export declare const AUTONOMOUS_REASONING_SKILL: {
+    version: string;
+    mode: string;
+    systemPrompt: string;
+};
