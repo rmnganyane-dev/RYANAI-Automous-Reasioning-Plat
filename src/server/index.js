@@ -1,17 +1,8 @@
 import Fastify from 'fastify';
+
 const server = Fastify({ logger: true });
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-async function startServer() {
-    try {
-        await server.listen({ port: PORT, host: '0.0.0.0' });
-        console.log(`Server listening on port ${PORT}`);
-    }
-    catch (err) {
-        server.log.error(err);
-        process.exit(1);
-    }
-}
-startServer();
+
 // Enable CORS natively without external plugin dependencies
 server.addHook('onRequest', (req, reply, done) => {
     reply.header('Access-Control-Allow-Origin', '*');
@@ -23,6 +14,7 @@ server.addHook('onRequest', (req, reply, done) => {
     }
     done();
 });
+
 server.get('/health', async () => {
     return {
         status: 'online',
@@ -31,6 +23,7 @@ server.get('/health', async () => {
         timestamp: new Date().toISOString()
     };
 });
+
 server.post('/api/reason', async (request) => {
     const body = request.body;
     return {
@@ -40,11 +33,15 @@ server.post('/api/reason', async (request) => {
         timestamp: new Date().toISOString()
     };
 });
-try {
-    await server.listen({ port: PORT, host: '0.0.0.0' });
-    console.log(`RyanAI API Gateway listening on http://0.0.0.0:${PORT}`);
+
+async function startServer() {
+    try {
+        await server.listen({ port: PORT, host: '0.0.0.0' });
+        console.log(`RyanAI API Gateway listening on http://0.0.0.0:${PORT}`);
+    } catch (err) {
+        server.log.error(err);
+        process.exit(1);
+    }
 }
-catch (err) {
-    server.log.error(err);
-    process.exit(1);
-}
+
+startServer();
