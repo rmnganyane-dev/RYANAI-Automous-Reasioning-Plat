@@ -1,0 +1,16 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model ReasoningLog {
+  id        String   @id @default(uuid())
+  prompt    String
+  response  String
+  embedding Unsupported("vector(1536)")?
+  createdAt DateTime @default(now())
+}

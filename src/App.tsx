@@ -1,79 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
-import { LogOut, Terminal, Cpu, Database, ShieldCheck, RefreshCw } from 'lucide-react';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
-import type { Session, User } from '@supabase/supabase-js';
-import AuthModal from '@/components/AuthModal';
-import { ChatStream } from './components/ChatStream';
-import { useAgentStore } from './store/agentStore';
+import { useState } from 'react';
+import { Terminal, Cpu, Database, RefreshCw, ShieldCheck } from 'lucide-react';
+import { ChatStream } from '@/components/ChatStream';
+import { useAgentStore } from '@/store/agentStore';
 
 export function App() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'chat' | 'telemetry' | 'vector'>('chat');
-
   const { sessionId, clearSession, activeTool } = useAgentStore();
-
-  useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setLoading(false);
-      return;
-    }
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    }).catch((error: unknown) => {
-      console.error('Failed to restore auth session:', error);
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleSignOut = async () => {
-    if (!isSupabaseConfigured) return;
-    await supabase.auth.signOut();
-    setSession(null);
-    setUser(null);
-  };
-
-  const handleAuthSuccess = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    setSession(session);
-    setUser(session?.user ?? null);
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-neutral-950">
-        <div className="relative w-16 h-16">
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-sky-400/30 to-emerald-400/10 blur-xl animate-pulse" />
-          <div className="relative w-16 h-16 rounded-2xl bg-neutral-900 border border-sky-500/30 flex items-center justify-center">
-            <span className="font-mono font-black text-2xl text-sky-400">R</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isSupabaseConfigured && (!session || !user)) {
-    return (
-      <AuthModal
-        isOpen
-        onClose={() => undefined}
-        onSuccess={handleAuthSuccess}
-        dismissible={false}
-      />
-    );
-  }
 
   return (
     <div className="flex h-screen w-screen bg-neutral-950 text-neutral-100 font-sans overflow-hidden">
@@ -143,15 +75,6 @@ export function App() {
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Reset Session</span>
           </button>
-          {isSupabaseConfigured && (
-            <button
-              onClick={handleSignOut}
-              className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-rose-950/30 border border-rose-900/40 hover:bg-rose-900/40 text-rose-300 rounded text-xs font-medium transition-colors"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Sign Out</span>
-            </button>
-          )}
         </div>
       </aside>
 
@@ -164,7 +87,7 @@ export function App() {
           </div>
           <div className="flex items-center space-x-4">
             <span className="text-xs text-neutral-400 font-mono">
-              {user?.email ?? 'local@ryanai.local'}
+              local@ryanai.local
             </span>
             <span className="text-xs text-neutral-500 font-mono">v1.0.0-prod</span>
           </div>

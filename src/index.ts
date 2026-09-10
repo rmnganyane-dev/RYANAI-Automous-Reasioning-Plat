@@ -1,10 +1,12 @@
 import Fastify from 'fastify';
+import { registerAgentRoutes } from './agent/react.js';
 
 const fastify = Fastify({ logger: true });
 
-fastify.get('/health', async (request, reply) => {
-  return { status: 'healthy', service: 'ryanai-api', timestamp: new Date().toISOString() };
-});
+fastify.get('/health', async () => ({ status: 'healthy', service: 'ryanai-api' }));
+
+// Register ReAct agent routes
+await fastify.register(registerAgentRoutes);
 
 const start = async () => {
   try {

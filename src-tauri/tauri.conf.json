@@ -1,26 +1,26 @@
 {
-  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "RyanAI",
-  "version": "0.1.0",
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/v2/toolchain/config/schema.json",
+  "productName": "RyanAI Desktop",
+  "version": "1.0.0",
   "identifier": "com.ryanai.desktop",
   "build": {
-    "frontendDist": "../dist",
-    "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
-        "title": "RyanAI Autonomous Reasoning Platform",
-        "width": 1200,
+        "title": "RyanAI Desktop",
+        "width": 1280,
         "height": 800,
         "resizable": true,
         "fullscreen": false
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://*.supabase.co; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; frame-ancestors 'self'"
+      "csp": null
     }
   },
   "bundle": {

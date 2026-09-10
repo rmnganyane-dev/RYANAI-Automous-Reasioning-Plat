@@ -1,30 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
 import { getEnvVar } from '../config/env';
 
-export const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || '';
-export const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || '';
+const configuredUrl = getEnvVar('VITE_SUPABASE_URL');
+const configuredAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
-const configuredUrl = import.meta.env.VITE_SUPABASE_URL;
-const configuredAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export const isSupabaseConfigured =
+  typeof configuredUrl === 'string' &&
+  /^https?:\/\//.test(configuredUrl) &&
+  typeof configuredAnonKey === 'string' &&
+  configuredAnonKey.trim().length > 0;
 
-const supabaseUrl = typeof configuredUrl === 'string' && /^https?:\/\//.test(configuredUrl)
-  ? configuredUrl
-  : null;
-const supabaseAnonKey = typeof configuredAnonKey === 'string' && configuredAnonKey.trim().length > 0
-  ? configuredAnonKey
-  : null;
+export const supabaseUrl = isSupabaseConfigured ? configuredUrl : 'https://placeholder.supabase.co';
+export const supabaseAnonKey = isSupabaseConfigured ? configuredAnonKey : 'placeholder-key';
 
-  
-export const isSupabaseConfigured = supabaseUrl !== null && supabaseAnonKey !== null;
-
-export const supabase = createClient(
-  supabaseUrl ?? 'https://example.supabase.co',
-  supabaseAnonKey ?? 'local-development-key',
-  {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
   },
-  },
-);
+});

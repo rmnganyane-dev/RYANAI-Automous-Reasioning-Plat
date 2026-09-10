@@ -6,10 +6,12 @@
   "type": "module",
   "scripts": {
     "dev:web": "vite",
-    "dev:api": "node --import tsx/esm src/mcp/systemServer.ts",
+    "dev:mcp": "node --import tsx/esm src/mcp/systemServer.ts",
     "dev:api": "node --import tsx/esm src/server/index.ts",
+    "dev:server": "node --import tsx/esm src/server/index.ts",
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:api": "node scripts/build-api.js",
     "docker:build": "docker compose build --no-cache",
     "docker:up": "docker compose up --build -d",
     "docker:down": "docker compose down",
@@ -17,7 +19,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "check": "npm run typecheck && npm run lint && npm run build",
     "preview": "vite preview --host",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck": "tsc --noEmit",
     "tauri": "tauri",
     "rust:fetch": "cargo fetch --manifest-path src-tauri/Cargo.toml",
     "rust:check": "cargo check --manifest-path src-tauri/Cargo.toml",
@@ -26,7 +28,7 @@
     "mcp:start": "npm --prefix mcp-server start",
     "release": "powershell -ExecutionPolicy Bypass -File ./build-installer.ps1",
     "ship": "npm run typecheck && npm run build && git add . && git commit -m \"ship: production build update\" && git push origin main",
-    "telemetry:collect": "node --import tsx/esm --import=./src/telemetry.ts src/server/index.ts",
+    "telemetry:collect": "node --import tsx/esm --import=./src/telemetry.ts src/mcp/systemServer.ts",
     "db:migrate": "node --import tsx/esm src/db/migrate.ts"
   },
   "dependencies": {
@@ -70,5 +72,9 @@
     "onlyBuiltDependencies": [
       "protobufjs"
     ]
+  },
+  "allowScripts": {
+    "protobufjs@7.6.6": true,
+    "esbuild@0.28.2": true
   }
 }

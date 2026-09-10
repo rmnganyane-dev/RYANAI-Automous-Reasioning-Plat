@@ -4,25 +4,27 @@ import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
   plugins: [react()],
+  root: process.cwd(),
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
-    port: 5173,
+    port: 1420,
+    strictPort: true,
     host: true,
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
     watch: {
       ignored: ['**/src-tauri/target/**', '**/node_modules/**'],
     },
   },
+  clearScreen: false,
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
