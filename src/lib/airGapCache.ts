@@ -1,6 +1,15 @@
+// File path: src/lib/airGapCache.ts
+
 const DB_NAME = 'ryan_ai_airgap_cache';
 const STORE_NAME = 'vectors';
 const DB_VERSION = 1;
+
+export interface VectorEntry {
+  id: string;
+  vector: number[];
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -39,7 +48,7 @@ async function getKey(): Promise<CryptoKey> {
   );
 }
 
-export async function saveVector(entry: { id: string; vector: number[]; metadata?: any }): Promise<void> {
+export async function saveVector(entry: VectorEntry): Promise<void> {
   const database = await openDB();
   const key = await getKey();
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -48,7 +57,12 @@ export async function saveVector(entry: { id: string; vector: number[]; metadata
   const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, payload);
 
   return new Promise<void>((resolve, reject) => {
-    const record = { id: entry.id, iv, ciphertext, metadata: entry.metadata || {} };
+    const record = { 
+      id: entry.id, 
+      iv, 
+      ciphertext, 
+      metadata: entry.metadata || {} 
+    };
     const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(record);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
@@ -57,7 +71,7 @@ export async function saveVector(entry: { id: string; vector: number[]; metadata
   });
 }
 
-export async function loadVector(id: string): Promise<any> {
+export async function loadVector(id: string): Promise<VectorEntry | null> {
   const database = await openDB();
   const key = await getKey();
 
@@ -79,7 +93,12 @@ export async function loadVector(id: string): Promise<any> {
   );
 
   database.close();
-  return JSON.parse(new TextDecoder().decode(decrypted));
+  
+  return {
+    id: record.id,
+    vector: JSON.parse(new TextDecoder().decode(decrypted)),
+    metadata: record.metadata,
+  };
 }
 
 export async function deleteVector(id: string): Promise<void> {
@@ -93,7 +112,7 @@ export async function deleteVector(id: string): Promise<void> {
   });
 }
 
-export async function clearCache(): Promise<void> {
+export async function clearVectorCache(): Promise<void> {
   const database = await openDB();
   return new Promise<void>((resolve, reject) => {
     const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).clear();
@@ -103,3 +122,42 @@ export async function clearCache(): Promise<void> {
     database.close();
   });
 }
+
+export async function clearCache(): Promise<void> {
+  return clearVectorCache();
+}
+
+interface CacheEntry<T = unknown> {
+  value: T;
+  expiry: number;
+}
+
+export class AirGapCache {
+  private store = new Map<string, CacheEntry>();
+  private defaultTtl: number;
+
+  constructor(options?: { ttl?: number; [key: string]: unknown }) {
+    this.defaultTtl = options?.ttl ?? 3600000; // 1 hour default
+  }
+
+  async get<T = unknown>(key: string): Promise<T | null> {
+    const entry = this.store.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiry) {
+      this.store.delete(key);
+      return null;
+    }
+    return entry.value as T;
+  }
+
+  async set(key: string, value: unknown, ttl?: number): Promise<void> {
+    const expiry = Date.now() + (ttl ?? this.defaultTtl);
+    this.store.set(key, { value, expiry });
+  }
+
+  async clear(): Promise<void> {
+    this.store.clear();
+  }
+}
+
+export const airGapCache = new AirGapCache();

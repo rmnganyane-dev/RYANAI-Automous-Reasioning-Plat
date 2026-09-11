@@ -1,7 +1,7 @@
 # Stage 1: Build Vite frontend
 FROM node:22-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
+COPY package*.json tsconfig*.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build

@@ -1,13 +1,34 @@
 import type { ModelId, ToolStep } from './types';
+
 export interface StreamCallbacks {
-    onToken: (text: string) => void;
-    onStep: (step: ToolStep) => void;
-    onTitle: (title: string) => void;
-    onDone: () => void;
-    onError: (msg: string) => void;
+  onToken: (text: string) => void;
+  onStep: (step: ToolStep) => void;
+  onTitle: (title: string) => void;
+  onDone: () => void;
+  onError: (msg: string) => void;
 }
-declare const TOOL_NAMES: readonly ["web_search", "calculator", "memory_recall", "code_executor"];
-type ToolName = (typeof TOOL_NAMES)[number];
-declare const TOOL_LABELS: Record<ToolName, string>;
-export declare function streamReasoning(userText: string, model: ModelId, callbacks: StreamCallbacks): Promise<void>;
-export { TOOL_LABELS };
+
+export const TOOL_NAMES = [
+  'eBPF_PacketFilter',
+  'PostgreSQL_Query',
+  'Vector_Cache',
+  'MCP_SystemServer',
+  'LangGraph_ReAct',
+] as const;
+
+export type ToolName = (typeof TOOL_NAMES)[number];
+
+export const TOOL_LABELS: Record<ToolName, string>;
+
+export declare function streamReasoning(
+  userText: string,
+  model: ModelId,
+  callbacks: StreamCallbacks
+): Promise<void>;
+
+export interface ReasoningContext {
+  sessionId: string;
+  activeTool?: ToolName | null;
+  stepCount: number;
+  metadata?: Record<string, unknown>;
+}

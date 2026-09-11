@@ -1,5 +1,3 @@
-// File path: ./src/api/mcpRoute.ts
-
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -7,26 +5,58 @@ import { promisify } from "util";
 const execAsync = promisify(exec);
 
 interface McpPayload {
-  tool: string;
+  tool?: string;
+  action?: string;
   arguments?: {
     container?: string;
   };
+  payload?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export async function registerMcpRoutes(fastify: FastifyInstance) {
+  // Execute specific tool actions via HTTP API
   fastify.post("/api/mcp/execute", async (req: FastifyRequest<{ Body: McpPayload }>, reply: FastifyReply) => {
     const { tool, arguments: args } = req.body;
 
-    if (tool === "check_system_logs") {
+    if (!tool) {
+      return reply.code(400).send({ success: false, error: "Missing tool parameter" });
+    }
+
+    if (tool === "check_system_logs" || tool === "get_container_logs") {
       try {
         const container = args?.container || "ryanai-runtime";
-        const { stdout } = await execAsync(`docker logs --tail 50 ${container}`);
-        return reply.send({ success: true, result: stdout });
+        
+        // Basic input sanitization to prevent command injection
+        if (!/^[a-zA-Z0-9_.-]+$/.test(container)) {
+          return reply.code(400).send({ success: false, error: "Invalid container name format" });
+        }
+
+        const { stdout, stderr } = await execAsync(`docker logs --tail 50 ${container}`);
+        return reply.send({ success: true, result: stdout || stderr });
       } catch (err: any) {
         return reply.code(500).send({ success: false, error: err.message });
       }
     }
 
     return reply.code(404).send({ success: false, error: `Unknown MCP tool: ${tool}` });
+  });
+
+  // General MCP routing endpoint
+  fastify.post("/api/mcp", async (request: FastifyRequest<{ Body: McpPayload }>, reply: FastifyReply) => {
+    const { action, tool, payload } = request.body;
+
+    if (!action && !tool) {
+      return reply.code(400).send({ success: false, error: "Missing action or tool parameter" });
+    }
+
+    return reply.send({
+      success: true,
+      data: {
+        receivedAction: action,
+        receivedTool: tool,
+        processedPayload: payload ?? {},
+      },
+    });
   });
 }

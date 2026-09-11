@@ -1,14 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-type VoiceState = 'idle' | 'listening' | 'error' | 'unsupported';
+export type VoiceState = 'idle' | 'listening' | 'error' | 'unsupported';
 
-interface UseVoiceOptions {
+export interface UseVoiceOptions {
   onTranscript?: (text: string, isFinal: boolean) => void;
   onCommand?: (command: string, args: string) => void;
   lang?: string;
 }
 
-const VOICE_COMMANDS: Record<string, { keywords: string[]; description: string }> = {
+export const VOICE_COMMANDS: Record<string, { keywords: string[]; description: string }> = {
   new_thread: { keywords: ['new thread', 'new conversation', 'start new'], description: 'Create a new conversation thread' },
   send: { keywords: ['send message', 'send', 'submit'], description: 'Send the current message' },
   clear: { keywords: ['clear input', 'clear', 'reset'], description: 'Clear the input field' },
@@ -22,13 +22,62 @@ const VOICE_COMMANDS: Record<string, { keywords: string[]; description: string }
   stop: { keywords: ['stop listening', 'stop voice', 'cancel voice'], description: 'Stop voice recognition' },
 };
 
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionEventData {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorData {
+  error: string;
+  message?: string;
+}
+
+interface SpeechRecognitionInstance {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventData) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorData) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
 export function useVoiceRecognition({ onTranscript, onCommand, lang = 'en-US' }: UseVoiceOptions = {}) {
   const [state, setState] = useState<VoiceState>('idle');
   const [interimText, setInterimText] = useState('');
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const shouldRestartRef = useRef(false);
 
-  const isSupported = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+  const getConstructor = () => {
+    if (typeof window === 'undefined') return null;
+    const win = window as unknown as {
+      SpeechRecognition?: new () => SpeechRecognitionInstance;
+      webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
+    };
+    return win.SpeechRecognition || win.webkitSpeechRecognition || null;
+  };
+
+  const isSupported = typeof window !== 'undefined' && !!getConstructor();
 
   const detectCommand = useCallback((text: string): { command: string; args: string } | null => {
     const lower = text.toLowerCase().trim();
@@ -44,11 +93,11 @@ export function useVoiceRecognition({ onTranscript, onCommand, lang = 'en-US' }:
   }, []);
 
   const initRecognition = useCallback(() => {
-    if (!isSupported) {
+    const Ctor = getConstructor();
+    if (!Ctor) {
       setState('unsupported');
       return null;
     }
-    const Ctor = (window.SpeechRecognition || window.webkitSpeechRecognition)!;
     const rec = new Ctor();
     rec.lang = lang;
     rec.continuous = false;
@@ -57,15 +106,17 @@ export function useVoiceRecognition({ onTranscript, onCommand, lang = 'en-US' }:
 
     rec.onstart = () => setState('listening');
 
-    rec.onresult = (event: SpeechRecognitionEvent) => {
+    rec.onresult = (event: SpeechRecognitionEventData) => {
       let interim = '';
       let final = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
-        if (result.isFinal) {
-          final += result[0].transcript;
-        } else {
-          interim += result[0].transcript;
+        if (result && result[0]) {
+          if (result.isFinal) {
+            final += result[0].transcript;
+          } else {
+            interim += result[0].transcript;
+          }
         }
       }
       if (interim) setInterimText(interim);
@@ -81,7 +132,7 @@ export function useVoiceRecognition({ onTranscript, onCommand, lang = 'en-US' }:
       }
     };
 
-    rec.onerror = (event: SpeechRecognitionErrorEvent) => {
+    rec.onerror = (event: SpeechRecognitionErrorData) => {
       if (event.error === 'no-speech' || event.error === 'aborted') {
         return;
       }
@@ -102,7 +153,7 @@ export function useVoiceRecognition({ onTranscript, onCommand, lang = 'en-US' }:
     };
 
     return rec;
-  }, [isSupported, lang, onTranscript, onCommand, detectCommand]);
+  }, [lang, onTranscript, onCommand, detectCommand]);
 
   const start = useCallback(() => {
     if (!recognitionRef.current) {
@@ -154,12 +205,10 @@ export function useVoiceRecognition({ onTranscript, onCommand, lang = 'en-US' }:
   return {
     state,
     interimText,
-    isSupported: !!isSupported,
+    isSupported,
     start,
     stop,
     toggle,
     commands: VOICE_COMMANDS,
   };
 }
-
-export { VOICE_COMMANDS };

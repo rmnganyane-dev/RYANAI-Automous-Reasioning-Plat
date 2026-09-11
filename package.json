@@ -32,6 +32,10 @@
     "db:migrate": "node --import tsx/esm src/db/migrate.ts"
   },
   "dependencies": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "mcp:system": "tsx src/mcp/runSystemServer.ts",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@opentelemetry/auto-instrumentations-node": "^0.80.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
