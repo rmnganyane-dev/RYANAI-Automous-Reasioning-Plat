@@ -11,7 +11,7 @@
     "dev:server": "node --import tsx/esm src/server/index.ts",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:api": "node scripts/build-api.js",
+    "build:api": "tsc",
     "docker:build": "docker compose build --no-cache",
     "docker:up": "docker compose up --build -d",
     "docker:down": "docker compose down",
@@ -26,16 +26,14 @@
     "rust:build": "cargo build --manifest-path src-tauri/Cargo.toml --all-targets",
     "mcp:check": "npm --prefix mcp-server run check",
     "mcp:start": "npm --prefix mcp-server start",
+    "mcp:system": "tsx src/mcp/runSystemServer.ts",
     "release": "powershell -ExecutionPolicy Bypass -File ./build-installer.ps1",
     "ship": "npm run typecheck && npm run build && git add . && git commit -m \"ship: production build update\" && git push origin main",
     "telemetry:collect": "node --import tsx/esm --import=./src/telemetry.ts src/mcp/systemServer.ts",
-    "db:migrate": "node --import tsx/esm src/db/migrate.ts"
+    "db:migrate": "node --import tsx/esm src/db/migrate.ts",
+    "start": "node dist/server.js"
   },
   "dependencies": {
-    "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "mcp:system": "tsx src/mcp/runSystemServer.ts",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@opentelemetry/auto-instrumentations-node": "^0.80.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
@@ -56,7 +54,7 @@
   "devDependencies": {
     "@eslint/js": "^9.9.1",
     "@tauri-apps/cli": "^2.11.4",
-    "@types/node": "^26.5.0",
+    "@types/node": "^22.0.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.4",
@@ -71,14 +69,5 @@
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.3.0",
     "vite": "^5.4.11"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "protobufjs"
-    ]
-  },
-  "allowScripts": {
-    "protobufjs@7.6.6": true,
-    "esbuild@0.28.2": true
   }
 }

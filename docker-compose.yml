@@ -39,7 +39,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: ryanai-db
     environment:
       - POSTGRES_USER=postgres
@@ -47,7 +47,6 @@ services:
       - POSTGRES_DB=ryanai
     ports:
       - "5432:5432"
-    command: postgres -c shared_preload_libraries=pg_stat_statements
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ryanai"]
       interval: 5s
@@ -55,7 +54,7 @@ services:
       retries: 5
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./prisma/migrations:/docker-entrypoint-initdb.d
+      - ./src/db/init_vector_memory.sql:/docker-entrypoint-initdb.d/init_vector_memory.sql
     networks:
       - ryanai-net
     restart: unless-stopped

@@ -34,6 +34,13 @@ requirements.txt        Python dependency declaration; currently none required
 - Docker Desktop for web deployment
 - PowerShell for Windows installers
 
+**RyanAI Runtime & Model Context Protocol (MCP) Server**
+
+### Quick Start
+1. **Install Dependencies**
+   ```bash
+   npm install
+
 ## Install and Develop
 
 ```bash
