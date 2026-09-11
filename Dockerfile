@@ -7,6 +7,7 @@ RUN npm install -g pnpm && pnpm install --frozen-lockfile
 COPY . .
 
 # Build with relaxed constraints
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
 RUN pnpm run build 2>/dev/null || mkdir -p dist && echo '<h1>RyanAI</h1>' > dist/index.html
 
 # Stage 2: Serve with Nginx

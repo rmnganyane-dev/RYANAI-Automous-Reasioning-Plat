@@ -9,6 +9,7 @@ RUN npm install -g pnpm && pnpm install --frozen-lockfile
 COPY src/ ./src/
 
 # Skip TypeScript build—use Node.js directly with tsx
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
 RUN mkdir -p dist && echo 'console.log("API running");' > dist/server.js
 
 # Stage 2: Production execution environment

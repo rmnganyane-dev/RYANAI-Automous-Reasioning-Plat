@@ -39,7 +39,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: pgvector/pgvector:pg16
+    image: postgres:16
     container_name: ryanai-db
     environment:
       - POSTGRES_USER=postgres
