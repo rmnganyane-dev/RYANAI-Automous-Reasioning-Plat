@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   ryanai-api:
     build:
@@ -10,14 +12,14 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOST=0.0.0.0
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ryanai
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@ryanai-db:5432/${DB_NAME:-ryanai}
+      - REDIS_URL=redis://ryanai-redis:6379
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      postgres:
+      ryanai-db:
         condition: service_healthy
-      redis:
+      ryanai-redis:
         condition: service_started
     networks:
       - ryanai-net
@@ -38,17 +40,17 @@ services:
       - ryanai-net
     restart: unless-stopped
 
-  postgres:
+  ryanai-db:
     image: postgres:16
     container_name: ryanai-db
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=ryanai
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-ryanai}
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ryanai"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-ryanai}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -59,7 +61,7 @@ services:
       - ryanai-net
     restart: unless-stopped
 
-  redis:
+  ryanai-redis:
     image: redis:7-alpine
     container_name: ryanai-redis
     ports:
