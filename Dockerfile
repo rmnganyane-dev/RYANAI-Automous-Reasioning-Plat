@@ -1,24 +1,18 @@
-# File path: ./Dockerfile
-FROM node:22-alpine AS builder
+FROM node:22-alpine
+
+# Enable pnpm via corepack
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+# Copy lockfile and workspace configurations
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY ryanai-api/package.json ./ryanai-api/
 
+# Install dependencies using pnpm frozen lockfile
+RUN pnpm install --frozen-lockfile
+
+# Copy source code and build
 COPY . .
-
-RUN npm run build
-
-FROM node:22-alpine AS runner
-WORKDIR /app
-
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
-
-RUN npm install --omit=dev
-
-EXPOSE 80
-ENV PORT=80
-
-CMD ["node", "dist/server.js"]
+WORKDIR /app/ryanai-api
+CMD ["pnpm", "run", "dev"]
