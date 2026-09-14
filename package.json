@@ -5,8 +5,6 @@
   "description": "RyanAI Autonomous Reasoning Platform",
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "ship": "pnpm run typecheck && pnpm run build && git add . && git commit -m \"ship: production build update\" && git push origin main",
     "dev": "vite",
     "dev:web": "vite",
     "dev:mcp": "node --import tsx/esm src/mcp/systemServer.ts",
@@ -26,7 +24,7 @@
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run build",
     "tauri": "tauri",
     "rust:fetch": "cargo fetch --manifest-path src-tauri/Cargo.toml",
