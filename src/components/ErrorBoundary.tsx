@@ -1,91 +1,46 @@
-// File path: ./src/components/ErrorBoundary.tsx
-
-import React, { Component, ErrorInfo, ReactNode } from "react";
+// src/components/ErrorBoundary.tsx
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode;
 }
 
 interface State {
   hasError: boolean;
-  error: Error | null;
-  errorInfo: ErrorInfo | null;
+  error?: Error;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+export default class ErrorBoundary extends Component<Props, State> {
   public state: State = {
-    hasError: false,
-    error: null,
-    errorInfo: null,
+    hasError: false
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error, errorInfo: null };
+    return { hasError: true, error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    this.setState({ errorInfo });
-    // Telemetry logging can be integrated here (e.g., OpenTelemetry / Sentry)
-    console.error("RyanAI Unhandled Runtime Exception:", error, errorInfo);
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("RyanAI Uncaught error:", error, errorInfo);
   }
 
-  private handleReset = (): void => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
-    window.location.reload();
-  };
-
-  public render(): ReactNode {
+  public render() {
     if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-
       return (
-        <div className="min-h-screen w-full bg-[#020617] text-slate-100 flex items-center justify-center p-6 font-sans">
-          <div className="max-w-xl w-full bg-slate-900/90 border border-red-500/30 rounded-2xl p-6 shadow-2xl shadow-red-950/20 backdrop-blur space-y-6">
-            {/* Header */}
-            <div className="flex items-center space-x-3 border-b border-slate-800 pb-4">
-              <div className="h-10 w-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-xl font-['Orbitron']">
-                !
-              </div>
-              <div>
-                <h2 className="font-['Orbitron'] font-bold text-lg text-red-400 tracking-wide">
-                  RYANAI EXECUTION EXCEPTION
-                </h2>
-                <p className="text-xs text-slate-400 font-['Space_Grotesk']">
-                  Runtime environment error intercepted
-                </p>
-              </div>
+        <div className="h-screen w-screen bg-[#0b0f19] text-slate-100 flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-slate-900 border border-red-500/30 rounded-2xl p-6 shadow-2xl text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-red-400 font-bold text-lg">
+              !
             </div>
-
-            {/* Error Stack Display */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider font-['JetBrains_Mono']">
-                Exception Diagnostics
-              </label>
-              <div className="bg-slate-950 rounded-lg p-4 border border-slate-800/80 font-['JetBrains_Mono'] text-xs text-red-300 overflow-x-auto max-h-48 leading-relaxed">
-                <p className="font-bold">{this.state.error?.toString()}</p>
-                {this.state.errorInfo?.componentStack && (
-                  <pre className="mt-2 text-[11px] text-slate-500 whitespace-pre-wrap">
-                    {this.state.errorInfo.componentStack}
-                  </pre>
-                )}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-xs text-slate-500 font-['Space_Grotesk']">
-                Engine state preserved.
-              </span>
-              <button
-                onClick={this.handleReset}
-                className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-['JetBrains_Mono'] font-bold text-xs rounded-xl transition-all shadow-lg shadow-cyan-950/30"
-              >
-                REBOOT ENGINE
-              </button>
-            </div>
+            <h2 className="text-lg font-bold text-red-400">RyanAI Engine Fault Detected</h2>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              {this.state.error?.message || "An unexpected error occurred in the autonomous workspace."}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full py-2.5 bg-cyan-500 text-slate-950 font-semibold rounded-xl text-xs hover:bg-cyan-400 transition-colors"
+            >
+              Restart Reasoning Engine
+            </button>
           </div>
         </div>
       );
@@ -94,5 +49,3 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-
-export default ErrorBoundary;

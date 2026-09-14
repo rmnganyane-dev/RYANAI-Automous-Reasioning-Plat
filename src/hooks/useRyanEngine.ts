@@ -3,6 +3,13 @@
 import { useState, useCallback } from "react";
 import { executeAgentReasoning, fetchSystemHealth, SystemHealth } from "../services/api";
 
+export type EngineState = 'IDLE' | 'RUNNING' | 'PAUSED' | 'ERROR';
+
+export interface EngineEvent {
+  type: string;
+  payload: Record<string, unknown>;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -16,9 +23,9 @@ export function useRyanEngine() {
     {
       id: "1",
       role: "assistant",
-      content: "RyanAI Autonomous Reasoning Engine initialized via index.html root platform container[cite: 3]. Fastify gateway connection active.",
+      content: "RyanAI Autonomous Reasoning Engine initialized. Fastify gateway connection active.",
       reasoningSteps: [
-        "Mounted root index.html platform container template[cite: 3].",
+        "Mounted root platform container template.",
         "Initialized Fastify API gateway & LangGraph ReAct workflow.",
         "Verified CUDA driver acceleration & memory allocation."
       ],
@@ -27,15 +34,24 @@ export function useRyanEngine() {
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [health, setHealth] = useState<SystemHealth | null>(null);
+  const [engineState, setEngineState] = useState<EngineState>('IDLE');
+  const [events, setEvents] = useState<EngineEvent[]>([]);
+
+  const logEvent = useCallback((type: string, payload: Record<string, unknown>) => {
+    setEvents((prev) => [...prev, { type, payload }]);
+  }, []);
 
   const checkHealth = useCallback(async () => {
     try {
       const data = await fetchSystemHealth();
       setHealth(data);
-    } catch (err) {
-      console.error("Backend health check warning:", err);
+      logEvent('HEALTH_CHECK_SUCCESS', { status: data.status });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error("Backend health check warning:", errorMessage);
+      logEvent('HEALTH_CHECK_ERROR', { error: errorMessage });
     }
-  }, []);
+  }, [logEvent]);
 
   const sendMessage = useCallback(async (prompt: string) => {
     if (!prompt.trim() || isProcessing) return;
@@ -49,6 +65,8 @@ export function useRyanEngine() {
 
     setMessages((prev) => [...prev, userMessage]);
     setIsProcessing(true);
+    setEngineState('RUNNING');
+    logEvent('REASONING_START', { promptLength: prompt.length });
 
     try {
       const result = await executeAgentReasoning(prompt);
@@ -60,24 +78,31 @@ export function useRyanEngine() {
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch (err: any) {
-      const errorMessage: Message = {
+      setEngineState('IDLE');
+      logEvent('REASONING_COMPLETE', { stepsCount: result.reasoningTrace?.length ?? 0 });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown gateway error";
+      const errorMsgObj: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Error executing reasoning pipeline: ${err.message || "Unknown gateway error"}. Ensure Fastify server is running on port 9090.`,
+        content: `Error executing reasoning pipeline: ${errorMessage}. Ensure Fastify server is running on port 9090.`,
         reasoningSteps: ["Gateway connection error", "Falling back to local fallback buffer"],
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, errorMsgObj]);
+      setEngineState('ERROR');
+      logEvent('REASONING_ERROR', { error: errorMessage });
     } finally {
       setIsProcessing(false);
     }
-  }, [isProcessing]);
+  }, [isProcessing, logEvent]);
 
   return {
     messages,
     isProcessing,
     health,
+    engineState,
+    events,
     sendMessage,
     checkHealth,
   };

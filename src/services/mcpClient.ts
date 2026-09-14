@@ -1,34 +1,43 @@
 // File path: ./src/services/mcpClient.ts
 
-export interface McpPayload {
-  id: string | number;
+export interface MCPPayload {
+  id: string;
   method: string;
   params: Record<string, unknown>;
 }
 
-export interface McpToolCallRequest {
-  tool: string;
-  arguments: Record<string, unknown>;
-  payload?: McpPayload;
+export interface MCPResponse<T = unknown> {
+  id: string;
+  result?: T;
+  error?: {
+    code: number;
+    message: string;
+    data?: unknown;
+  };
 }
 
-export interface McpToolExecutionResponse {
-  result: unknown;
-}
+export class MCPClient {
+  private endpoint: string;
 
-export const mcpClient = {
-  async executeTool(request: McpToolCallRequest): Promise<unknown> {
-    const response = await fetch("/api/mcp/execute", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
+  constructor(endpoint: string = 'http://localhost:9100/mcp') {
+    this.endpoint = endpoint;
+  }
+
+  public async send<T = unknown>(payload: MCPPayload): Promise<MCPResponse<T>> {
+    const response = await fetch(this.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
-      throw new Error(`MCP Tool execution failed: ${response.statusText}`);
+      throw new Error(`MCP transport error: ${response.statusText}`);
     }
 
-    const data = (await response.json()) as McpToolExecutionResponse;
-    return data.result;
-  },
-};
+    return (await response.json()) as MCPResponse<T>;
+  }
+}
+
+export const defaultMCPClient = new MCPClient();

@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   MessageSquare, Terminal as TerminalIcon, GitBranch, Code2, Plus, 

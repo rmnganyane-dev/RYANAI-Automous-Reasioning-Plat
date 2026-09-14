@@ -1,9 +1,19 @@
-import { useState } from 'react';
+// File path: ./src/hooks/useReasoningStream.ts
+
+import { useState, useCallback } from 'react';
+
+export type StreamEventType = 'step' | 'token' | 'done';
+
+export interface StreamEventData {
+  type: StreamEventType;
+  message?: string;
+  content?: string;
+}
 
 export function useRyanStream() {
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
 
-  const streamReasoning = async (
+  const streamReasoning = useCallback(async (
     prompt: string, 
     onStep: (step: string) => void, 
     onToken: (token: string) => void, 
@@ -33,15 +43,26 @@ export function useRyanStream() {
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.substring(6));
-            if (data.type === 'step') onStep(data.message);
-            if (data.type === 'token') onToken(data.content);
-            if (data.type === 'done') onComplete();
+            const rawData = line.substring(6).trim();
+            if (!rawData) continue;
+            try {
+              const data = JSON.parse(rawData) as StreamEventData;
+              if (data.type === 'step' && data.message) {
+                onStep(data.message);
+              } else if (data.type === 'token' && data.content) {
+                onToken(data.content);
+              } else if (data.type === 'done') {
+                onComplete();
+              }
+            } catch (parseErr) {
+              console.error('Failed to parse SSE line data:', parseErr);
+            }
           }
         }
       }
-    } catch (err) {
-      console.error('Streaming connection error:', err);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error('Streaming connection error:', errorMessage);
       // Fallback simulation if backend server isn't active locally
       onStep('Fallback: Local LangGraph simulation mode active');
       onToken('Autonomous reasoning response generated successfully via local fallback.');
@@ -49,7 +70,7 @@ export function useRyanStream() {
     } finally {
       setIsStreaming(false);
     }
-  };
+  }, []);
 
   return { streamReasoning, isStreaming };
 }

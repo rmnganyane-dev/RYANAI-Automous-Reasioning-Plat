@@ -42,9 +42,9 @@ export class AgentOrchestrator {
     const thought = `Analyzing context for: "${inputPrompt}". Evaluating tool-routing matrix.`;
     state.currentStep++;
 
-    // Step 2: Action / Tool execution simulation
+    // Step 2: Action / Tool execution simulation with assigned thought variable
     const toolResult = state.currentStep <= state.maxSteps 
-      ? "Tool execution successful: eBPF / PostgreSQL state verified." 
+      ? `Tool execution successful: eBPF / PostgreSQL state verified. [Thought: ${thought}]` 
       : "Max reasoning steps reached.";
 
     const finalAnswer = `RyanAI Autonomous Reasoning Complete. Insight: [${toolResult}]`;

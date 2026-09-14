@@ -1,6 +1,6 @@
 // File path: ./server.ts
 
-import Fastify from "fastify";
+import Fastify, { FastifyRequest, FastifyReply } from "fastify";
 import cors from "@fastify/cors";
 import { defaultEngine } from "./src/agent/reactGraph";
 
@@ -8,13 +8,28 @@ const server = Fastify({
   logger: true,
 });
 
+server.get("/api/health", async () => {
+  return {
+    status: "ONLINE",
+    engine: "RyanAI Sovereign Autonomous Reasoning Platform",
+    architect: "Ntsiyeni Ganyane",
+    cudaActive: true,
+    activeGraph: "ReAct-v4",
+    timestamp: new Date().toISOString(),
+  };
+});
+
 // Configure CORS for the Vite frontend shell
 server.register(cors, {
   origin: process.env.NODE_ENV === "production" ? false : "*",
 });
 
+interface ReasonRequestBody {
+  prompt?: string;
+}
+
 // Health check endpoint
-server.get("/api/health", async (request, reply) => {
+server.get("/api/health", async (_request: FastifyRequest, _reply: FastifyReply) => {
   return {
     status: "online",
     engine: "RyanAI Sovereign Engine",
@@ -26,10 +41,10 @@ server.get("/api/health", async (request, reply) => {
 });
 
 // Agent Reasoning execution endpoint
-server.post("/api/reason", async (request, reply) => {
-  const { prompt } = request.body as { prompt: string };
+server.post("/api/reason", async (request: FastifyRequest<{ Body: ReasonRequestBody }>, reply: FastifyReply) => {
+  const { prompt } = request.body || {};
 
-  if (!prompt) {
+  if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
     return reply.status(400).send({ error: "Objective prompt is required." });
   }
 
@@ -46,9 +61,10 @@ server.post("/api/reason", async (request, reply) => {
       output: agentState.output,
       timestamp: new Date().toISOString(),
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Internal sovereign engine failure.";
     request.log.error(error);
-    return reply.status(500).send({ error: "Internal sovereign engine failure." });
+    return reply.status(500).send({ error: errorMessage });
   }
 });
 
