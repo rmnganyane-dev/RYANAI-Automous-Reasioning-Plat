@@ -26,7 +26,10 @@ export class SystemMcpServer {
                     inputSchema: {
                         type: "object",
                         properties: {
-                            container: { type: "string" },
+                            container: {
+                                type: "string",
+                                description: "Docker container name or ID"
+                            },
                         },
                         required: ["container"],
                     },
@@ -36,13 +39,26 @@ export class SystemMcpServer {
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const args = request.params.arguments;
             const container = args?.container || "ryanai-runtime";
-            try {
-                const { stdout } = await execAsync(`docker logs --tail 50 ${container}`);
+            // Secure input verification for container name parameter
+            if (!/^[a-zA-Z0-9_.-]+$/.test(container)) {
                 return {
                     content: [
                         {
                             type: "text",
-                            text: stdout || `No logs found for container: ${container}`,
+                            text: `Invalid container name format: ${container}`,
+                        },
+                    ],
+                    isError: true,
+                };
+            }
+            try {
+                const { stdout, stderr } = await execAsync(`docker logs --tail 50 ${container}`);
+                const output = stdout || stderr || `No logs found for container: ${container}`;
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: output,
                         },
                     ],
                 };
@@ -55,6 +71,7 @@ export class SystemMcpServer {
                             text: `Error fetching logs for container ${container}: ${err.message}`,
                         },
                     ],
+                    isError: true,
                 };
             }
         });

@@ -1,22 +1,18 @@
-import Fastify from 'fastify';
-import { registerAgentRoutes } from './agent/react.js';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { App } from './App';
+import './index.css';
+import indexHtmlSource from '../index.html?raw';
 
-const fastify = Fastify({ logger: true });
+(window as unknown as { __RYANAI_INDEX_HTML__: string }).__RYANAI_INDEX_HTML__ = indexHtmlSource;
 
-fastify.get('/health', async () => ({ status: 'healthy', service: 'ryanai-api' }));
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("Failed to find the root element for mounting.");
+}
 
-// Register ReAct agent routes
-await fastify.register(registerAgentRoutes);
-
-const start = async () => {
-  try {
-    const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
-    await fastify.listen({ port, host: '0.0.0.0' });
-    console.log(`RyanAI API server running on port ${port}`);
-  } catch (err) {
-    fastify.log.error(err);
-    process.exit(1);
-  }
-};
-
-start();
+ReactDOM.createRoot(rootElement).render(
+  <React.StrictMode>
+    <App indexHtmlSource={indexHtmlSource} />
+  </React.StrictMode>
+);

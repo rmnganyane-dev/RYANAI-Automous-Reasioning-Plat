@@ -1,23 +1,25 @@
 {
-  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/v2/toolchain/config/schema.json",
-  "productName": "RyanAI Desktop",
-  "version": "1.0.0",
-  "identifier": "com.ryanai.desktop",
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "RyanAI Sovereign",
+  "version": "2.4.0",
+  "identifier": "com.ryanai.sovereign",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
-        "title": "RyanAI Desktop",
+        "title": "RyanAI | Autonomous Reasoning Engine",
         "width": 1280,
         "height": 800,
-        "resizable": true,
-        "fullscreen": false
+        "decorations": true,
+        "transparent": false
       }
+
+      
     ],
     "security": {
       "csp": null

@@ -1,3 +1,5 @@
+# File path: .github/workflows/docker-ci.yml
+
 name: Docker CI/CD Pipeline
 
 on:
@@ -47,7 +49,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          target: production
+          target: runner
           load: true
           tags: ryanai-web:test
           cache-from: type=gha
@@ -55,11 +57,12 @@ jobs:
 
       - name: Test Container Health
         run: |
-          docker run -d -p 8080:80 --name test-container ryanai-web:test
+          docker run -d -p 8080:3000 --name test-container ryanai-web:test
           
           echo "Waiting for container web service..."
           for i in {1..30}; do
-            if curl -s -f http://localhost:8080 > /dev/null; then
+            # Targets /health based on your API setup, failing silently if not ready
+            if curl -s -f http://localhost:8080/health > /dev/null; then
               echo "Container healthcheck passed!"
               exit 0
             fi
@@ -80,7 +83,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          target: production
+          target: runner
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -100,19 +103,19 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /app/ryanai
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
-            docker image prune -f
+            docker image prune -af
 
       - name: Trigger Render Deploy
-        if: secrets.RENDER_DEPLOY_HOOK != ''
+        if: env.RENDER_DEPLOY_HOOK != ''
         run: curl -s "$RENDER_DEPLOY_HOOK"
         env:
           RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
 
       - name: Trigger Railway Deploy
-        if: secrets.RAILWAY_DEPLOY_HOOK != ''
+        if: env.RAILWAY_DEPLOY_HOOK != ''
         run: curl -X POST -s "$RAILWAY_DEPLOY_HOOK"
         env:
           RAILWAY_DEPLOY_HOOK: ${{ secrets.RAILWAY_DEPLOY_HOOK }}

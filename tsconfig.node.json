@@ -2,26 +2,13 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "composite": true,
-    "skipLibCheck": true,
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
-    "types": ["node", "vite/client"],
-    "noEmit": false
+    "strict": true,
+    "noEmit": true
   },
-  "include": [
-    "src/server/**/*",
-    "src/mcp/**/*",
-    "src/lib/**/*",
-    "src/services/**/*",
-    "src/config/**/*",
-    "src/vite-env.d.ts"
-  ],
-  "exclude": [
-    "src/components/**/*",
-    "src/pages/**/*",
-    "src/App.tsx",
-    "src/main.tsx",
-    "**/*.test.ts"
-  ]
+  "include": ["vite.config.ts"]
 }

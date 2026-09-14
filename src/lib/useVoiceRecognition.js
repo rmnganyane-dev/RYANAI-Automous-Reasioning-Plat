@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-const VOICE_COMMANDS = {
+export const VOICE_COMMANDS = {
     new_thread: { keywords: ['new thread', 'new conversation', 'start new'], description: 'Create a new conversation thread' },
     send: { keywords: ['send message', 'send', 'submit'], description: 'Send the current message' },
     clear: { keywords: ['clear input', 'clear', 'reset'], description: 'Clear the input field' },
@@ -17,7 +17,13 @@ export function useVoiceRecognition({ onTranscript, onCommand, lang = 'en-US' } 
     const [interimText, setInterimText] = useState('');
     const recognitionRef = useRef(null);
     const shouldRestartRef = useRef(false);
-    const isSupported = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+    const getConstructor = () => {
+        if (typeof window === 'undefined')
+            return null;
+        const win = window;
+        return win.SpeechRecognition || win.webkitSpeechRecognition || null;
+    };
+    const isSupported = typeof window !== 'undefined' && !!getConstructor();
     const detectCommand = useCallback((text) => {
         const lower = text.toLowerCase().trim();
         for (const [cmd, def] of Object.entries(VOICE_COMMANDS)) {
@@ -31,11 +37,11 @@ export function useVoiceRecognition({ onTranscript, onCommand, lang = 'en-US' } 
         return null;
     }, []);
     const initRecognition = useCallback(() => {
-        if (!isSupported) {
+        const Ctor = getConstructor();
+        if (!Ctor) {
             setState('unsupported');
             return null;
         }
-        const Ctor = (window.SpeechRecognition || window.webkitSpeechRecognition);
         const rec = new Ctor();
         rec.lang = lang;
         rec.continuous = false;
@@ -47,11 +53,13 @@ export function useVoiceRecognition({ onTranscript, onCommand, lang = 'en-US' } 
             let final = '';
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 const result = event.results[i];
-                if (result.isFinal) {
-                    final += result[0].transcript;
-                }
-                else {
-                    interim += result[0].transcript;
+                if (result && result[0]) {
+                    if (result.isFinal) {
+                        final += result[0].transcript;
+                    }
+                    else {
+                        interim += result[0].transcript;
+                    }
                 }
             }
             if (interim)
@@ -89,7 +97,7 @@ export function useVoiceRecognition({ onTranscript, onCommand, lang = 'en-US' } 
             }
         };
         return rec;
-    }, [isSupported, lang, onTranscript, onCommand, detectCommand]);
+    }, [lang, onTranscript, onCommand, detectCommand]);
     const start = useCallback(() => {
         if (!recognitionRef.current) {
             recognitionRef.current = initRecognition();
@@ -141,11 +149,10 @@ export function useVoiceRecognition({ onTranscript, onCommand, lang = 'en-US' } 
     return {
         state,
         interimText,
-        isSupported: !!isSupported,
+        isSupported,
         start,
         stop,
         toggle,
         commands: VOICE_COMMANDS,
     };
 }
-export { VOICE_COMMANDS };

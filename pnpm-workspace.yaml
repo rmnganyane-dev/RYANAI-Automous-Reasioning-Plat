@@ -1,3 +1,5 @@
 allowBuilds:
   esbuild: false
+  msgpackr-extract: set this to true or false
   protobufjs: false
+  workerd: set this to true or false

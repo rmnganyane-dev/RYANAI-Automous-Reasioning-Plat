@@ -24,17 +24,17 @@
       <p>Runtime sandbox and launch check for the autonomous reasoning platform.</p>
       <div class="grid">
         <a href="http://localhost:5173/">Open Vite development app</a>
-        <a href="http://localhost:9090/">Open Docker production app</a>
-        <button id="health" type="button">Check Docker health</button>
+        <a href="http://localhost:80/">Open Docker production app</a>
+        <button id="health" type="button">Check API Docker health</button>
       </div>
       <div id="status">Ready. Choose a runtime to continue.</div>
     </main>
     <script>
       document.getElementById('health').addEventListener('click', async () => {
         const status = document.getElementById('status');
-        status.textContent = 'Checking http://localhost:9090/health...';
+        status.textContent = 'Checking http://localhost:3000/health...';
         try {
-          const response = await fetch('http://localhost:9090/health');
+          const response = await fetch('http://localhost:3000/health');
           status.textContent = response.ok ? `Healthy: HTTP ${response.status}` : `Unhealthy: HTTP ${response.status}`;
         } catch (error) {
           status.textContent = `Unavailable: ${error instanceof Error ? error.message : String(error)}`;

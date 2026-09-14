@@ -1,12 +1,10 @@
 /// <reference types="vite/client" />
 
-interface ImportMetaEnv {
-  readonly VITE_SUPABASE_URL: string;
-  readonly VITE_SUPABASE_ANON_KEY: string;
-  readonly VITE_API_URL?: string;
-  // Add other env variables as needed
+declare module '*.html?raw' {
+  const content: string;
+  export default content;
 }
 
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
+interface Window {
+  __RYANAI_INDEX_HTML__?: string;
 }
