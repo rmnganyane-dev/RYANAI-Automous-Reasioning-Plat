@@ -3,6 +3,10 @@ import Fastify from 'fastify';
 const server = Fastify({ logger: true });
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
+server.get('/', async () => {
+  return { status: 'online', service: 'RyanAI API Gateway' };
+});
+
 // Enable CORS natively without external plugin dependencies
 server.addHook('onRequest', (req, reply, done) => {
   reply.header('Access-Control-Allow-Origin', '*');
