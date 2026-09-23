@@ -1,18 +1,21 @@
 FROM node:22-alpine
 
-# Enable pnpm via corepack
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Install build dependencies required by node-gyp for native C++ addons
+RUN apk add --no-cache python3 make g++ build-base
 
 WORKDIR /app
 
-# Copy lockfile and workspace configurations
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY ryanai-api/package.json ./ryanai-api/
+# Copy package management files
+COPY package*.json ./
 
-# Install dependencies using pnpm frozen lockfile
-RUN pnpm install --frozen-lockfile
+# Install dependencies matching your local workflow
+RUN npm install --legacy-peer-deps
 
-# Copy source code and build
+# Copy all source files
 COPY . .
-WORKDIR /app/ryanai-api
-CMD ["pnpm", "run", "dev"]
+
+# Expose Vite dev server port
+EXPOSE 5173
+
+# Run development server
+CMD ["npm", "run", "dev"]

@@ -2,9 +2,16 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-COPY package.json ./
+# Install build tools for native C/C++ modules (node-gyp)
+RUN apk add --no-cache python3 make g++ build-base
+
+# Copy package definitions
+COPY package*.json ./
+
+# Install dependencies (matching your local environment)
 RUN npm install --legacy-peer-deps
 
+# Copy source code and TypeScript configs
 COPY tsconfig*.json ./
 COPY src/ ./src/
 
@@ -12,8 +19,14 @@ COPY src/ ./src/
 FROM node:22-alpine AS runner
 WORKDIR /app
 
+# Install runtime utilities
+RUN apk add --no-cache wget dumb-init
+
+# Copy package.json (needed for module resolution)
 COPY package.json ./
-RUN npm install --legacy-peer-deps
+
+# Copy compiled node_modules from builder (includes native addons)
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/tsconfig*.json ./
 
@@ -22,7 +35,8 @@ ENV HOST=0.0.0.0
 ENV PORT=3000
 ENV NODE_ENV=production
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
 
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["node", "--import", "tsx/esm", "src/server/index.ts"]
