@@ -11,8 +11,11 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    port: 5173,
+    port: 1420,
     strictPort: true,
+    watch: {
+      usePolling: true, // Prevents file-watching issues inside Codespaces/Docker
+    },
     proxy: {
       '/api': {
         target: process.env.VITE_API_URL || 'http://localhost:9090',

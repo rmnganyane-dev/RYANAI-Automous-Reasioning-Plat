@@ -1,0 +1,34 @@
+schema-version: v1.0
+sast:
+  # Controls whether default global rulesets are included alongside your custom list.
+  # Set to 'false' if you want your explicitly listed rulesets to be the absolute source of truth.
+  use-default-rulesets: false
+
+  use-rulesets:
+    # --- TypeScript Rulesets ---
+    - tsx-react
+    - typescript-best-practices
+    - typescript-browser-security
+    - typescript-code-style
+    - typescript-common-security
+    - typescript-express
+    - typescript-inclusive
+    - typescript-node-security
+
+    # --- JavaScript Rulesets ---
+    - javascript-best-practices
+    - javascript-browser-security
+    - javascript-code-style
+    - javascript-common-security
+    - javascript-express
+    - javascript-inclusive
+    - javascript-node-security
+    - jsx-react
+
+  # Recommended: Exclude vendor directories and build outputs to improve scan speed and avoid noise
+  global-config:
+    ignore-paths:
+      - "node_modules/**"
+      - "dist/**"
+      - "build/**"
+      - "src-tauri/target/**"
