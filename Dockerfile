@@ -1,21 +1,19 @@
-FROM node:22-alpine
-
-# Install build dependencies required by node-gyp for native C++ addons
-RUN apk add --no-cache python3 make g++ build-base
-
+FROM node:22-alpine AS builder
 WORKDIR /app
-
-# Copy package management files
 COPY package*.json ./
-
-# Install dependencies matching your local workflow
-RUN npm install --legacy-peer-deps
-
-# Copy all source files
+RUN npm install
 COPY . .
+RUN npm run build
 
-# Expose Vite dev server port
-EXPOSE 5173
+FROM nginx:alpine
+# Copy built static files
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Run development server
-CMD ["npm", "run", "dev"]
+# Copy custom nginx template
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+
+# Render dynamic port substitution and startup command
+ENV PORT=10000
+EXPOSE 10000
+
+CMD ["nginx", "-g", "daemon off;"]
