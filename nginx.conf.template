@@ -1,5 +1,4 @@
-﻿server {
-    # Render automatically injects the assigned port here at runtime
+server {
     listen ${PORT};
     server_name localhost;
 
