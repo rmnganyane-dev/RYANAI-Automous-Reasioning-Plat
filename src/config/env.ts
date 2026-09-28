@@ -1,19 +1,29 @@
+// File path: shared/utils/env.ts
+
 /**
- * Retrieves an environment variable across Vite and Node.js environments
- * with auto-prefixing fallback for `VITE_` variables.
+ * Retrieves an environment variable seamlessly across Vite (Tauri/Browser) 
+ * and Node.js (Fastify/Server) environments, with auto-prefixing fallback 
+ * for `VITE_` variables.
+ *
+ * @param key - The environment variable key (e.g., 'API_URL' or 'VITE_API_URL')
+ * @param defaultValue - Fallback value if the variable is undefined (default: '')
+ * @returns The resolved environment variable as a string, or the default value
  */
 export const getEnvVar = (key: string, defaultValue = ''): string => {
   const viteKey = key.startsWith('VITE_') ? key : `VITE_${key}`;
 
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    const env = import.meta.env as Record<string, unknown>;
-    if (env[viteKey] !== undefined) return env[viteKey] as string;
-    if (env[key] !== undefined) return env[key] as string;
+  // 1. Check Vite / Client environment
+  // Safely cast import.meta to avoid TS errors in strict Node contexts
+  if (typeof import.meta !== 'undefined' && 'env' in import.meta) {
+    const viteEnv = (import.meta as any).env;
+    if (viteEnv[viteKey] !== undefined) return String(viteEnv[viteKey]);
+    if (viteEnv[key] !== undefined) return String(viteEnv[key]);
   }
 
+  // 2. Check Node.js / Server environment
   if (typeof process !== 'undefined' && process.env) {
-    if (process.env[key] !== undefined) return process.env[key] as string;
-    if (process.env[viteKey] !== undefined) return process.env[viteKey] as string;
+    if (process.env[key] !== undefined) return String(process.env[key]);
+    if (process.env[viteKey] !== undefined) return String(process.env[viteKey]);
   }
 
   return defaultValue;

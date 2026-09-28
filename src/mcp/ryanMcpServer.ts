@@ -1,0 +1,154 @@
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
+import * as fs from "fs/promises";
+import * as path from "path";
+import { RyanAISandbox } from "../engine/sandbox.js";
+import { SelfPatchSkill } from "../engine/selfPatchSkill.js";
+import { systemDiagnosticsTool } from "../tools/systemTools.js";
+
+const WORKSPACE_DIR = process.cwd();
+
+export class RyanMCPServer {
+  private server: Server;
+
+  constructor() {
+    this.server = new Server(
+      {
+        name: "ryanai-mcp-server",
+        version: "1.0.0",
+      },
+      {
+        capabilities: {
+          tools: {},
+        },
+      }
+    );
+
+    this.setupToolHandlers();
+  }
+
+  private setupToolHandlers() {
+    // List available tools exposed to external MCP clients
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+      return {
+        tools: [
+          {
+            name: "read_workspace_file",
+            description: "Reads a source file securely from the RyanAI workspace directory.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                filePath: { type: "string", description: "Relative path to the target file." },
+              },
+              required: ["filePath"],
+            },
+          },
+          {
+            name: "execute_sandbox_script",
+            description: "Executes a JavaScript/TypeScript script inside the isolated RyanAISandbox runtime.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                scriptContent: { type: "string", description: "Executable code string." },
+                fileName: { type: "string", description: "Optional file name for the script." },
+              },
+              required: ["scriptContent"],
+            },
+          },
+          {
+            name: "system_diagnostics",
+            description: "Inspects local GPU, memory, or general system telemetry.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                queryType: { type: "string", enum: ["memory", "gpu", "general"], description: "Type of diagnostics query." },
+              },
+              required: ["queryType"],
+            },
+          },
+          {
+            name: "self_patch_workspace",
+            description: "Securely applies and sandbox-verifies code patches for RyanAI platform self-evolution.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                filePath: { type: "string", description: "Target file path to update." },
+                patchContent: { type: "string", description: "New file content or patch string." },
+                testScript: { type: "string", description: "Optional verification script to run in sandbox." }
+              },
+              required: ["filePath", "patchContent"]
+            }
+          }
+        ],
+      };
+    });
+
+    // Handle tool execution requests with secure validation and structured error handling
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+
+      try {
+        if (name === "read_workspace_file") {
+          const filePath = (args as any)?.filePath;
+          if (!filePath) {
+            throw new Error("Missing required argument: 'filePath'");
+          }
+          
+          const targetPath = path.resolve(WORKSPACE_DIR, filePath);
+          if (!targetPath.startsWith(WORKSPACE_DIR)) {
+            throw new Error("Access denied: Path traversal outside workspace is prohibited.");
+          }
+
+          const content = await fs.readFile(targetPath, "utf-8");
+          return {
+            content: [{ type: "text", text: content }],
+          };
+        }
+
+        if (name === "execute_sandbox_script") {
+          const { scriptContent, fileName } = args as any;
+          if (!scriptContent) {
+            throw new Error("Missing required argument: 'scriptContent'");
+          }
+
+          const result = await RyanAISandbox.executeInSandbox(scriptContent, fileName || "mcp_payload.js");
+          return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          };
+        }
+
+        if (name === "system_diagnostics") {
+          const result = await systemDiagnosticsTool.invoke(args as any);
+          return {
+            content: [{ type: "text", text: typeof result === "string" ? result : JSON.stringify(result, null, 2) }],
+          };
+        }
+
+        if (name === "self_patch_workspace") {
+          const result = await SelfPatchSkill.applyAndVerifyPatch(args as any);
+          return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+            isError: result.status === "failed",
+          };
+        }
+
+        throw new Error(`Unknown MCP tool requested: ${name}`);
+      } catch (error: any) {
+        return {
+          content: [{ type: "text", text: `Error executing tool [${name}]: ${error.message}` }],
+          isError: true,
+        };
+      }
+    });
+  }
+
+  public async start() {
+    const transport = new StdioServerTransport();
+    await this.server.connect(transport);
+    console.error("[RyanAI MCP Server] Model Context Protocol server running on stdio.");
+  }
+}

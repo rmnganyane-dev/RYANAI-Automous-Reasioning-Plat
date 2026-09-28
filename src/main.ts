@@ -1,7 +1,13 @@
 import "dotenv/config";
 import { task, type TaskContext } from "@renderinc/sdk/workflows";
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam, ChatCompletionTool } from "openai/resources/chat/completions";
+import type { ChatCompletionMessageParam, ChatCompletionTool, ChatCompletionMessageToolCall } from "openai/resources/chat/completions";
+
+type ToolCall = {
+  id: string;
+  type: string;
+  function: { name: string; arguments: string };
+};
 
 const retry = {
   maxRetries: 3,
@@ -44,7 +50,6 @@ const getOrderStatus = task(
   },
 );
 
-// No retry: processing a refund is non-idempotent
 const processRefund = task(
   { name: "processRefund" },
   function processRefund(_ctx: TaskContext, orderId: string, reason: string) {
@@ -174,14 +179,17 @@ const callLlmWithTools = task(
     const message = response.choices[0].message;
     const result: {
       content: string | null;
-      tool_calls: { id: string; type: string; function: { name: string; arguments: string } }[];
+      tool_calls: ToolCall[];
     } = { content: message.content, tool_calls: [] };
 
     if (message.tool_calls) {
-      result.tool_calls = message.tool_calls.map((tc) => ({
+      result.tool_calls = message.tool_calls.map((tc: ChatCompletionMessageToolCall) => ({
         id: tc.id,
         type: "function",
-        function: { name: tc.function.name, arguments: tc.function.arguments },
+        function: {
+          name: 'function' in tc ? tc.function.name : (tc as any).name,
+          arguments: 'function' in tc ? tc.function.arguments : JSON.stringify((tc as any).arguments || {}),
+        },
       }));
       console.log(`[AGENT] Model requested ${result.tool_calls.length} tool calls`);
     }
@@ -273,7 +281,7 @@ const agentTurn = task(
       toolResults.push({ tool: toolCall.function.name, result });
     }
 
-    const toolMessages: ChatCompletionMessageParam[] = llmResponse.tool_calls.map((tc, i) => ({
+    const toolMessages: ChatCompletionMessageParam[] = llmResponse.tool_calls.map((tc: ToolCall, i: number) => ({
       role: "tool" as const,
       tool_call_id: tc.id,
       content: JSON.stringify(toolResults[i].result),
@@ -284,7 +292,7 @@ const agentTurn = task(
       {
         role: "assistant" as const,
         content: llmResponse.content,
-        tool_calls: llmResponse.tool_calls.map((tc) => ({
+        tool_calls: llmResponse.tool_calls.map((tc: ToolCall) => ({
           id: tc.id,
           type: "function" as const,
           function: { name: tc.function.name, arguments: tc.function.arguments },
@@ -309,7 +317,6 @@ const agentTurn = task(
   },
 );
 
-// Root task: multi-turn conversation
 task(
   { name: "multiTurnConversation", retry, timeoutSeconds: 300 },
   async function multiTurnConversation(ctx: TaskContext, ...messages: string[]) {

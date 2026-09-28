@@ -1,0 +1,51 @@
+// src/engine/checkpointer.ts
+import { db } from '../database/db';
+
+export interface ThreadCheckpoint {
+  threadId: string;
+  step: number;
+  state: any;
+}
+
+export class RyanAICheckpointer {
+  /**
+   * Saves or updates a graph execution checkpoint for a specific thread ID
+   */
+  static async saveCheckpoint(threadId: string, step: number, state: any): Promise<void> {
+    try {
+      await db.agentMemory.create({
+        data: {
+          sessionId: threadId, // Mapping thread to session ID
+          brainSource: `checkpoint_step_${step}`,
+          content: JSON.stringify(state),
+          metadata: { step, timestamp: Date.now() }
+        }
+      });
+      console.log(`[Checkpointer] State checkpoint saved for thread ${threadId} at step ${step}.`);
+    } catch (error) {
+      console.error(`[Checkpointer Error] Failed to save checkpoint for thread ${threadId}:`, error);
+    }
+  }
+
+  /**
+   * Retrieves the latest checkpoint state for a thread to resume execution
+   */
+  static async getLatestCheckpoint(threadId: string): Promise<any | null> {
+    try {
+      const latestLog = await db.agentMemory.findFirst({
+        where: { sessionId: threadId },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (!latestLog) return null;
+
+      return {
+        step: (latestLog.metadata as any)?.step || 0,
+        state: JSON.parse(latestLog.content)
+      };
+    } catch (error) {
+      console.error(`[Checkpointer Error] Failed to retrieve checkpoint for thread ${threadId}:`, error);
+      return null;
+    }
+  }
+}

@@ -1,188 +1,94 @@
-import type { ModelId, ToolStep } from './types';
-import { uid } from './storage';
-import { getPrimaryBrain } from '@/config/models';
-import { AUTONOMOUS_REASONING_SKILL } from '@/config/reasoningSkill';
+// src/lib/reasoning.ts
+// Autonomous reasoning engine integration
 
-export interface StreamCallbacks {
-  onToken: (text: string) => void;
-  onStep: (step: ToolStep) => void;
-  onTitle: (title: string) => void;
-  onDone: () => void;
-  onError: (msg: string) => void;
-}
+import type { ModelId, ReasoningCallbacks } from './types.js';
 
-const REASONING_TEMPLATES: Record<ModelId, string[]> = {
-  'gemini-3.1-pro': [
-    'Analyzing input across {n} semantic dimensions...',
-    'Cross-referencing with persistent memory graph...',
-    'Decomposing into {n} sub-tasks for parallel evaluation...',
-    'Synthesizing multimodal context window (2M tokens)...',
-    'Selecting optimal response strategy from {n} candidates...',
-  ],
-  'claude-sonnet-4.6': [
-    'Parsing intent and constructing reasoning chain...',
-    'Evaluating tool requirements against available capabilities...',
-    'Executing ReAct loop — observation → thought → action...',
-    'Checking memory for relevant prior context...',
-    'Composing structured response with tool-augmented data...',
-  ],
-  'gpt-5.4': [
-    'Allocating adaptive compute budget for reasoning...',
-    'Running chain-of-thought with {n} intermediate steps...',
-    'Querying knowledge base and persistent memory layer...',
-    'Validating response against safety and accuracy constraints...',
-    'Streaming final synthesis with confidence scoring...',
-  ],
-};
-
-const TOOL_NAMES = ['web_search', 'calculator', 'memory_recall', 'code_executor'] as const;
-type ToolName = (typeof TOOL_NAMES)[number];
-
-const TOOL_LABELS: Record<ToolName, string> = {
-  web_search: 'Web Search',
-  calculator: 'Calculator',
-  memory_recall: 'Memory Recall',
-  code_executor: 'Code Executor',
-};
-
-function pickRandom<T>(arr: T[] | readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function shouldUseTools(text: string): boolean {
-  const lower = text.toLowerCase();
-  return (
-    lower.includes('search') ||
-    lower.includes('find') ||
-    lower.includes('what') ||
-    lower.includes('latest') ||
-    lower.includes('news') ||
-    lower.includes('calculate') ||
-    lower.includes('compute') ||
-    lower.includes('remember') ||
-    lower.includes('code') ||
-    lower.includes('build') ||
-    lower.includes('deploy') ||
-    Math.random() > 0.5
-  );
-}
-
-function generateToolResult(name: string): string {
-  switch (name) {
-    case 'web_search':
-      return `Found 4 relevant sources. Top result: "Emergent AI architectures in 2026 — a survey of autonomous agent frameworks and their deployment patterns."`;
-    case 'calculator':
-      return `Computed: result = 42.0 (evaluated expression successfully)`;
-    case 'memory_recall':
-      return `Recalled 2 entries: user prefers TypeScript, working on RyanAI platform.`;
-    case 'code_executor':
-      return `Execution completed in 128ms. Exit code 0. stdout: "Build successful."`;
-    default:
-      return 'Tool completed.';
-  }
-}
-
-function generateResponse(model: ModelId, userText: string): string {
-  const primaryBrain = getPrimaryBrain();
-  const intros: Record<ModelId, string[]> = {
-    'gemini-3.1-pro': [
-      `Based on my analysis across multiple reasoning paths, here's what I've determined:`,
-      `After cross-referencing available context and tool outputs:`,
-      `My multimodal synthesis yields the following assessment:`,
-    ],
-    'claude-sonnet-4.6': [
-      `Here's my reasoned response after working through the problem:`,
-      `I've completed the reasoning loop. Here's what I found:`,
-      `After evaluating the available tools and context:`,
-    ],
-    'gpt-5.4': [
-      `With high confidence (p=0.94), here is my response:`,
-      `Following adaptive compute allocation, I've reached this conclusion:`,
-      `My chain-of-thought analysis produces the following:`,
-    ],
-  };
-
-  const modelIntros = intros[model] ?? intros['claude-sonnet-4.6'];
-  const intro = pickRandom(modelIntros);
-
-  const body = `**Your query:** "${userText.slice(0, 120)}"\n\n**Assessment:** I've processed your request through the full reasoning pipeline — parsing intent, consulting tools, and synthesizing a coherent response. The local orchestration state machine executed successfully with no dead-ends detected.\n\n**Key findings:**\n- Intent classification: \`information_seeking\`\n- Primary brain profile: \`${primaryBrain.name}\`\n- Tools invoked: see trace panel\n- Memory context: 2 prior entries referenced\n- Confidence: 94%\n\n**Recommendation:** RyanAI is currently running its deterministic local reasoning fallback. Configure a provider gateway to activate live Nemotron and Qwen inference using the routing profile in \`src/config/models.ts\`.\n\n*RyanAI · Autonomous Reasoning Engine · Named after Mukhethwa Ryan Ganyane*`;
-
-  return `${intro}\n\n${body}`;
-}
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 export async function streamReasoning(
-  userText: string,
+  prompt: string,
   model: ModelId,
-  callbacks: StreamCallbacks,
+  callbacks: ReasoningCallbacks
 ): Promise<void> {
   try {
-    const modelTemplates = REASONING_TEMPLATES[model] ?? REASONING_TEMPLATES['claude-sonnet-4.6'];
-    const skillTemplates = Array.isArray(AUTONOMOUS_REASONING_SKILL) ? AUTONOMOUS_REASONING_SKILL : [];
-    const templates = [...skillTemplates, ...modelTemplates];
-    const fullResponse = generateResponse(model, userText);
+    const response = await fetch(`${API_BASE}/api/reasoning/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt,
+        model,
+      }),
+    });
 
-    // Emit title early
-    const title = userText.trim().slice(0, 48) || 'New Thread';
-    callbacks.onTitle(title);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`);
+    }
 
-    // Phase 1: Reasoning steps (visible thinking trace)
-    const numSteps = 3 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < numSteps; i++) {
-      const template = templates[i % templates.length].replace('{n}', String(2 + Math.floor(Math.random() * 4)));
-      const words = template.split(' ');
-      for (const word of words) {
-        callbacks.onToken(word + ' ');
-        await sleep(30 + Math.random() * 40);
+    if (!response.body) {
+      throw new Error('No response body');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.status === 'processing' && data.message) {
+              callbacks.onStep?.({
+                type: 'reasoning',
+                name: 'process',
+                result: data.message,
+              });
+            } else if (data.status === 'complete' && data.result) {
+              callbacks.onToken?.(data.result);
+              callbacks.onDone?.();
+            } else if (data.error) {
+              callbacks.onError?.(data.error);
+            }
+          } catch {
+            if (line.trim()) {
+              callbacks.onToken?.(line.trim());
+            }
+          }
+        }
       }
-      callbacks.onToken('\n');
-      await sleep(100);
     }
 
-    // Phase 2: Tool calling (if applicable)
-    if (shouldUseTools(userText)) {
-      const numTools = 1 + Math.floor(Math.random() * 2);
-      for (let i = 0; i < numTools; i++) {
-        const toolName = pickRandom(TOOL_NAMES);
-        const step: ToolStep = {
-          id: uid('step'),
-          type: 'tool_start',
-          name: toolName,
-          args: { query: userText.slice(0, 60) },
-          status: 'running',
-        };
-        callbacks.onStep(step);
-        await sleep(400 + Math.random() * 600);
-
-        const resultStep: ToolStep = {
-          ...step,
-          type: 'tool_result',
-          result: generateToolResult(toolName),
-          status: 'done',
-        };
-        callbacks.onStep(resultStep);
-        await sleep(200);
-      }
-    }
-
-    // Phase 3: Clear reasoning buffer, stream final response
-    callbacks.onToken('\n---\n\n');
-    await sleep(200);
-
-    // Stream the final response word by word
-    const tokens = fullResponse.split(/(\s+)/);
-    for (const token of tokens) {
-      callbacks.onToken(token);
-      await sleep(15 + Math.random() * 35);
-    }
-
-    callbacks.onDone();
+    callbacks.onDone?.();
   } catch (err) {
-    callbacks.onError(err instanceof Error ? err.message : 'An error occurred during reasoning execution.');
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    callbacks.onError?.(message);
   }
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+export async function quickReason(prompt: string, model: ModelId): Promise<string> {
+  try {
+    const response = await fetch(`${API_BASE}/api/reason`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt, model }),
+    });
 
-export { TOOL_LABELS };
+    const data = await response.json();
+    return data.response || 'No response';
+  } catch (err) {
+    return `Error: ${err instanceof Error ? err.message : 'Unknown error'}`;
+  }
+}

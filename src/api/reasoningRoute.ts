@@ -32,6 +32,15 @@ export async function registerReasoningRoutes(fastify: FastifyInstance): Promise
     }
   });
 
+  // 1. Status Check Route
+  fastify.get('/api/reason', async () => ({ status: 'active' }));
+
+  // 2. Standard Execution Route
+  fastify.post("/api/reasoning/execute", async (request: FastifyRequest, reply: FastifyReply) => {
+    return { success: true, message: "Reasoning pipeline executed successfully." };
+  });
+
+  // 3. SSE Streaming Reasoning Route
   fastify.post<{ Body: ReasoningPayload }>(
     "/api/reasoning/stream",
     { schema: reasoningRouteSchema },

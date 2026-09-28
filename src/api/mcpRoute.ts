@@ -14,7 +14,13 @@ interface McpPayload {
   [key: string]: unknown;
 }
 
-export async function registerMcpRoutes(fastify: FastifyInstance) {
+export async function registerMcpRoutes(fastify: FastifyInstance): Promise<void> {
+  // Status check endpoint
+  fastify.get('/api/mcp', async () => ({ 
+    status: 'active', 
+    protocol: 'Model Context Protocol' 
+  }));
+
   // Execute specific tool actions via HTTP API
   fastify.post("/api/mcp/execute", async (req: FastifyRequest<{ Body: McpPayload }>, reply: FastifyReply) => {
     const { tool, arguments: args } = req.body;

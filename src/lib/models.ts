@@ -1,44 +1,53 @@
-import type { ModelId, ModelMeta } from './types';
+// src/lib/models.ts
+// LLM model definitions and metadata
 
-export const DEFAULT_MODEL_ID: ModelId = 'claude-sonnet-4.6';
+import type { ModelId } from './types.js';
+
+export interface ModelMeta {
+  id: ModelId;
+  label: string;
+  provider: string;
+  maxTokens: number;
+  costPer1kTokens: number;
+  description: string;
+}
 
 export const MODELS: Record<ModelId, ModelMeta> = {
-  'gemini-3.1-pro': {
-    id: 'gemini-3.1-pro',
-    label: 'Gemini 3.1 Pro',
-    short: 'GEM',
-    vendor: 'Google DeepMind',
-    color: '#4285f4',
-    accent: 'blue',
-    description: 'Multimodal frontier model with 2M token context',
-  },
   'claude-sonnet-4.6': {
     id: 'claude-sonnet-4.6',
     label: 'Claude Sonnet 4.6',
-    short: 'CLD',
-    vendor: 'Anthropic',
-    color: '#d97706',
-    accent: 'amber',
-    description: 'Balanced reasoning and speed with strong tool use',
+    provider: 'Anthropic',
+    maxTokens: 200000,
+    costPer1kTokens: 0.003,
+    description: 'Fast and capable model by Anthropic',
   },
   'gpt-5.4': {
     id: 'gpt-5.4',
     label: 'GPT-5.4',
-    short: 'GPT',
-    vendor: 'OpenAI',
-    color: '#10a37f',
-    accent: 'emerald',
-    description: 'Advanced reasoning with adaptive compute allocation',
+    provider: 'OpenAI',
+    maxTokens: 128000,
+    costPer1kTokens: 0.002,
+    description: 'Advanced reasoning model by OpenAI',
+  },
+  'gemini-3.1-pro': {
+    id: 'gemini-3.1-pro',
+    label: 'Gemini 3.1 Pro',
+    provider: 'Google',
+    maxTokens: 2000000,
+    costPer1kTokens: 0.001,
+    description: 'Large context model by Google',
   },
 };
 
-export const MODEL_LIST: ModelMeta[] = Object.values(MODELS);
+export const MODEL_LIST: ModelId[] = Object.keys(MODELS) as ModelId[];
 
-export function isModelId(id: string): id is ModelId {
-  return id in MODELS;
+export function modelMeta(modelId?: ModelId): ModelMeta {
+  if (!modelId || !MODELS[modelId]) {
+    return MODELS['claude-sonnet-4.6'];
+  }
+  return MODELS[modelId];
 }
 
-export function modelMeta(id?: string | ModelId): ModelMeta {
-  if (id && isModelId(id)) return MODELS[id];
-  return MODELS[DEFAULT_MODEL_ID];
+export function getAvailableModels(): ModelMeta[] {
+  return MODEL_LIST.map((id) => MODELS[id]);
 }

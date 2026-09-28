@@ -1,7 +1,7 @@
 // File path: ./src/components/ChatStream.tsx
 
 import React, { useRef, useState } from "react";
-import { ScrollControl } from "./scrollcontrol";
+import ScrollControl from "./scrollcontrol";
 
 export const ChatStream: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);

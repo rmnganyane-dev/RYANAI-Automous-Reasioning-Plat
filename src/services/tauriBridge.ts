@@ -1,0 +1,24 @@
+// src/services/tauriBridge.ts
+import { invoke } from "@tauri-apps/api/core";
+
+export interface AgentResponse {
+  status: string;
+  objective: string;
+  result: string;
+}
+
+export class TauriBridge {
+  public static async executeObjective(objective: string): Promise<AgentResponse> {
+    try {
+      const response = await invoke<AgentResponse>("trigger_agent_objective", { objective });
+      return response;
+    } catch (error: any) {
+      console.error("[Tauri IPC Error]:", error);
+      throw new Error(error || "Unknown Tauri IPC execution failure.");
+    }
+  }
+
+  public static async checkSystemHealth(): Promise<any> {
+    return await invoke("get_system_status");
+  }
+}

@@ -14,7 +14,7 @@ import AboutModal from '@/components/AboutModel';
 import MemoryVault from '@/components/MemoryVault';
 import GithubModal from '@/components/GithubModal';
 import CodeRain from '@/components/CodeRain';
-import { ChatInterface } from '@/components/ChatInterface';
+import ChatInterface from '@/components/ChatInterface';
 import Modal from '@/components/Modal';
 
 const DEFAULT_MODEL: ModelId = 'claude-sonnet-4.6';
@@ -73,9 +73,9 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
       return;
     }
 
-    // Load messages for each conversation
+    // Load messages for each conversation with explicit any typing resolved
     const convsWithMessages: Conversation[] = await Promise.all(
-      data.map(async (conv) => {
+      data.map(async (conv: any) => {
         const { data: msgs } = await supabase
           .from('messages')
           .select('*')
@@ -86,7 +86,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
           id: conv.id,
           title: conv.title,
           model: conv.model as ModelId,
-          messages: (msgs ?? []).map((m) => ({
+          messages: (msgs ?? []).map((m: any) => ({
             id: m.id,
             role: m.role,
             content: m.content,
@@ -406,6 +406,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     <TelemetryPanel status={status} steps={traceSteps} sending={sending} />
   );
 
+  // Updated chatPanelProps utilizing explicit union type casting
   const chatPanelProps = {
     messages: activeMessages,
     model,
@@ -418,7 +419,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     activeTitle: activeConversation?.title,
     onOpenLeft: () => setLeftOpen(true),
     onOpenRight: () => setRightOpen(true),
-    voiceState: voice.state,
+    voiceState: voice.state as "listening" | "processing" | "idle",
     voiceInterim: voice.interimText,
     voiceSupported: voice.isSupported,
     onVoiceToggle: voice.toggle,

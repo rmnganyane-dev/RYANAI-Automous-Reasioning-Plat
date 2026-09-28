@@ -1,0 +1,41 @@
+// src/services/mobileApiClient.ts
+const BACKEND_URL = process.env.EXPO_PUBLIC_RYAN_API_URL || "https://api.ryanganyane.co.za"; // Or local IP for development
+
+export interface AgentEvolutionResponse {
+  status: string;
+  objective: string;
+  result: string;
+}
+
+export class MobileApiClient {
+  public static async executeObjective(objective: string): Promise<AgentEvolutionResponse> {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/agent/evolve`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ objective }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error((errorData as any).error || `Server responded with status ${response.status}`);
+      }
+
+      return await response.json() as AgentEvolutionResponse;
+    } catch (error: any) {
+      console.error("[Mobile API Error]:", error.message);
+      throw error;
+    }
+  }
+
+  public static async checkHealth(): Promise<any> {
+    try {
+      const response = await fetch(`${BACKEND_URL}/health`);
+      return await response.json();
+    } catch (error) {
+      return { status: "offline" };
+    }
+  }
+}

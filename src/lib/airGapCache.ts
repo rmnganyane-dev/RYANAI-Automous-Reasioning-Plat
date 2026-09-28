@@ -11,6 +11,13 @@ export interface VectorEntry {
   [key: string]: unknown;
 }
 
+interface StoredVectorRecord {
+  id: string;
+  iv: Uint8Array;
+  ciphertext: ArrayBuffer;
+  metadata?: Record<string, unknown>;
+}
+
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -57,7 +64,7 @@ export async function saveVector(entry: VectorEntry): Promise<void> {
   const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, payload);
 
   return new Promise<void>((resolve, reject) => {
-    const record = { 
+    const record: StoredVectorRecord = { 
       id: entry.id, 
       iv, 
       ciphertext, 
@@ -75,7 +82,7 @@ export async function loadVector(id: string): Promise<VectorEntry | null> {
   const database = await openDB();
   const key = await getKey();
 
-  const record: any = await new Promise((resolve, reject) => {
+  const record = await new Promise<StoredVectorRecord | undefined>((resolve, reject) => {
     const request = database.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(id);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);

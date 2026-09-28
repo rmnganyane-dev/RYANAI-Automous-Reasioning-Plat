@@ -1,73 +1,13 @@
-import type { Conversation, Message, ModelId, ToolStep, MemoryEntry } from './types';
+// src/lib/storage.ts
+// LocalStorage and persistence utilities
+
+import type { Conversation, Message, ModelId, MemoryEntry, ToolStep } from './types.js';
 
 const STORAGE_KEY = 'ryanai_conversations';
 const MEMORY_KEY = 'ryanai_memory';
 
-function isStorageAvailable(): boolean {
-  try {
-    return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
-  } catch {
-    return false;
-  }
-}
-
-export function loadConversations(): Conversation[] {
-  if (!isStorageAvailable()) return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as Conversation[];
-  } catch {
-    return [];
-  }
-}
-
-export function saveConversations(conversations: Conversation[]): void {
-  if (!isStorageAvailable()) return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
-  } catch (error) {
-    console.warn('[Storage] Failed to save conversations to localStorage:', error);
-  }
-}
-
-export function loadMemory(): MemoryEntry[] {
-  if (!isStorageAvailable()) return [];
-  try {
-    const raw = localStorage.getItem(MEMORY_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as MemoryEntry[];
-  } catch {
-    return [];
-  }
-}
-
-export function saveMemory(entries: MemoryEntry[]): void {
-  if (!isStorageAvailable()) return;
-  try {
-    localStorage.setItem(MEMORY_KEY, JSON.stringify(entries));
-  } catch (error) {
-    console.warn('[Storage] Failed to save memory to localStorage:', error);
-  }
-}
-
-export function uid(prefix: string = 'id'): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
-  }
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-export function createConversation(model: ModelId): Conversation {
-  const now = Date.now();
-  return {
-    id: uid('conv'),
-    title: 'New Thread',
-    messages: [],
-    model,
-    createdAt: now,
-    updatedAt: now,
-  };
+export function uid(): string {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 export function createMessage(
@@ -77,7 +17,7 @@ export function createMessage(
   steps?: ToolStep[]
 ): Message {
   return {
-    id: uid('msg'),
+    id: uid(),
     role,
     content,
     model,
@@ -86,9 +26,74 @@ export function createMessage(
   };
 }
 
+export function createConversation(model: ModelId): Conversation {
+  const now = Date.now();
+  return {
+    id: uid(),
+    title: 'New Conversation',
+    model,
+    messages: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 export function generateTitle(text: string): string {
-  const clean = text.trim().replace(/\s+/g, ' ');
-  if (!clean) return 'New Thread';
-  if (clean.length <= 48) return clean;
-  return `${clean.slice(0, 45)}...`;
+  const words = text.split(' ').slice(0, 6);
+  return words.join(' ').substring(0, 50) + (text.length > 50 ? '...' : '');
+}
+
+export function loadConversations(): Conversation[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveConversations(conversations: Conversation[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+  } catch (err) {
+    console.error('Failed to save conversations:', err);
+  }
+}
+
+export function loadMemory(): MemoryEntry[] {
+  try {
+    const data = localStorage.getItem(MEMORY_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveMemory(entries: MemoryEntry[]): void {
+  try {
+    localStorage.setItem(MEMORY_KEY, JSON.stringify(entries));
+  } catch (err) {
+    console.error('Failed to save memory:', err);
+  }
+}
+
+export function addMemoryEntry(content: string, type: 'note' | 'thought' | 'insight' = 'note'): MemoryEntry {
+  const entry: MemoryEntry = {
+    id: uid(),
+    content,
+    type,
+    timestamp: Date.now(),
+  };
+  
+  const entries = loadMemory();
+  entries.push(entry);
+  saveMemory(entries);
+  
+  return entry;
+}
+
+export function deleteMemoryEntry(id: string): void {
+  const entries = loadMemory();
+  const filtered = entries.filter((e) => e.id !== id);
+  saveMemory(filtered);
 }

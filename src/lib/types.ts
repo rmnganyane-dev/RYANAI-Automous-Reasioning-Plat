@@ -1,22 +1,13 @@
-export type ModelId = 'gemini-3.1-pro' | 'claude-sonnet-4.6' | 'gpt-5.4';
+// src/lib/types.ts
+// Complete TypeScript type definitions for RyanAI
+
+export type ModelId = 'claude-sonnet-4.6' | 'gpt-5.4' | 'gemini-3.1-pro' | string;
 
 export interface ModelMeta {
-  id: ModelId;
-  label: string;
-  short: string;
-  vendor: string;
-  color: string;
-  accent: string;
-  description: string;
-}
-
-export interface ToolStep {
   id: string;
-  type: 'tool_start' | 'tool_result';
   name: string;
-  args?: Record<string, unknown>;
-  result?: string;
-  status?: 'running' | 'done' | 'error';
+  provider: string;
+  contextWindow?: number;
 }
 
 export interface Message {
@@ -31,18 +22,17 @@ export interface Message {
 export interface Conversation {
   id: string;
   title: string;
-  messages: Message[];
   model: ModelId;
+  messages: Message[];
   createdAt: number;
   updatedAt: number;
 }
 
-export interface MemoryEntry {
-  id: string;
-  key: string;
-  value: string;
-  category: 'preference' | 'fact' | 'project' | 'skill';
-  createdAt: number;
+export interface ToolStep {
+  type: string;
+  name: string;
+  result?: string;
+  args?: Record<string, unknown>;
 }
 
 export interface SystemStatus {
@@ -53,5 +43,40 @@ export interface SystemStatus {
   tokensOut: number;
   uptime: string;
   model: ModelId;
-  state: 'idle' | 'thinking' | 'tool-calling' | 'responding';
+  state: 'idle' | 'thinking' | 'error';
+}
+
+export interface MemoryEntry {
+  id: string;
+  content: string;
+  timestamp: number;
+  type: 'note' | 'thought' | 'insight';
+}
+
+export interface APIResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  timestamp: string;
+}
+
+export interface StreamingResponse {
+  status: 'processing' | 'complete' | 'error';
+  message?: string;
+  result?: string;
+  error?: string;
+}
+
+export interface ReasoningRequest {
+  prompt: string;
+  sessionId?: string;
+  model?: ModelId;
+}
+
+export interface ReasoningCallbacks {
+  onToken?: (token: string) => void;
+  onStep?: (step: ToolStep) => void;
+  onTitle?: (title: string) => void;
+  onDone?: () => void;
+  onError?: (error: string) => void;
 }
