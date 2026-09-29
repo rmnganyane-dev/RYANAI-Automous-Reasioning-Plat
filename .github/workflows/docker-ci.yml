@@ -21,6 +21,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Lowercase Repository Owner
+        id: repo_owner
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -28,7 +32,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ steps.repo_owner.outputs.owner }}/ryanai-web
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -45,7 +49,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Docker Image (Local Test)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
@@ -61,7 +65,6 @@ jobs:
           
           echo "Waiting for container web service..."
           for i in {1..30}; do
-            # Targets /health based on your API setup, failing silently if not ready
             if curl -s -f http://localhost:8080/health > /dev/null; then
               echo "Container healthcheck passed!"
               exit 0
@@ -79,7 +82,7 @@ jobs:
 
       - name: Push Docker Image to GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
@@ -88,6 +91,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     needs: build-test-and-push
