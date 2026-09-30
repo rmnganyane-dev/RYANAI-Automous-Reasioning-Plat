@@ -172,3 +172,10 @@ build/
 *.dll
 *.so
 *.node
+*.zip
+*.csv
+*.bat
+*.ps1
+*.sh
+*.gguf
+*.md
