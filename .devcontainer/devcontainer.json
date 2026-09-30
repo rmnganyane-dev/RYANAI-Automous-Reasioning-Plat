@@ -5,7 +5,12 @@
     "ghcr.io/devcontainers/features/node:1": {
       "version": "22"
     },
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "helm": "latest",
+      "kubectl": "latest",
+      "minikube": "none"
+    }
   },
   "postCreateCommand": "npm ci --legacy-peer-deps",
   "customizations": {
@@ -14,7 +19,8 @@
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "ms-vscode.vscode-typescript-next",
-        "github.copilot"
+        "github.copilot",
+        "ms-kubernetes-tools.vscode-kubernetes-tools"
       ]
     }
   },

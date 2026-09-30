@@ -8,6 +8,7 @@ import {
   UserPlus,
   type LucideIcon,
 } from 'lucide-react';
+<<<<<<< HEAD
 import appManifest from '../app/routes.json';
 import { UI_CONFIG } from '@/config/core';
 import RyanAICockpit from '@/components/dashboard/RyanAICockpit';
@@ -16,6 +17,9 @@ import DashboardPage from '@/pages/Dashboard';
 import LandingPage from '@/pages/LandingPage';
 import AuthPage from '@/pages/AuthPage';
 import { useAuth } from '@/hooks/useAuth';
+=======
+import { Analytics } from '@vercel/analytics/react';
+>>>>>>> 6685bcc (Install Vercel Web Analytics)
 
 type Route = (typeof appManifest.routes)[number]['id'];
 
@@ -71,6 +75,7 @@ export default function App() {
   }, []);
 
   return (
+<<<<<<< HEAD
     <div className="flex h-screen min-h-[480px] flex-col overflow-hidden bg-slate-950 text-slate-100">
       <header className="z-20 flex min-h-14 items-center justify-between border-b border-cyan-400/15 bg-slate-950/95 px-4 sm:px-8">
         <a
@@ -156,6 +161,20 @@ export default function App() {
           </>
         )}
       </main>
+=======
+    <div className="relative h-screen w-screen bg-slate-950 overflow-hidden flex flex-col">
+      <MatrixRainCanvas />
+      {isAuthenticated ? (
+        <CommandCenter 
+          onSignOut={handleSignOut} 
+          userEmail={userEmail} 
+          userFullName={userFullName} 
+        />
+      ) : (
+        <AuthPage onSignIn={handleSignIn} />
+      )}
+      <Analytics />
+>>>>>>> 6685bcc (Install Vercel Web Analytics)
     </div>
   );
 }
