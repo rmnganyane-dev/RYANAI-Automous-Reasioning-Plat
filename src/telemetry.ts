@@ -1,7 +1,8 @@
 // File path: ./src/telemetry.ts
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { Resource } from '@opentelemetry/resources';
+import opentelemetryResources from '@opentelemetry/resources';
+const { Resource } = opentelemetryResources as any;
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 
 export function initializeTelemetry(serviceName: string = "ryanai-autonomous-reasoning-engine"): Resource {

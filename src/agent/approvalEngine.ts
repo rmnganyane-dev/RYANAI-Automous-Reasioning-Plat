@@ -16,8 +16,20 @@ const databaseUrl =
 
 export const checkpointer = PostgresSaver.fromConnString(databaseUrl);
 
-// Automatically set up checkpoint tables on module initialization
-await checkpointer.setup();
+// Safe, non-blocking initialization function
+let isInitialized = false;
+export async function initializeAgentDatabase() {
+  if (isInitialized) return;
+  try {
+    console.log('[DB] Connecting and setting up LangGraph PostgresSaver checkpointer...');
+    await checkpointer.setup();
+    isInitialized = true;
+    console.log('[DB] PostgresSaver checkpointer successfully initialized.');
+  } catch (error) {
+    console.error('[CRITICAL] Failed to initialize PostgresSaver checkpointer:', error);
+    throw error;
+  }
+}
 
 // Register communication tools alongside WhatsApp integration
 const agentTools = [...commsTools, sendWhatsAppTool];

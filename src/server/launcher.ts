@@ -1,18 +1,19 @@
 // MUST be imported first for proper OpenTelemetry & Sentry tracing
-import '../instrument';
-import '../telemetry';
+import '../instrument.js';
+import '../telemetry.js';
 
 import Fastify from 'fastify';
 import fastifyRedis from '@fastify/redis';
 import fastifyRateLimit from '@fastify/rate-limit';
 import pg from 'pg';
 
-import { authPlugin } from './routes/auth';
-import { commsPlugin } from './comms/index';
-import { approvalRoutes } from './routes/approvalRoutes';
-import { slackInteractionsPlugin } from './routes/slackInteractions';
-import { twilioWebhookPlugin } from './routes/twilioWebhook';
-import { metricsRoutes } from './routes/metrics';
+import { authPlugin } from './routes/auth.js';
+import { commsPlugin } from './comms/index.js';
+import { approvalRoutes } from './routes/approvalRoutes.js';
+import { slackInteractionsPlugin } from './routes/slackInteractions.js';
+import { twilioWebhookPlugin } from './routes/twilioWebhook.js';
+import { metricsRoutes } from './routes/metrics.js';
+import { initializeAgentDatabase } from '../agent/approvalEngine.js';
 
 const { Pool } = pg;
 
@@ -61,6 +62,7 @@ let dbPool: pg.Pool;
 const serviceStatus = {
   database: false,
   redis: false,
+  agentCheckpointer: false,
   api: false,
 };
 
@@ -122,6 +124,15 @@ async function initializeDatabase() {
 
     console.log(`✓ Database connected: ${result.rows[0].now}`);
     serviceStatus.database = true;
+
+    // Initialize LangGraph PostgresSaver checkpointer tables
+    try {
+      await initializeAgentDatabase();
+      serviceStatus.agentCheckpointer = true;
+    } catch (agentErr) {
+      console.warn('⚠️ Agent PostgresSaver checkpointer setup deferred/failed:', agentErr instanceof Error ? agentErr.message : agentErr);
+    }
+
     return true;
   } catch (err) {
     console.error(`✗ Database connection failed:`, err instanceof Error ? err.message : err);

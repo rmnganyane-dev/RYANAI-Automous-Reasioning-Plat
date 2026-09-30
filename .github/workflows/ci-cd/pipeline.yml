@@ -1,0 +1,39 @@
+name: RyanAI Production CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, production ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Monorepo
+        uses: actions/checkout@v4
+
+      - name: Set up Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python Dependencies & Test Agents
+        run: |
+          pip install pytest chromadb langgraph fastapi
+          pytest ./packages/agent-core/ ./packages/knowledge-rag/
+
+      - name: Set up Node.js & Test Fastify Gateway
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Gateway Dependencies & Build
+        run: |
+          cd services/fastify-gateway
+          npm install
+          npm run build
+
+      - name: Verify eBPF Security Guardrails
+        run: |
+          python3 security/ebpf/guardrail_enforcer.py
