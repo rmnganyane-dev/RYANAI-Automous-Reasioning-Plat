@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ryanai-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ryanai-secrets
+  namespace: ryanai-system
+type: Opaque
+stringData:
+  DB_PASSWORD: "ryanai_secure_password"
+  REDIS_PASSWORD: "ryanai_redis_password"
+  JWT_SECRET: "your_jwt_secret_key_change_in_production"

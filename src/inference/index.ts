@@ -4,31 +4,27 @@ import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
 
-// TypeScript interface matching native C++ module exports in cuda_engine.cpp
 interface NativeCudaEngine {
   executeInference(prompt: string): string;
   executeCUDAInference(payload: string): string;
+  executeMatrixScale(arr: Float32Array, scale: number): Float32Array;
   isCudaAvailable(): boolean;
 }
 
 let cudaEngine: NativeCudaEngine | null = null;
 
-// Attempt to load compiled C++ native addon targets
 try {
   cudaEngine = require('../../build/Release/ryan_cuda_engine.node') as NativeCudaEngine;
   console.log("[Hardware] Native CUDA Engine (ryan_cuda_engine) loaded successfully.");
 } catch (_err1) {
   try {
     cudaEngine = require('../../build/Release/cuda_inference_bridge.node') as NativeCudaEngine;
-    console.log("[Hardware] CUDA Inference Bridge (cuda_inference_bridge) loaded successfully.");
+    console.log("[Hardware] CUDA Inference Bridge loaded successfully.");
   } catch (_err2) {
-    console.warn("[Hardware] Native CUDA bindings not loaded. Run 'npm run build:native'. Operating in CPU Fallback mode.");
+    console.warn("[Hardware] Native CUDA bindings not loaded. Operating in CPU Fallback mode.");
   }
 }
 
-/**
- * Offloads compute-heavy task vectors to the native C++ module (JSON Payload mode)
- */
 export const runHardwareInference = (payload: string): string => {
   if (cudaEngine && typeof cudaEngine.executeCUDAInference === 'function') {
     try {
@@ -38,7 +34,6 @@ export const runHardwareInference = (payload: string): string => {
     }
   }
 
-  // CPU Fallback logic
   return JSON.stringify({
     cuda_status: "offline",
     fallback: "cpu_simulated",
@@ -47,9 +42,6 @@ export const runHardwareInference = (payload: string): string => {
   });
 };
 
-/**
- * Executes tensor embedding inference via C++ CUDA binding
- */
 export const runTensorInference = (prompt: string): string => {
   if (cudaEngine && typeof cudaEngine.executeInference === 'function') {
     try {
@@ -59,13 +51,9 @@ export const runTensorInference = (prompt: string): string => {
     }
   }
 
-  // CPU Fallback logic
   return `[CPU Engine] Simulated tensor embeddings for: "${prompt}". Hardware latency: 0.05ms (Fallback).`;
 };
 
-/**
- * Checks if native CUDA hardware acceleration is active and available
- */
 export const isCudaHardwareAvailable = (): boolean => {
   if (cudaEngine && typeof cudaEngine.isCudaAvailable === 'function') {
     return cudaEngine.isCudaAvailable();

@@ -5,6 +5,7 @@ import {
   CheckCircle2, AlertTriangle, X, RefreshCw, Layers, Code2, Sparkles,
   Trash2, RotateCcw, Server, LogOut, Wifi, Hash, ChevronRight, ChevronDown
 } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 
 // ==========================================
 // MOCK DATA & CONSTANTS
@@ -759,6 +760,7 @@ export default function App() {
       ) : (
         <AuthPage onSignIn={handleSignIn} />
       )}
+      <Analytics />
     </div>
   );
 }

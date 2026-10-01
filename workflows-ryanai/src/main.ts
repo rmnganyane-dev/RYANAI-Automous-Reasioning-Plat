@@ -44,7 +44,6 @@ const getOrderStatus = task(
   },
 );
 
-// No retry: processing a refund is non-idempotent
 const processRefund = task(
   { name: "processRefund" },
   function processRefund(_ctx: TaskContext, orderId: string, reason: string) {
@@ -250,7 +249,6 @@ const agentTurn = task(
 
     const llmResponse = await ctx.run(callLlmWithTools, messages, tools);
 
-    // If no tools requested, return simple response and update history
     if (!llmResponse.tool_calls.length) {
       console.log("[AGENT TURN] No tool calls, returning response");
       return {
@@ -302,7 +300,6 @@ const agentTurn = task(
 
     console.log("[AGENT TURN] Agent turn complete");
 
-    // FIXED: Correctly preserve the full tool exchange in conversation history for multi-turn continuity
     return {
       response: finalResponse.content,
       conversation_history: [
@@ -317,7 +314,6 @@ const agentTurn = task(
   },
 );
 
-// Root task: multi-turn conversation
 task(
   { name: "multiTurnConversation", retry, timeoutSeconds: 300 },
   async function multiTurnConversation(ctx: TaskContext, ...messages: string[]) {

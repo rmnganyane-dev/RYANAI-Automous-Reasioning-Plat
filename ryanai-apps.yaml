@@ -1,0 +1,89 @@
+# API Backend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ryanai-api
+  namespace: ryanai-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ryanai-api
+  template:
+    metadata:
+      labels:
+        app: ryanai-api
+    spec:
+      containers:
+        - name: api
+          image: my-app-api:latest # Update with your image repository tag
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: DATABASE_URL
+              value: "postgresql://ryanai:ryanai_secure_password@postgres:5432/ryanai_db"
+            - name: REDIS_URL
+              value: "redis://:ryanai_redis_password@redis:6379"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ryanai-secrets
+                  key: JWT_SECRET
+            - name: PORT
+              value: "3001"
+          ports:
+            - containerPort: 3001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: ryanai-system
+spec:
+  ports:
+    - port: 3001
+      targetPort: 3001
+  selector:
+    app: ryanai-api
+---
+# Web Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ryanai-web
+  namespace: ryanai-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ryanai-web
+  template:
+    metadata:
+      labels:
+        app: ryanai-web
+    spec:
+      containers:
+        - name: web
+          image: my-app-web:latest # Update with your image repository tag
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: VITE_API_URL
+              value: "http://api:3001"
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ryanai-web-svc
+  namespace: ryanai-system
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30090
+  selector:
+    app: ryanai-web
+    
