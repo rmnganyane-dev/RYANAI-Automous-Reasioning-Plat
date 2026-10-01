@@ -6,7 +6,14 @@
   "type": "module",
   "scripts": {
     "### ═══════════════════════════════════════════════════════════ BUILD & VALIDATION ═══════════════════════════════════════════════════════════ ###": "",
-    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+<<<<<<<<< Temporary merge branch 1
+    "build": "vite build",
+    "build": "vite build",
+  "build:desktop": "tauri build",
+    "docker:up": "docker compose up --build -d",
+    "docker:health": "docker compose exec ryanai-api curl -s http://localhost:3000/health | jq",
+=========
+>>>>>>>>> Temporary merge branch 2
     "build": "tsc -p tsconfig.app.json && vite build",
     "build:desktop": "tauri build",
     "docker:up": "docker compose up --build -d",
