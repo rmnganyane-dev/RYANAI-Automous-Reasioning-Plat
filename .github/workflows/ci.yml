@@ -1,24 +1,24 @@
 # File path: .github/workflows/ci.yml
 
-name: RyanAI CI/CD Pipeline
+name: RyanAI Autonomous CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main", "master", "dev" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main", "master", "dev" ]
 
 jobs:
-  build-and-test:
+  validate-and-test:
     runs-on: ubuntu-latest
 
     services:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: ryanai
+          POSTGRES_USER: ryanai_admin
+          POSTGRES_PASSWORD: secure_ryanai_password
+          POSTGRES_DB: ryanai_memory
         ports:
           - 5432:5432
         options: >-
@@ -26,28 +26,68 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
       redis:
-        image: redis:alpine
+        image: redis:7-alpine
         ports:
           - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://ryanai_admin:secure_ryanai_password@localhost:5432/ryanai_memory?schema=public
+      REDIS_URL: redis://localhost:6379
+      NODE_ENV: test
+      PORT: 3000
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Dependencies (Using pnpm)
+        run: |
+          curl -fsSL https://get.pnpm.io/install.sh | sh -
+          export PATH="$HOME/.local/share/pnpm:$PATH"
+          pnpm install --no-frozen-lockfile --force
+      - name: Install System Dependencies (eBPF & node-gyp)
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 linux-headers-generic libbpf-dev
 
-      - name: Setup Node.js
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js 24.x
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: '24.x'
+          cache: 'pnpm'
 
       - name: Install Dependencies
-        run: npm ci --legacy-peer-deps
+        run: pnpm install --no-frozen-lockfile --force
 
-      - name: Run TypeScript Typecheck
-        run: npm run typecheck
+      - name: Generate Prisma Client
+        run: pnpm exec prisma generate
+
+      - name: Run Prisma Database Push / Schema Sync
+        run: pnpm exec prisma db push --skip-generate
+
+      - name: Run TypeScript Type Check
+        run: pnpm exec tsc --noEmit
+
+      - name: Execute System Verification Suite
+        run: pnpm exec tsx scripts/system-verify.ts
+
+      - name: Run Unit Tests
+        run: pnpm test --if-present
 
       - name: Run Production Build
-        run: npm run build
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ryanai?schema=public
+        run: pnpm run build

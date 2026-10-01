@@ -19,8 +19,7 @@ node_modules/
 .npm/
 .yarn-integrity
 *.tgz
-pnpm-lock.yaml.bak
-package-lock.json.bak
+vendor/
 
 # ==========================
 # Build Outputs & Distribution
@@ -35,12 +34,11 @@ installers/
 .svelte-kit/
 .vite/
 *.tsbuildinfo
-*.exe
+build/
 
 # ==========================
 # Native C++ Addons (node-gyp)
 # ==========================
-build/
 build/Release/
 build/Debug/
 *.node
@@ -117,6 +115,15 @@ coverage/
 *.lcov
 
 # ==========================
+# Binaries & Archives
+# ==========================
+*.zip
+*.exe
+*.iso
+*.7z
+*.tar.gz
+
+# ==========================
 # IDEs & Editors
 # ==========================
 .vscode/*
@@ -147,35 +154,3 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 .directory
-
-# ==========================
-# Docker & Container Artifacts
-# ==========================
-.docker/
-docker-compose.override.yml
-.dockerignore.tmp
-
-# ==========================
-# CI/CD & Build Systems
-# ==========================
-.github/workflows/logs/
-.gitlab-ci.yml.backup
-.github/workflows/cache/
-
-node_modules/
-.pnpm-store/
-vendor/
-dist/
-build/
-.next/
-*.exe
-*.dll
-*.so
-*.node
-*.zip
-*.csv
-*.bat
-*.ps1
-*.sh
-*.gguf
-*.md

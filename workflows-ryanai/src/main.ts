@@ -158,7 +158,7 @@ const callLlmWithTools = task(
     _ctx: TaskContext,
     messages: ChatCompletionMessageParam[],
     toolDefs: ChatCompletionTool[],
-    model: string = "gpt-4",
+    model: string = "gpt-4o",
   ) {
     console.log(`[AGENT] Calling ${model} with ${toolDefs.length} tools available`);
 
@@ -228,6 +228,8 @@ const agentTurn = task(
         success: false,
         error: `user_message must be a string, got ${typeof userMessage}`,
         response: "I'm sorry, there was an error processing your message. Please try again.",
+        conversation_history: conversationHistory,
+        tool_calls: [],
       };
     }
 
@@ -248,6 +250,7 @@ const agentTurn = task(
 
     const llmResponse = await ctx.run(callLlmWithTools, messages, tools);
 
+    // If no tools requested, return simple response and update history
     if (!llmResponse.tool_calls.length) {
       console.log("[AGENT TURN] No tool calls, returning response");
       return {
@@ -279,17 +282,19 @@ const agentTurn = task(
       content: JSON.stringify(toolResults[i].result),
     }));
 
+    const assistantToolCallMessage: ChatCompletionMessageParam = {
+      role: "assistant" as const,
+      content: llmResponse.content,
+      tool_calls: llmResponse.tool_calls.map((tc) => ({
+        id: tc.id,
+        type: "function" as const,
+        function: { name: tc.function.name, arguments: tc.function.arguments },
+      })),
+    };
+
     const finalMessages: ChatCompletionMessageParam[] = [
       ...messages,
-      {
-        role: "assistant" as const,
-        content: llmResponse.content,
-        tool_calls: llmResponse.tool_calls.map((tc) => ({
-          id: tc.id,
-          type: "function" as const,
-          function: { name: tc.function.name, arguments: tc.function.arguments },
-        })),
-      },
+      assistantToolCallMessage,
       ...toolMessages,
     ];
 
@@ -297,11 +302,14 @@ const agentTurn = task(
 
     console.log("[AGENT TURN] Agent turn complete");
 
+    // FIXED: Correctly preserve the full tool exchange in conversation history for multi-turn continuity
     return {
       response: finalResponse.content,
       conversation_history: [
         ...conversationHistory,
         { role: "user" as const, content: userMessage },
+        assistantToolCallMessage,
+        ...toolMessages,
         { role: "assistant" as const, content: finalResponse.content },
       ],
       tool_calls: toolResults,
