@@ -6,6 +6,9 @@
   "type": "module",
   "scripts": {
     "### ═══════════════════════════════════════════════════════════ BUILD & VALIDATION ═══════════════════════════════════════════════════════════ ###": "",
+    "build": "vite build",
+    "build": "vite build",
+  "build:desktop": "tauri build",
     "docker:up": "docker compose up --build -d",
     "docker:health": "docker compose ps",
     "build": "tsc -p tsconfig.app.json && vite build",
