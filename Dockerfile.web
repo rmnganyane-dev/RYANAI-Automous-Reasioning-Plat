@@ -19,6 +19,9 @@ COPY . .
 # Install dependencies
 RUN pnpm install --frozen-lockfile || npm ci
 
+# Increase Node.js memory limit to prevent out-of-memory errors during build
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
 # Build frontend bundle
 RUN pnpm run build:client || pnpm run build
 
