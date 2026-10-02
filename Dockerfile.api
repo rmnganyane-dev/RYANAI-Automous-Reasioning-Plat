@@ -11,6 +11,12 @@ COPY package*.json ./
 # Install dependencies (matching your local environment)
 RUN npm install --legacy-peer-deps
 
+# Install Python, build tools, and local Node.js development headers
+RUN apk add --no-cache python3 make g++ build-base nodejs-dev
+
+# Tell node-gyp to use the local container headers instead of downloading them online
+RUN npm config set nodedir /usr
+
 # Copy source code and TypeScript configs
 COPY tsconfig*.json ./
 COPY src/ ./src/

@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { reasoningAgent } from '../../agent/engine';
+import { reasoningAgent } from '../../agent/engine.js';
 
 export const reasonPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.post('/api/reason', async (request, reply) => {
@@ -18,9 +18,10 @@ export const reasonPlugin: FastifyPluginAsync = async (fastify) => {
         response: lastMessage.content,
         trace: result.messages,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       reply.status(500);
-      return { success: false, error: err.message };
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      return { success: false, error: errorMessage };
     }
   });
 };

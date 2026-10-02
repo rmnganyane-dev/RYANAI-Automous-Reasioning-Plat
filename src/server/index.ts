@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
-import { registerReasoningRoutes } from './api/reasoningRoute.js';
-import { registerMcpRoutes } from './api/mcpRoute.js';
+import fastifyRedis from '@fastify/redis';
+import { reasonPlugin } from './routes/reason.js';
+import { RyanMCPServer } from '../mcp/ryanMcpServer.js';
 
 const server = Fastify({ logger: true });
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -28,43 +29,57 @@ server.get('/', async () => {
   };
 });
 
-// Health check endpoint
+// Health check endpoint with live Redis ping
 server.get('/health', async () => {
+  let redisStatus = 'not-configured';
+  try {
+    if (server.redis) {
+      await server.redis.ping();
+      redisStatus = 'connected';
+    }
+  } catch {
+    redisStatus = 'disconnected';
+  }
+
   return {
     status: 'online',
     service: 'ryanai-api-gateway',
     database: process.env.DATABASE_URL ? 'configured' : 'not-configured',
-    redis: process.env.REDIS_URL ? 'configured' : 'not-configured',
+    redis: redisStatus,
     cudaDevice: process.env.CUDA_DEVICE_ID || '0',
     timestamp: new Date().toISOString()
   };
 });
 
-// Legacy reasoning endpoint
-server.post('/api/reason', async (request) => {
-  const body = request.body as { prompt?: string };
-  return {
-    success: true,
-    engine: 'RyanAI LangGraph ReAct + CUDA',
-    response: `Autonomous reasoning processed: "${body?.prompt || 'No prompt provided'}"`,
-    timestamp: new Date().toISOString()
-  };
-});
-
-// Register feature routes
+// Register plugins and feature routes
 async function setupRoutes() {
+  // Register Redis plugin with explicit IPv4 configuration to prevent Windows timeout hangs
   try {
-    await registerReasoningRoutes(server);
+    await server.register(fastifyRedis, {
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: Number(process.env.REDIS_PORT) || 6379,
+      family: 4 // Forces IPv4 to bypass Windows IPv6 resolution delay
+    });
+    console.log('✓ Redis plugin registered successfully');
+  } catch (err) {
+    console.error('Failed to register Redis plugin:', err);
+  }
+
+  try {
+    // Register reasoning plugin routes
+    await server.register(reasonPlugin);
     console.log('✓ Reasoning routes registered');
   } catch (err) {
     console.error('Failed to register reasoning routes:', err);
   }
 
   try {
-    await registerMcpRoutes(server);
-    console.log('✓ MCP routes registered');
+    // Initialize MCP server instance
+    const mcpServer = new RyanMCPServer();
+    void mcpServer; // Explicitly suppress unused variable warning
+    console.log('✓ RyanMCPServer initialized successfully');
   } catch (err) {
-    console.error('Failed to register MCP routes:', err);
+    console.error('Failed to initialize RyanMCPServer:', err);
   }
 }
 
@@ -75,8 +90,7 @@ async function startServer() {
     await server.listen({ port: PORT, host: HOST });
     console.log(`✓ RyanAI API Gateway listening on http://${HOST}:${PORT}`);
     console.log(`✓ Health check: http://${HOST}:${PORT}/health`);
-    console.log(`✓ Reasoning endpoint: POST http://${HOST}:${PORT}/api/reasoning/stream`);
-    console.log(`✓ MCP endpoint: POST http://${HOST}:${PORT}/api/mcp`);
+    console.log(`✓ Reasoning endpoint: POST http://${HOST}:${PORT}/api/reason`);
   } catch (err) {
     server.log.error(err);
     process.exit(1);

@@ -6,6 +6,10 @@
   "type": "module",
   "scripts": {
     "### ═══════════════════════════════════════════════════════════ BUILD & VALIDATION ═══════════════════════════════════════════════════════════ ###": "",
+    "build:server": "tsc -p tsconfig.server.json",
+    "start": "node dist/server/index.js",
+    "start:dev": "node --import tsx/esm src/server/launcher.ts",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.app.json --noEmit",
     "build": "NODE_OPTIONS=--max-old-space-size=4096 tsc -p tsconfig.app.json && vite build",
     "validate": "NODE_OPTIONS=--max-old-space-size=4096 npm run typecheck && npm run lint && npm run build",
     "build": "tsc -p tsconfig.app.json && vite build",
