@@ -4,7 +4,7 @@
     "composite": true,
     "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
@@ -39,7 +39,15 @@
     },
     "types": ["vite/client", "node"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": [
+    "src/pages/**/*.tsx",
+    "src/components/**/*.tsx",
+    "src/hooks/**/*.ts",
+    "src/hooks/**/*.tsx",
+    "src/store/**/*.ts",
+    "src/main.tsx",
+    "src/App.tsx"
+  ],
 "exclude": [
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
