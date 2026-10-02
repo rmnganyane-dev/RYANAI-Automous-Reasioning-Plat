@@ -1,9 +1,14 @@
-# API Backend Deployment
+# ==============================================================================
+# API Backend Deployment & Service
+# ==============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ryanai-api
   namespace: ryanai-system
+  labels:
+    app.kubernetes.io/name: ryanai-api
+    app.kubernetes.io/part-of: ryanai-platform
 spec:
   replicas: 1
   selector:
@@ -17,7 +22,7 @@ spec:
       containers:
         - name: api
           image: my-app-api:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           env:
             - name: NODE_ENV
               value: "production"
@@ -33,7 +38,8 @@ spec:
             - name: PORT
               value: "3001"
           ports:
-            - containerPort: 3001
+            - name: http
+              containerPort: 3001
           readinessProbe:
             httpGet:
               path: /health
@@ -50,21 +56,31 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: api
+  name: ryanai-api-svc
   namespace: ryanai-system
+  labels:
+    app.kubernetes.io/name: ryanai-api-svc
+    app.kubernetes.io/part-of: ryanai-platform
 spec:
+  type: ClusterIP
   ports:
-    - port: 3001
+    - name: http
+      port: 3001
       targetPort: 3001
   selector:
     app: ryanai-api
 ---
-# Web Frontend Deployment
+# ==============================================================================
+# Web Frontend Deployment & Service
+# ==============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ryanai-web
   namespace: ryanai-system
+  labels:
+    app.kubernetes.io/name: ryanai-web
+    app.kubernetes.io/part-of: ryanai-platform
 spec:
   replicas: 1
   selector:
@@ -78,22 +94,27 @@ spec:
       containers:
         - name: web
           image: my-app-web:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           env:
             - name: VITE_API_URL
-              value: "http://api:3001"
+              value: "http://ryanai-api-svc:3001"
           ports:
-            - containerPort: 80
+            - name: http
+              containerPort: 80
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: ryanai-web-svc
   namespace: ryanai-system
+  labels:
+    app.kubernetes.io/name: ryanai-web-svc
+    app.kubernetes.io/part-of: ryanai-platform
 spec:
   type: NodePort
   ports:
-    - port: 80
+    - name: http
+      port: 80
       targetPort: 80
       nodePort: 30090
   selector:

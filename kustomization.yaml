@@ -7,3 +7,13 @@ resources:
   - ryanai-core.yaml
   - ryanai-databases.yaml
   - ryanai-apps.yaml
+
+# Patch all containers in deployment manifests to use local images without pulling remotely
+patches:
+  - target:
+      kind: Deployment
+      name: ryanai-api
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
