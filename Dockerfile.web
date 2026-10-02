@@ -17,6 +17,9 @@ RUN apk add --no-cache python3 make g++ build-base nodejs-dev
 # Tell node-gyp to use the local container headers instead of downloading them online
 RUN npm config set nodedir /usr
 
+# Set the environment variable for node-gyp headers
+ENV npm_config_nodedir=/usr
+
 # Install dependencies
 RUN pnpm install --frozen-lockfile --ignore-scripts || npm ci --ignore-scripts
 RUN apk add --no-cache python3 make g++ nodejs-dev

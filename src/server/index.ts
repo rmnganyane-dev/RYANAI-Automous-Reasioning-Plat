@@ -3,7 +3,10 @@ import fastifyRedis from '@fastify/redis';
 import { reasonPlugin } from './routes/reason.js';
 import { RyanMCPServer } from '../mcp/ryanMcpServer.js';
 
-const server = Fastify({ logger: true });
+const server = Fastify({ 
+  logger: true,
+  pluginTimeout: 30000 // Increase Avvio plugin timeout to 30 seconds
+});
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
@@ -53,16 +56,17 @@ server.get('/health', async () => {
 
 // Register plugins and feature routes
 async function setupRoutes() {
-  // Register Redis plugin with explicit IPv4 configuration to prevent Windows timeout hangs
+  // Register Redis plugin with graceful fallback and fail-fast connection timeout
   try {
     await server.register(fastifyRedis, {
-      host: process.env.REDIS_HOST || '127.0.0.1',
-      port: Number(process.env.REDIS_PORT) || 6379,
-      family: 4 // Forces IPv4 to bypass Windows IPv6 resolution delay
+      url: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
+      family: 4,          // Forces IPv4 to prevent Windows socket resolution hangs
+      connectTimeout: 5000 // Fail fast if unreachable
     });
     console.log('✓ Redis plugin registered successfully');
-  } catch (err) {
-    console.error('Failed to register Redis plugin:', err);
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.warn('⚠️ Redis connection skipped/failed; running without Redis cache:', errorMsg);
   }
 
   try {
@@ -76,7 +80,7 @@ async function setupRoutes() {
   try {
     // Initialize MCP server instance
     const mcpServer = new RyanMCPServer();
-    void mcpServer; // Explicitly suppress unused variable warning
+    void mcpServer; // Suppress unused variable warning
     console.log('✓ RyanMCPServer initialized successfully');
   } catch (err) {
     console.error('Failed to initialize RyanMCPServer:', err);

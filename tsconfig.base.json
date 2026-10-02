@@ -1,30 +1,20 @@
 {
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "composite": true,
     "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
     "moduleDetection": "force",
-    "noEmit": true,
-    "jsx": "react-jsx",
-    "types": ["vite/client", "node"],
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
     "paths": {
       "@/*": ["./src/*"],
       "@/components/*": ["./src/components/*"],
@@ -35,16 +25,13 @@
       "@/hooks/*": ["./src/hooks/*"],
       "@/types/*": ["./src/types/*"],
       "@/config/*": ["./src/config/*"],
-      "@/utils/*": ["./src/utils/*"]
-    },
-    "types": ["vite/client", "node"]
-  },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-"exclude": [
-    "src/**/*.test.ts",
-    "src/**/*.test.tsx",
-    "src/**/*.spec.ts",
-    "src/**/*.spec.tsx",
-    "src/**/*.js"
-  ]
+      "@/utils/*": ["./src/utils/*"],
+      "@/server/*": ["./src/server/*"],
+      "@/mcp/*": ["./src/mcp/*"],
+      "@/api/*": ["./src/api/*"],
+      "@/agent/*": ["./src/agent/*"],
+      "@/db/*": ["./src/db/*"],
+      "@/routes/*": ["./src/routes/*"]
+    }
+  }
 }

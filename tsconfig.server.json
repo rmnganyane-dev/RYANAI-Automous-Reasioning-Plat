@@ -1,14 +1,24 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
+    "composite": true,
+    "target": "ESNext",
     "moduleResolution": "NodeNext",
+    "allowJs": true,
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "noEmit": false,
+    "types": ["node"],
     "lib": ["ES2022"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "noEmit": true,
+    "composite": true,
+    "noEmit": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitReturns": true,
@@ -41,5 +51,14 @@
     "src/services/**/*",
     "src/index.ts"
   ],
-  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "target",
+    "scripts",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts"
+  ]
 }

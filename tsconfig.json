@@ -1,15 +1,13 @@
 {
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
     "target": "ESNext",
     "module": "NodeNext",
-    "noEmit": true,
-    "moduleResolution": "Node",
-    "resolveJsonModule": true,    "allowJs": true,
+    "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
+    "allowJs": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "composite": true,
     "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true,
     "declaration": true,
@@ -38,14 +36,11 @@
     "types": ["node"],
     "composite": true,
     "incremental": true,
+    "noEmit": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "strictPropertyInitialization": true,
     "lib": ["ES2022"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
@@ -63,6 +58,7 @@
   ],
   "references": [
     { "path": "./tsconfig.server.json" },
-    { "path": "./tsconfig.app.json" }
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.mcp.json" }
   ]
 }
