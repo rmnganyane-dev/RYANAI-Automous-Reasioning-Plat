@@ -22,7 +22,11 @@ spec:
       containers:
         - name: api
           image: my-app-api:latest
+<<<<<<< HEAD
           imagePullPolicy: Never
+=======
+          imagePullPolicy: IfNotPresent
+>>>>>>> 2c18b0511655432fda9dde82873dddcc859eeadc
           env:
             - name: NODE_ENV
               value: "production"
@@ -38,8 +42,12 @@ spec:
             - name: PORT
               value: "3001"
           ports:
+<<<<<<< HEAD
             - name: http
               containerPort: 3001
+=======
+            - containerPort: 3001
+>>>>>>> 2c18b0511655432fda9dde82873dddcc859eeadc
           readinessProbe:
             httpGet:
               path: /health
@@ -94,7 +102,11 @@ spec:
       containers:
         - name: web
           image: my-app-web:latest
+<<<<<<< HEAD
           imagePullPolicy: Never
+=======
+          imagePullPolicy: IfNotPresent
+>>>>>>> 2c18b0511655432fda9dde82873dddcc859eeadc
           env:
             - name: VITE_API_URL
               value: "http://ryanai-api-svc:3001"

@@ -6,6 +6,7 @@ namespace: ryanai-system
 resources:
   - ryanai-core.yaml
   - ryanai-databases.yaml
+<<<<<<< HEAD
   - ryanai-apps.yaml
 
 # Define image overrides cleanly using Kustomize's native images field
@@ -33,3 +34,6 @@ patches:
             containers:
               - name: api
                 imagePullPolicy: Never
+=======
+  - ryanai-apps.yaml
+>>>>>>> 2c18b0511655432fda9dde82873dddcc859eeadc
