@@ -8,12 +8,28 @@ resources:
   - ryanai-databases.yaml
   - ryanai-apps.yaml
 
-# Patch all containers in deployment manifests to use local images without pulling remotely
+# Define image overrides cleanly using Kustomize's native images field
+images:
+  - name: api
+    newName: my-app-api
+    newTag: latest
+  - name: web
+    newName: my-app-web
+    newTag: latest
+
+# Patch deployment manifests to update imagePullPolicy safely by container name
 patches:
   - target:
       kind: Deployment
       name: ryanai-api
     patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/imagePullPolicy
-        value: Never
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: ryanai-api
+      spec:
+        template:
+          spec:
+            containers:
+              - name: api
+                imagePullPolicy: Never

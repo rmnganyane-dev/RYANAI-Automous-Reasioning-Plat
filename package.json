@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "### ═══════════════════════════════════════════════════════════ BUILD & VALIDATION ═══════════════════════════════════════════════════════════ ###": "",
+    "build": "NODE_OPTIONS=--max-old-space-size=4096 tsc -p tsconfig.app.json && vite build",
+    "validate": "NODE_OPTIONS=--max-old-space-size=4096 npm run typecheck && npm run lint && npm run build",
     "build": "tsc -p tsconfig.app.json && vite build",
     "build:desktop": "tauri build",
     "docker:up": "docker compose up --build -d",
