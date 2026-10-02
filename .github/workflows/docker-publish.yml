@@ -1,37 +1,43 @@
-name: Build and Push Docker Images
+name: Docker - Build, Push & Deploy
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*.*.*' ]
+    branches: [main, master]
+    tags: ['v*']
+  workflow_run:
+    workflows: ['CI - Build & Test']
+    branches: [main, master]
+    types: [completed]
 
 permissions:
   contents: read
   packages: write
 
 jobs:
-  publish-images:
+  docker-build-push:
+    name: Build & Push Docker Images
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    timeout-minutes: 90
 
-      - name: Lowercase Repository Owner
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lowercase repo owner
         id: repo_owner
         run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # --- API IMAGE ---
-      - name: Extract Metadata (API)
+      # Build API image
+      - name: Extract metadata (API)
         id: meta-api
         uses: docker/metadata-action@v5
         with:
@@ -40,9 +46,9 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=sha,format=short
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
 
-      - name: Build and Push API Image
+      - name: Build and push API
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -53,8 +59,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # --- WEB IMAGE ---
-      - name: Extract Metadata (Web)
+      # Build Web image
+      - name: Extract metadata (Web)
         id: meta-web
         uses: docker/metadata-action@v5
         with:
@@ -63,9 +69,9 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=sha,format=short
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
 
-      - name: Build and Push Web Image
+      - name: Build and push Web
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -75,3 +81,38 @@ jobs:
           labels: ${{ steps.meta-web.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Production
+    needs: docker-build-push
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Deploy via SSH
+        if: secrets.SSH_HOST != ''
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd /opt/ryanai
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -af
+        continue-on-error: true
+
+      - name: Trigger Render deploy
+        if: secrets.RENDER_DEPLOY_HOOK != ''
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK }}"
+        continue-on-error: true
+
+      - name: Trigger Railway deploy
+        if: secrets.RAILWAY_DEPLOY_HOOK != ''
+        run: curl -X POST -s "${{ secrets.RAILWAY_DEPLOY_HOOK }}"
+        continue-on-error: true
