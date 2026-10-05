@@ -15,14 +15,6 @@ import { twilioWebhookPlugin } from './routes/twilioWebhook.js';
 import { metricsRoutes } from './routes/metrics.js';
 import { initializeAgentDatabase } from '../agent/approvalEngine.js';
 
-await fastify.register(import('@fastify/redis'), {
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: Number(process.env.REDIS_PORT) || 6379,
-  lazyConnect: true,
-  connectTimeout: 5000,
-  closeServerOnFirstError: false,
-});
-
 const { Pool } = pg;
 
 console.log('🚀 RyanAI Platform Initialization');
@@ -46,22 +38,6 @@ console.log(`   - Node Env: ${config.nodeEnv}`);
 console.log(`   - Host: ${config.host}:${config.port}`);
 console.log(`   - Database: Configured`);
 console.log(`   - Redis: Configured\n`);
-
-// src/server/launcher.ts
-try {
-  await server.register(fastifyRedis, {
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: Number(process.env.REDIS_PORT) || 6379,
-    family: 4,               // Force IPv4 on Windows
-    connectTimeout: 3000,    // Fail fast after 3 seconds
-    enableReadyCheck: false, // Prevent hanging Avvio initialization
-    maxRetriesPerRequest: 1
-  });
-  console.log('✓ Redis plugin registered');
-} catch (err) {
-  console.warn('⚠️ Redis offline, continuing without cache:', err instanceof Error ? err.message : err);
-}
-
 
 // Initialize Fastify instance with trustProxy and telemetry-aware logger
 const fastify = Fastify({

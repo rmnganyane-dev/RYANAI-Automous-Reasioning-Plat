@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { isSupabaseConfigured, supabase } from './supabase';
+import { isSupabaseConfigured, requireSupabaseClient, supabase } from './supabase';
 
 export interface Profile {
   id: string;
@@ -16,6 +16,7 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   const loadProfile = useCallback(async (uid: string) => {
+    if (!supabase) return;
     const { data, error } = await supabase
       .from('profiles')
       .select('id, email, full_name, avatar_url')
@@ -35,7 +36,8 @@ export function useAuth() {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
+    const client = requireSupabaseClient();
+    client.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -47,7 +49,7 @@ export function useAuth() {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: any) => {
+    const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -61,13 +63,13 @@ export function useAuth() {
   }, [loadProfile]);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await requireSupabaseClient().auth.signInWithPassword({ email, password });
     if (error) throw error;
     return data;
   }, []);
 
   const signUpWithEmail = useCallback(async (email: string, password: string, fullName?: string) => {
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await requireSupabaseClient().auth.signUp({
       email,
       password,
       options: {
@@ -79,7 +81,7 @@ export function useAuth() {
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await requireSupabaseClient().auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: window.location.origin,
@@ -90,7 +92,7 @@ export function useAuth() {
   }, []);
 
   const signOut = useCallback(async () => {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await requireSupabaseClient().auth.signOut();
     if (error) throw error;
     setProfile(null);
   }, []);

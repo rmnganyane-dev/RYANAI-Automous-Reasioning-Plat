@@ -121,7 +121,7 @@ Test Details:
 ${this.results
   .map(
     (t) => `
-${t.status === 'passed' ? '✓' : '✗'} ${t.name}
+${t.status === 'passed' ? '✓' : '✗'} ${t.testName}
    Status: ${t.status}
    Time: ${t.duration}ms
    Message: ${t.message}

@@ -63,7 +63,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, dismissible = tr
     event.preventDefault();
     resetFeedback();
 
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured || !supabase) {
       setError('Authentication is not configured. Add Supabase values to .env.local.');
       return;
     }
@@ -112,7 +112,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, dismissible = tr
 
   const handleOAuth = async (provider: 'google' | 'azure') => {
     resetFeedback();
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured || !supabase) {
       setError('Authentication is not configured. Add Supabase values to .env.local.');
       return;
     }
@@ -131,7 +131,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, dismissible = tr
   const handlePhoneSubmit = async (event: FormEvent) => {
     event.preventDefault();
     resetFeedback();
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured || !supabase) {
       setError('Authentication is not configured. Add Supabase values to .env.local.');
       return;
     }

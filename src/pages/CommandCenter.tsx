@@ -6,7 +6,7 @@ import { modelMeta } from '@/lib/models';
 import { createConversation, createMessage, generateTitle, loadConversations as loadLocalConversations, saveConversations } from '@/lib/storage';
 import { streamReasoning } from '@/lib/reasoning';
 import { useVoiceRecognition, VOICE_COMMANDS } from '@/lib/useVoiceRecognition';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { isSupabaseConfigured, requireSupabaseClient, supabase } from '@/lib/supabase';
 import Sidebar from '@/components/Sidebar';
 import ChatPanel from '@/components/ChatPanel';
 import TelemetryPanel from '@/components/TelemetryPanel';
@@ -48,7 +48,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
   const voiceStopRef = useRef<() => void>(() => undefined);
 
   const loadConversations = useCallback(async () => {
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured || !supabase) {
       const localConversations = loadLocalConversations();
       setConversations(localConversations);
       if (localConversations.length > 0) {
@@ -58,7 +58,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await requireSupabaseClient()
       .from('conversations')
       .select('*')
       .order('updated_at', { ascending: false });
@@ -76,7 +76,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     // Load messages for each conversation with explicit any typing resolved
     const convsWithMessages: Conversation[] = await Promise.all(
       data.map(async (conv: any) => {
-        const { data: msgs } = await supabase
+        const { data: msgs } = await requireSupabaseClient()
           .from('messages')
           .select('*')
           .eq('conversation_id', conv.id)
@@ -152,7 +152,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
       return conv.id;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await requireSupabaseClient()
       .from('conversations')
       .insert({ title: 'New Thread', model })
       .select()
@@ -191,7 +191,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
 
   const deleteConversation = useCallback(async (id: string) => {
     if (isSupabaseConfigured) {
-      await supabase.from('conversations').delete().eq('id', id);
+      await requireSupabaseClient().from('conversations').delete().eq('id', id);
     }
     setConversations((prev) => {
       const remaining = prev.filter((c) => c.id !== id);
@@ -227,7 +227,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     });
 
     if (isSupabaseConfigured) {
-      await supabase.from('messages').insert({
+      await requireSupabaseClient().from('messages').insert({
         conversation_id: convId,
         role: 'user',
         content: text,
@@ -239,7 +239,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     if (conv && conv.messages.length === 0) {
       const title = generateTitle(text);
       if (isSupabaseConfigured) {
-        await supabase.from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', convId);
+        await requireSupabaseClient().from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', convId);
       }
     }
 
@@ -268,7 +268,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
             return next;
           });
           if (isSupabaseConfigured) {
-            supabase.from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', convId);
+            requireSupabaseClient().from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', convId);
           }
         },
         onDone: () => {
@@ -286,7 +286,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
           setLiveSteps([]);
 
           if (isSupabaseConfigured) {
-            supabase.from('messages').insert({
+            requireSupabaseClient().from('messages').insert({
               conversation_id: convId,
               role: 'assistant',
               content: accText,
@@ -321,7 +321,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
         return next;
       });
       if (isSupabaseConfigured) {
-        supabase.from('conversations').update({ model: m }).eq('id', activeId);
+        requireSupabaseClient().from('conversations').update({ model: m }).eq('id', activeId);
       }
     }
   }, [activeId]);

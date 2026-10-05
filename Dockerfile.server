@@ -1,70 +1,33 @@
-# ==========================================
-# Stage 1: Build & Dependencies
-# ==========================================
-FROM node:22-alpine AS builder
+FROM node:22-alpine AS dependencies
 
 WORKDIR /app
+RUN apk add --no-cache python3 make g++ libc6-compat
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
 
-# Enable pnpm via corepack
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
-# Build tools required for native C/C++ modules & node-gyp
-RUN apk add --no-cache python3 make g++ build-base libc6-compat linux-headers
-
-# Copy package manifests (wildcards safely ignore missing optional lockfiles)
-COPY package.json pnpm-lock.yaml* package-lock.json* pnpm-workspace.yaml* ./
-
-# Copy configuration files
-COPY tsconfig*.json vite.config.* ./
-
-# Copy source directories cleanly using shell execution
-COPY . .
-
-# Install workspace dependencies
-RUN pnpm install --frozen-lockfile || pnpm install || npm ci
-
-# Generate Prisma client if schema exists
-RUN [ -f prisma/schema.prisma ] && pnpm prisma generate || true
-
-# Build application bundle
-RUN pnpm run build || pnpm run build:server || pnpm tsc -p tsconfig.json || true
-
-# Prune dev dependencies for production
-RUN pnpm prune --prod || npm prune --production
-
-# ==========================================
-# Stage 2: Production Runtime
-# ==========================================
 FROM node:22-alpine AS runner
 
 WORKDIR /app
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=3000
 
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOST=0.0.0.0
+RUN apk add --no-cache dumb-init wget libstdc++ libc6-compat \
+    && addgroup -S ryanai \
+    && adduser -S -G ryanai ryanai \
+    && mkdir -p /app/logs \
+    && chown -R ryanai:ryanai /app
 
-# Install runtime utilities
-RUN apk add --no-cache libstdc++ libc6-compat wget docker-cli dumb-init
+COPY --from=dependencies --chown=ryanai:ryanai /app/node_modules ./node_modules
+COPY --chown=ryanai:ryanai package.json ./
+COPY --chown=ryanai:ryanai src ./src
+COPY --chown=ryanai:ryanai tsconfig.json tsconfig.base.json ./
 
-# Create unprivileged system user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 fastify
-
-# Create required directories with correct permissions
-RUN mkdir -p /app/logs /app/config && chown -R fastify:nodejs /app
-
-# Copy built artifacts and dependencies from builder stage
-COPY --from=builder --chown=fastify:nodejs /app/package.json ./
-COPY --from=builder --chown=fastify:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=fastify:nodejs /app/dist ./dist
-
-USER fastify
-
+USER ryanai
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=5 \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:3000/health || exit 1
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["node", "dist/server/launcher.js"]
+CMD ["node", "--import", "tsx/esm", "src/server/launcher.ts"]

@@ -22,7 +22,7 @@ export const ChatStream: React.FC = () => {
             {msg}
           </div>
         ))}
-        <ScrollControl containerRef={containerRef} />
+        <ScrollControl containerRef={containerRef} contentKey={messages.length} />
       </div>
       <button onClick={startStream} className="m-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded font-medium">
         Trigger Reasoning Stream

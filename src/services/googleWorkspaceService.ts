@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { Credentials } from 'google-auth-library';
-import pdfParse from 'pdf-parse/lib/pdf-parse.js';
+import { PDFParse } from 'pdf-parse';
 import * as xlsx from 'xlsx';
 import * as docx from 'docx';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
@@ -74,8 +74,13 @@ export class GoogleWorkspaceService {
   // DOCUMENT IMPORT & PARSING (PDF, EXCEL, WORD)
   // ---------------------------------------------------------------------------
   async parsePdfBuffer(buffer: Buffer): Promise<string> {
-    const data = await pdfParse(buffer);
-    return data.text;
+    const parser = new PDFParse({ data: buffer });
+    try {
+      const data = await parser.getText();
+      return data.text;
+    } finally {
+      await parser.destroy();
+    }
   }
 
   parseExcelBuffer(buffer: Buffer): ParsedExcelRow[] {
