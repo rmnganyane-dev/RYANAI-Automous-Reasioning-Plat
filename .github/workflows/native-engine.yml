@@ -1,0 +1,131 @@
+name: Project Ryan Native Engines (Go & Rust) CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - 'engine/**'
+      - 'native/**'
+      - 'microservices/native/**'
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+  pull_request:
+    branches: [ "main", "master" ]
+    paths:
+      - 'engine/**'
+      - 'native/**'
+      - 'microservices/native/**'
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go-engine:
+    name: Go Core Engine Pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Install Go Dependencies
+        run: |
+          echo "📦 Downloading Go modules across monorepo..."
+          find . -name "go.mod" -not -path "*/node_modules/*" | while read -r mod; do
+            dir=$(dirname "$mod")
+            echo "Processing Go module in $dir..."
+            (cd "$dir" && go mod download)
+          done
+
+      - name: Run Go Linters & Tests
+        run: |
+          echo "🧪 Running Go tests with race detection..."
+          find . -name "go.mod" -not -path "*/node_modules/*" | while read -r mod; do
+            dir=$(dirname "$mod")
+            echo "Testing Go package in $dir..."
+            (cd "$dir" && go test -v -race -coverprofile=coverage.out ./...)
+          done
+
+      - name: Build Go Binaries
+        run: |
+          echo "🔨 Compiling Go binaries for Linux..."
+          find . -name "go.mod" -not -path "*/node_modules/*" | while read -r mod; do
+            dir=$(dirname "$mod")
+            echo "Building Go binaries in $dir..."
+            (cd "$dir" && CGO_ENABLED=0 GOOS=linux go build -v ./...)
+          done
+
+  rust-engine:
+    name: Rust Inference Engine Pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check Code Formatting
+        run: |
+          echo "🎨 Verifying Rust code formatting..."
+          find . -name "Cargo.toml" -not -path "*/target/*" -not -path "*/node_modules/*" | while read -r cargo; do
+            dir=$(dirname "$cargo")
+            echo "Checking cargo fmt in $dir..."
+            (cd "$dir" && cargo fmt --all -- --check)
+          done
+
+      - name: Run Cargo Clippy
+        run: |
+          echo "🔍 Executing Cargo Clippy linter..."
+          find . -name "Cargo.toml" -not -path "*/target/*" -not -path "*/node_modules/*" | while read -r cargo; do
+            dir=$(dirname "$cargo")
+            echo "Running Clippy in $dir..."
+            (cd "$dir" && cargo clippy -- -D warnings)
+          done
+
+      - name: Run Cargo Tests
+        run: |
+          echo "🧪 Running Rust unit and integration tests..."
+          find . -name "Cargo.toml" -not -path "*/target/*" -not -path "*/node_modules/*" | while read -r cargo; do
+            dir=$(dirname "$cargo")
+            echo "Running Cargo tests in $dir..."
+            (cd "$dir" && cargo test --release)
+          done
+
+      - name: Build Rust Release Binaries
+        run: |
+          echo "🚀 Compiling Rust release targets..."
+          find . -name "Cargo.toml" -not -path "*/target/*" -not -path "*/node_modules/*" | while read -r cargo; do
+            dir=$(dirname "$cargo")
+            echo "Building release binary in $dir..."
+            (cd "$dir" && cargo build --release)
+          done

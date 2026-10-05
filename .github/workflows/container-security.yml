@@ -1,0 +1,121 @@
+name: Project Ryan Container Image Security Scan
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - '**/Dockerfile'
+      - 'docker/**'
+      - '.github/workflows/container-security.yml'
+  pull_request:
+    branches: [ "main", "master" ]
+    paths:
+      - '**/Dockerfile'
+      - 'docker/**'
+      - '.github/workflows/container-security.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan-containers:
+    name: Scan Container Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # --- API GATEWAY SCAN ---
+      - name: Build API Gateway Test Image
+        if: hashFiles('apps/api/Dockerfile') != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          load: true
+          tags: ryan-app-api:local-scan
+
+      - name: Run Trivy Scanner on API Image
+        if: hashFiles('apps/api/Dockerfile') != ''
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: 'ryan-app-api:local-scan'
+          format: 'sarif'
+          output: 'trivy-api-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      - name: Upload API Scan Results to Security Tab
+        if: hashFiles('trivy-api-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-api-results.sarif'
+          category: 'container-api'
+
+      # --- LLM MICROSERVICE SCAN ---
+      - name: Build LLM Microservice Test Image
+        if: hashFiles('microservices/llm/Dockerfile') != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: ./microservices/llm
+          file: ./microservices/llm/Dockerfile
+          load: true
+          tags: ryan-app-llm:local-scan
+
+      - name: Run Trivy Scanner on LLM Image
+        if: hashFiles('microservices/llm/Dockerfile') != ''
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: 'ryan-app-llm:local-scan'
+          format: 'sarif'
+          output: 'trivy-llm-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      - name: Upload LLM Scan Results to Security Tab
+        if: hashFiles('trivy-llm-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-llm-results.sarif'
+          category: 'container-llm'
+
+      # --- WEB APP SCAN ---
+      - name: Build Web App Test Image
+        if: hashFiles('apps/web/Dockerfile') != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          load: true
+          tags: ryan-app-web:local-scan
+
+      - name: Run Trivy Scanner on Web Image
+        if: hashFiles('apps/web/Dockerfile') != ''
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: 'ryan-app-web:local-scan'
+          format: 'sarif'
+          output: 'trivy-web-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      - name: Upload Web Scan Results to Security Tab
+        if: hashFiles('trivy-web-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-web-results.sarif'
+          category: 'container-web'
+
+      - name: Container Security Audit Completed
+        run: echo "✅ All container image security scans finished successfully."

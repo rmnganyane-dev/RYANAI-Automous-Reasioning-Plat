@@ -1,4 +1,4 @@
-name: "CodeQL Analysis"
+name: CodeQL Security Analysis
 
 on:
   push:
@@ -7,35 +7,41 @@ on:
     branches: [ "main", "master" ]
   schedule:
     - cron: '0 0 * * 0'
+  workflow_dispatch:
 
 permissions:
   contents: read
   security-events: write
   actions: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
-    name: Analyze Code
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
+    timeout-minutes: 360
 
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'python' ]
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: python
+            build-mode: none
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

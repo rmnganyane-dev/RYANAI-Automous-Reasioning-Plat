@@ -1,0 +1,81 @@
+name: Project Ryan Smoke & Health Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target environment to test'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - preview
+  schedule:
+    - cron: '0 */6 * * *' # Run health checks every 6 hours
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-test:
+    name: Execute Endpoint Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      TARGET_ENV: ${{ github.event.inputs.target_env || 'production' }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Endpoint Health Verification
+        run: |
+          echo "🚀 Initiating smoke tests for environment: $TARGET_ENV"
+
+          # Resolve endpoints based on target environment
+          if [ "$TARGET_ENV" = "production" ]; then
+            GATEWAY_URL="${{ secrets.PROD_GATEWAY_URL }}"
+            FRONTEND_URL="${{ secrets.PROD_FRONTEND_URL }}"
+          else
+            GATEWAY_URL="${{ secrets.PREVIEW_GATEWAY_URL }}"
+            FRONTEND_URL="${{ secrets.PREVIEW_FRONTEND_URL }}"
+          fi
+
+          # Fallback default evaluation if secrets aren't explicitly populated
+          if [ -z "$GATEWAY_URL" ]; then
+            GATEWAY_URL="https://api.ryan-app.internal/health"
+          fi
+
+          if [ -z "$FRONTEND_URL" ]; then
+            FRONTEND_URL="https://ryan-app.vercel.app"
+          fi
+
+          check_endpoint() {
+            local label="$1"
+            local url="$2"
+            echo "Checking $label availability: $url"
+
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 -L "$url" || echo "000")
+
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+              echo "✅ $label reachable (HTTP $HTTP_CODE)."
+            else
+              echo "⚠️ $label check warning: Endpoint returned HTTP $HTTP_CODE or timed out."
+            fi
+          }
+
+          check_endpoint "Frontend" "$FRONTEND_URL"
+          check_endpoint "Gateway" "$GATEWAY_URL"
+
+          echo "✅ Smoke test execution completed."

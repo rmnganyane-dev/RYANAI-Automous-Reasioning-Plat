@@ -5,16 +5,25 @@ on:
     branches: [main, master, dev, develop]
   pull_request:
     branches: [main, master, dev, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
-    name: Build & Test (${{ matrix.node-version }})
+    name: Build & Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
 
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [20.x, 24.x]
+        node-version: [20.x, 22.x]
 
     services:
       postgres:
@@ -42,54 +51,48 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql://ryanai_admin:[REDACTED]@localhost:5432/ryanai_db
+      DATABASE_URL: postgresql://ryanai_admin:password_ci@localhost:5432/ryanai_db
       REDIS_URL: redis://localhost:6379
       NODE_ENV: test
       PORT: 3001
       NODE_OPTIONS: --max-old-space-size=8192
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
 
-      - name: Cache pnpm
-        uses: actions/cache@v4
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
         with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-pnpm-
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
 
-      - name: Install system dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential python3
 
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Prisma generate
+      - name: Prisma Generate
         run: pnpm exec prisma generate
-        continue-on-error: true
 
-      - name: Build
-        run: pnpm run build:client
-        continue-on-error: true
+      - name: Build Client
+        run: pnpm run build:client --if-present
 
-      - name: Tests
+      - name: Run Tests
         run: pnpm test --if-present
-        continue-on-error: true
 
-      - name: Upload coverage
+      - name: Upload Coverage to Codecov
         uses: codecov/codecov-action@v4
+        if: always()
         with:
           files: ./coverage/coverage-final.json
-        continue-on-error: true
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}

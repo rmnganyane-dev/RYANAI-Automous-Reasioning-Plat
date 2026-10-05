@@ -1,0 +1,68 @@
+name: Ryan-app Configuration Validation & Linting
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'config/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'config/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-configs:
+    name: Validate Configuration Files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate JSON Configuration Files
+        run: |
+          echo "🔍 Checking JSON syntax in config directory..."
+          if [ -d "config" ]; then
+            shopt -s nullglob
+            json_files=(config/*.json)
+            if [ ${#json_files[@]} -gt 0 ]; then
+              for file in "${json_files[@]}"; do
+                echo "Validating $file..."
+                node -e "JSON.parse(require('fs').readFileSync('$file', 'utf8'))"
+              done
+              echo "✅ All JSON configuration files are valid."
+            else
+              echo "ℹ️ No JSON files found in config directory."
+            fi
+          else
+            echo "ℹ️ No config directory found, skipping JSON validation."
+          fi
+
+      - name: Validate MFE Config Schema
+        run: |
+          if [ -f "config/mfe-config.json" ]; then
+            echo "⚙️ Validating mfe-config.json structure..."
+            node -e "
+              const config = JSON.parse(require('fs').readFileSync('config/mfe-config.json', 'utf8'));
+              if (typeof config.mfe_config_present !== 'boolean') {
+                console.error('❌ Error: mfe_config_present must be a boolean.');
+                process.exit(1);
+              }
+              console.log('✅ MFE config schema validation passed.');
+            "
+          fi

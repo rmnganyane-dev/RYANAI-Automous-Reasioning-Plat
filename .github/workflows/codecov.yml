@@ -1,0 +1,73 @@
+name: Project Ryan Code Coverage & Quality Gate
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  upload-coverage:
+    name: Generate & Upload Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install Node Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Node.js Tests with Coverage
+        run: |
+          echo "🧪 Running Node.js workspace tests with coverage..."
+          if grep -q '"test:cov"' package.json; then
+            pnpm run test:cov
+          else
+            pnpm run test --if-present -- --coverage
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Run Go Tests with Coverage Profile
+        run: |
+          echo "🧪 Generating Go coverage profiles..."
+          find . -name "go.mod" -not -path "*/node_modules/*" | while read -r mod; do
+            dir=$(dirname "$mod")
+            echo "Running Go coverage in $dir..."
+            (cd "$dir" && go test -coverprofile=coverage.out -covermode=atomic ./...)
+          done
+
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          verbose: true

@@ -8,23 +8,33 @@ on:
     workflows: ['CI - Build & Test']
     branches: [main, master]
     types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   docker-build-push:
     name: Build & Push Docker Images
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
       - name: Lowercase repo owner
         id: repo_owner
-        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -85,34 +95,38 @@ jobs:
   deploy:
     name: Deploy to Production
     needs: docker-build-push
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    if: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
       - name: Deploy via SSH
-        if: secrets.SSH_HOST != ''
+        if: ${{ secrets.SSH_HOST != '' }}
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
+          envs: GHCR_TOKEN,GHCR_USER
           script: |
             set -e
             cd /opt/ryanai
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
             docker image prune -af
         continue-on-error: true
 
       - name: Trigger Render deploy
-        if: secrets.RENDER_DEPLOY_HOOK != ''
+        if: ${{ secrets.RENDER_DEPLOY_HOOK != '' }}
         run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK }}"
         continue-on-error: true
 
       - name: Trigger Railway deploy
-        if: secrets.RAILWAY_DEPLOY_HOOK != ''
+        if: ${{ secrets.RAILWAY_DEPLOY_HOOK != '' }}
         run: curl -X POST -s "${{ secrets.RAILWAY_DEPLOY_HOOK }}"
         continue-on-error: true
