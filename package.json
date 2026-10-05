@@ -7,6 +7,7 @@
   "scripts": {
     "### ═══════════════════════════════════════════════════════════ BUILD & VALIDATION ═══════════════════════════════════════════════════════════ ###": "",
     "build:server": "tsc",
+    "buildCommand": "npm run build:api",
     "start": "node --import tsx/esm src/server/launcher.ts",
     "start:dev": "node --import tsx/esm src/server/launcher.ts",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
