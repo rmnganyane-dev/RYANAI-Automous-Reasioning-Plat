@@ -1,6 +1,9 @@
 node_modules
 **/node_modules
 **/.pnpm-store
+/vendor
+/src-tauri
+/RYANAI
 dist
 **/dist
 build
