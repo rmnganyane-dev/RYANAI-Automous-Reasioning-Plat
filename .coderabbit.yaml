@@ -16,3 +16,5 @@ remote_config:
   repository: "shared-configs"
   ref: "main"
   path: ".shared-coderabbit.yaml"
+
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/rmnganyane-dev/RYANAI-Automous-Reasioning-Plat?utm_source=oss&utm_medium=github&utm_campaign=rmnganyane-dev%2FRYANAI-Automous-Reasioning-Plat&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
