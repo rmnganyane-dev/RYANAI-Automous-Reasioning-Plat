@@ -1,5 +1,7 @@
 {
-  "installCommand": "npm ci --legacy-peer-deps",
   "buildCommand": "npm run build:web",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
