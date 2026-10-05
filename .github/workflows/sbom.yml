@@ -1,0 +1,15 @@
+- name: Generate SPDX SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: ryan-app-sbom.spdx.json
+          artifact-name: ryan-app-sbom
+
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: ryan-app-sbom.cyclonedx.json
+          artifact-name: ryan-app-cyclonedx
