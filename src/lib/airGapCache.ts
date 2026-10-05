@@ -93,8 +93,10 @@ export async function loadVector(id: string): Promise<VectorEntry | null> {
     return null;
   }
 
+  const iv = new Uint8Array(record.iv.length);
+  iv.set(record.iv);
   const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: record.iv },
+    { name: 'AES-GCM', iv },
     key,
     record.ciphertext
   );

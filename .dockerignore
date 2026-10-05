@@ -1,11 +1,17 @@
 node_modules
+**/node_modules
+**/.pnpm-store
 dist
+**/dist
 build
+**/build
 .git
+**/.git
 .dockerignore
 Dockerfile*
 docker-compose*.yml
 compose*.yaml
+**/target
 src-tauri/target
 src-tauri/binaries
 src-tauri/gen
@@ -13,6 +19,9 @@ src-tauri/icons
 *.log
 .env
 .env.local
+**/.env
+**/.env.local
+**/.env.enterprise
 .DS_Store
 .vscode
 .idea

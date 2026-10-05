@@ -24,7 +24,6 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
     "paths": {
       "@/*": ["./src/*"],
       "@/components/*": ["./src/components/*"],
@@ -45,6 +44,9 @@
     "src/hooks/**/*.ts",
     "src/hooks/**/*.tsx",
     "src/store/**/*.ts",
+    "src/services/**/*.ts",
+    "src/lib/**/*.ts",
+    "src/types.ts",
     "src/main.tsx",
     "src/App.tsx"
   ],

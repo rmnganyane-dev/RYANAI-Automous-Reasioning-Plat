@@ -4,7 +4,7 @@
  */
 import { Resend } from 'resend';
 import fetch from 'node-fetch';
-import { logger } from '../app/logger.js';
+import { logger } from '../shared/logger.js';
 
 interface PipelineNotificationPayload {
   version: string;

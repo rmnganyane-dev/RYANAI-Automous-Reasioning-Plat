@@ -25,7 +25,7 @@ export interface SecurityAlertPayload {
   pid: number;
   command: string;
   violations: string[];
-  actionTaken: 'SIGKILL' | 'BLOCKED' | 'FLAGGED';
+  actionTaken: 'SIGKILL' | 'BLOCKED' | 'FLAGGED' | 'SUCCESS' | 'FAILED';
   timestamp: string;
 }
 

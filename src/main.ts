@@ -56,7 +56,12 @@ const processRefund = task(
     console.log(`[TOOL] Processing refund for order: ${orderId}`);
     console.log(`[TOOL] Refund reason: ${reason}`);
 
-    const refundId = `REF-${orderId}-${new Date().toISOString().replace(/[-:T.]/g, "").slice(0, 14)}`;
+    const timestamp = new Date().toISOString()
+      .replaceAll("-", "")
+      .replaceAll(":", "")
+      .replaceAll(".", "")
+      .replaceAll("T", "");
+    const refundId = `REF-${orderId}-${timestamp.slice(0, 14)}`;
 
     const result = {
       success: true,
