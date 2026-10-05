@@ -1,10 +1,12 @@
-name: Security Scan & SBOM
+name: "CodeQL Security Analysis"
 
 on:
   push:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
+  schedule:
+    - cron: '0 0 * * 0'
 
 permissions:
   contents: read
@@ -12,9 +14,77 @@ permissions:
   actions: read
 
 jobs:
-  security:
-    name: CodeQL & SBOM Scan
+  analyze:
+    name: Analyze Code
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        categoryThe CodeQL analysis completed scanning the codebase, but the final upload step failed due to two configuration issues in your repository and workflow setup:
+
+1. **Repository Feature Disabled:** GitHub Code Scanning is turned off in your repository settings (or GitHub Advanced Security is inactive if the repository is private).
+2. **Missing Token Permissions:** The workflow runner lacks write permissions (`security-events: write`) to push SARIF security reports to the repository's Security tab.
+
+---
+
+### Step 1: Enable Code Scanning in GitHub UI
+
+1. Open your repository on GitHub: `https://github.com/rmnganyane-dev/RyanAI-v1.0.0`
+2. Navigate to **Settings** $\rightarrow$ **Code security and analysis** (under the *Security* sidebar section).
+3. Scroll to **Code scanning**:
+   * **Public Repository:** Click **Enable** or **Set up** under Code scanning.
+   * **Private Repository:** Toggle **GitHub Advanced Security** on first, then enable **Code scanning**.
+
+---
+
+### Step 2: Update Your CodeQL Workflow YAML
+
+Ensure the workflow running CodeQL (e.g., `.github/workflows/codeql.yml` or `.github/workflows/security.yml`) contains explicit `security-events: write` permissions at the top level or job level.
+
+```yaml
+name: "CodeQL Analysis"
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  schedule:
+    - cron: '0 0 * * 0'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  analyze:
+    name: Analyze Code
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
 
     steps:
       - name: Checkout repository
@@ -27,19 +97,5 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
-
-      - name: Generate SPDX SBOM with Syft
-        uses: anchore/sbom-action@v0
         with:
-          path: .
-          format: spdx-json
-          output-file: ryan-app-sbom.spdx.json
-          artifact-name: ryan-app-sbom
-
-      - name: Generate CycloneDX SBOM
-        uses: anchore/sbom-action@v0
-        with:
-          path: .
-          format: cyclonedx-json
-          output-file: ryan-app-sbom.cyclonedx.json
-          artifact-name: ryan-app-cyclonedx
+          category: "/language:python"
