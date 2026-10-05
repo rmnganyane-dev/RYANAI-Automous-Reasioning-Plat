@@ -1,4 +1,4 @@
-name: Project Ryan Database Schema & Migration CI
+﻿name: Project Ryan Database Schema & Migration CI
 
 on:
   push:

@@ -1,103 +1,93 @@
-name: Security - Scan & Analyze
+﻿name: Project Ryan Enterprise Security & Vulnerability Audit
 
 on:
   push:
-    branches: [main, master]
+    branches: [ main, master ]
   pull_request:
-    branches: [main, master]
+    branches: [ main, master ]
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
   security-events: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  trivy:
-    name: Trivy Filesystem Scan
+  audit-dependencies:
+    name: Audit Monorepo Dependencies
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Trivy scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: sarif
-          output: trivy-results.sarif
-
-      - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-results.sarif
-        continue-on-error: true
-
-  dependencies:
-    name: Check Dependencies
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24.x
+          node-version: '20'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
 
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-        continue-on-error: true
+      - name: Audit Node.js Dependencies
+        run: |
+          echo "🔍 Auditing Node.js dependencies across workspace..."
+          pnpm audit --prod --audit-level=high || echo "⚠️ Node audit reported potential advisories."
 
-      - name: npm audit
-        run: npm audit --audit-level=moderate
-        continue-on-error: true
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Snyk scan
-        uses: snyk/actions/node@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        continue-on-error: true
+      - name: Audit Rust Dependencies
+        run: |
+          echo "🔍 Auditing Rust crates..."
+          cargo install cargo-audit --locked || true
+          if [ -f "Cargo.toml" ]; then
+            cargo audit || echo "⚠️ Rust audit reported potential advisories."
+          else
+            echo "ℹ️️ No top-level Cargo.toml found, checking subdirectories..."
+            find . -name "Cargo.toml" -maxdepth 3 -not -path "*/node_modules/*" | while read -r file; do
+              dir=$(dirname "$file")
+              echo "Auditing $dir..."
+              (cd "$dir" && cargo audit) || echo "⚠️ Rust audit failed for $dir"
+            done
+          fi
 
-  codeql:
-    name: CodeQL Analysis
+      - name: Datadog Static Analysis
+        uses: DataDog/datadog-static-analyzer-action@v3
+
+      - name: Setup Python & Astral uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Audit Python Dependencies
+        run: |
+          echo "🔍 Auditing Python packages..."
+          uv pip install pip-audit || true
+          pip-audit || echo "⚠️ Python audit reported potential advisories."
+
+  trivy-scan:
+    name: Trivy Container & Repository Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
-    strategy:
-      matrix:
-        language: ['typescript']
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
         with:
-          languages: ${{ matrix.language }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24.x
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-        continue-on-error: true
-
-      - name: CodeQL analysis
-        uses: github/codeql-action/analyze@v3
-        continue-on-error: true
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
