@@ -46,7 +46,10 @@
     "src/store/**/*.ts",
     "src/services/**/*.ts",
     "src/lib/**/*.ts",
+<<<<<<< HEAD
     "src/shared/**/*.ts",
+=======
+>>>>>>> eee4d7489a5d7571d83820de0de28f9d922ed43c
     "src/types.ts",
     "src/main.tsx",
     "src/App.tsx"
