@@ -1,7 +1,5 @@
 {
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "composite": true,
     "target": "ES2022",
     "useDefineForClassFields": true,
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
@@ -35,8 +33,7 @@
       "@/types/*": ["./src/types/*"],
       "@/config/*": ["./src/config/*"],
       "@/utils/*": ["./src/utils/*"]
-    },
-    "types": ["vite/client", "node"]
+    }
   },
   "include": [
     "src/pages/**/*.tsx",
@@ -44,10 +41,13 @@
     "src/hooks/**/*.ts",
     "src/hooks/**/*.tsx",
     "src/store/**/*.ts",
+    "src/services/**/*.ts",
+    "src/lib/**/*.ts",
+    "src/types.ts",
     "src/main.tsx",
     "src/App.tsx"
   ],
-"exclude": [
+  "exclude": [
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
     "src/**/*.spec.ts",
