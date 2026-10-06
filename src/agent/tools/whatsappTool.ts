@@ -16,8 +16,8 @@ export const sendWhatsAppTool = tool(
       });
 
       return `WhatsApp message sent successfully. SID: ${res.sid}`;
-    } catch (err: any) {
-      return `Failed to send WhatsApp message: ${err.message}`;
+    } catch (err: unknown) {
+      return `Failed to send WhatsApp message: ${(err instanceof Error ? err.message : String(err))}`;
     }
   },
   {

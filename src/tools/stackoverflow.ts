@@ -9,7 +9,7 @@ export interface StackOverflowQueryPayload {
 
 export interface StackOverflowQueryResult {
   success: boolean;
-  data: any;
+  data: unknown;
   error?: string;
 }
 
@@ -38,11 +38,16 @@ export async function queryStackOverflow(
       success: true,
       data: response.data,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const responseData = axios.isAxiosError<unknown>(err) ? err.response?.data : undefined;
+    const responseMessage = responseData !== null && typeof responseData === 'object' &&
+      'message' in responseData && typeof responseData.message === 'string'
+      ? responseData.message
+      : undefined;
     return {
       success: false,
       data: null,
-      error: err.response?.data?.message || err.message || 'Unknown network error',
+      error: responseMessage || (err instanceof Error ? err.message : String(err)) || 'Unknown network error',
     };
   }
 }

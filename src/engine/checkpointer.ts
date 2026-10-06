@@ -4,14 +4,14 @@ import { db } from '../database/db';
 export interface ThreadCheckpoint {
   threadId: string;
   step: number;
-  state: any;
+  state: unknown;
 }
 
 export class RyanAICheckpointer {
   /**
    * Saves or updates a graph execution checkpoint for a specific thread ID
    */
-  static async saveCheckpoint(threadId: string, step: number, state: any): Promise<void> {
+  static async saveCheckpoint(threadId: string, step: number, state: unknown): Promise<void> {
     try {
       await db.agentMemory.create({
         data: {
@@ -30,7 +30,7 @@ export class RyanAICheckpointer {
   /**
    * Retrieves the latest checkpoint state for a thread to resume execution
    */
-  static async getLatestCheckpoint(threadId: string): Promise<any | null> {
+  static async getLatestCheckpoint(threadId: string): Promise<{ step: number; state: unknown } | null> {
     try {
       const latestLog = await db.agentMemory.findFirst({
         where: { sessionId: threadId },
@@ -40,7 +40,7 @@ export class RyanAICheckpointer {
       if (!latestLog) return null;
 
       return {
-        step: (latestLog.metadata as any)?.step || 0,
+        step: (latestLog.metadata as { step?: number } | null)?.step || 0,
         state: JSON.parse(latestLog.content)
       };
     } catch (error) {

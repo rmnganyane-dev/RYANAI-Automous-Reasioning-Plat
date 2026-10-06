@@ -9,6 +9,9 @@ RUN npm ci --legacy-peer-deps
 
 COPY tsconfig.base.json tsconfig.server.json ./
 COPY src ./src
+COPY scripts/copy-server-assets.mjs ./scripts/copy-server-assets.mjs
+COPY models/catalog.json ./models/catalog.json
+COPY app/routes.json ./app/routes.json
 COPY prisma ./prisma
 
 RUN if [ -f prisma/schema.prisma ]; then npx prisma generate; fi
@@ -29,6 +32,8 @@ RUN apk add --no-cache dumb-init libstdc++ libc6-compat wget \
 COPY --from=builder --chown=node:node /app/package.json ./package.json
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/dist/server ./dist/server
+COPY --from=builder --chown=node:node /app/dist/app ./dist/app
+COPY --from=builder --chown=node:node /app/dist/models ./dist/models
 
 USER node
 EXPOSE 3000

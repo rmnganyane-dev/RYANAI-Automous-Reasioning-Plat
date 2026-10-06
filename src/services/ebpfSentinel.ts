@@ -22,7 +22,7 @@ export class EbpfSentinelService {
       // Fallback user-space kill signal if eBPF map update fails
       try {
         process.kill(pid, 'SIGKILL');
-      } catch (e) {
+      } catch {
         // Process may already be dead
       }
     }

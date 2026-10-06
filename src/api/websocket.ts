@@ -2,7 +2,7 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { WebSocket } from 'ws';
 import { v4 as uuid } from 'uuid';
-import { WebSocketMessage, AuthContext, ReasoningRequest, StreamEvent } from '../shared/types.js';
+import { WebSocketMessage, AuthContext, ReasoningRequest } from '../shared/types.js';
 import { createLogger } from '../shared/logger.js';
 
 const logger = createLogger('websocket');
@@ -84,8 +84,11 @@ async function handleMessage(context: ConnectionContext, message: WebSocketMessa
           response.data = { authenticated: !!context.auth, userId: context.auth?.userId };
         } else if (channel === 'reasoning.start') {
           handleReasoningRequest(context, data as ReasoningRequest);
-          response.data = { queued: true, sessionId: data.sessionId };
+          response.data = { queued: true, sessionId: (data as ReasoningRequest).sessionId };
         } else if (channel === 'subscribe') {
+          if (!data || typeof data !== 'object' || !('channel' in data) || typeof data.channel !== 'string') {
+            throw new Error('A subscription channel is required');
+          }
           context.subscriptions.add(data.channel);
           if (!channels.has(data.channel)) {
             channels.set(data.channel, new Set());
@@ -107,8 +110,8 @@ async function handleMessage(context: ConnectionContext, message: WebSocketMessa
       default:
         response.error = { code: 'UNKNOWN_TYPE', message: 'Unknown message type' };
     }
-  } catch (err: any) {
-    response.error = { code: 'HANDLER_ERROR', message: err.message };
+  } catch (err: unknown) {
+    response.error = { code: 'HANDLER_ERROR', message: (err instanceof Error ? err.message : String(err)) };
   }
 
   sendMessage(context.ws, response);
@@ -116,8 +119,7 @@ async function handleMessage(context: ConnectionContext, message: WebSocketMessa
 
 function handleReasoningRequest(context: ConnectionContext, request: ReasoningRequest) {
   // Simulate streaming response
-  const { sessionId, prompt } = request;
-  const startTime = Date.now();
+  const { sessionId } = request;
 
   // Send progress events
   ['Parsing context...', 'Initializing LangGraph...', 'Processing...', 'Complete'].forEach(
@@ -144,7 +146,7 @@ function handleReasoningRequest(context: ConnectionContext, request: ReasoningRe
   );
 }
 
-export function broadcast(channel: string, data: any) {
+export function broadcast(channel: string, data: unknown) {
   const event: WebSocketMessage = {
     id: uuid(),
     type: 'event',
@@ -195,7 +197,7 @@ function extractAuth(request: FastifyRequest): AuthContext | undefined {
       issuedAt: Date.now(),
       expiresAt: Date.now() + 86400000,
     };
-  } catch (err) {
+  } catch {
     return undefined;
   }
 }

@@ -103,9 +103,9 @@ export default function CommandCenter({
       return;
     }
 
-    // Load messages for each conversation with explicit any typing resolved
+    // Load messages for each conversation.
     const convsWithMessages: Conversation[] = await Promise.all(
-      data.map(async (conv: any) => {
+      data.map(async (conv) => {
         const { data: msgs } = await client
           .from('messages')
           .select('*')
@@ -118,7 +118,7 @@ export default function CommandCenter({
           model: MODELS[conv.model as ModelId]
             ? (conv.model as ModelId)
             : DEFAULT_MODEL,
-          messages: (msgs ?? []).map((m: any) => ({
+          messages: (msgs ?? []).map((m) => ({
             id: m.id,
             role: m.role,
             content: m.content,

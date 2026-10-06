@@ -10,6 +10,7 @@ import fastifyWebsocket from '@fastify/websocket';
 import fastifyRedis from '@fastify/redis';
 import fastifyRateLimit from '@fastify/rate-limit';
 import pg from 'pg';
+import { connectRedis } from './connectRedis.js';
 
 import { getReasoningAgent } from '../agent/engine.js';
 import { registerWebSocketRoutes } from '../api/websocket.js';
@@ -105,9 +106,11 @@ async function registerPlugins() {
     done();
   });
 
-  // 1. Register Fastify Redis Connection
+  // Check readiness before Avvio's plugin timeout obscures connection failures.
+  const redis = await connectRedis(config.redis.url);
   await fastify.register(fastifyRedis, {
-    url: config.redis.url,
+    client: redis,
+    closeClient: true,
   });
 
   // 2. Register Global Rate Limiter backed by Redis
@@ -231,7 +234,7 @@ async function runReasoning(prompt: string, model?: string) {
   const result = await getReasoningAgent(model).invoke({
     messages: [{ role: 'user', content: prompt }],
   });
-  const reasoningTrace = result.messages.map((message) =>
+  const reasoningTrace = result.messages.map((message: { content: unknown }) =>
     contentToText(message.content),
   );
   const output = reasoningTrace.at(-1) ?? '';

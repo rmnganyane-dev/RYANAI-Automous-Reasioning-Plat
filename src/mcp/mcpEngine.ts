@@ -51,7 +51,7 @@ export class RyanMcpEngine {
       const { name, arguments: args } = request.params;
 
       if (name === 'execute_pipeline') {
-        const { projectName, branch, autoShip = false, strictMode = true } = args as any;
+        const { projectName, branch, autoShip = false, strictMode = true } = args as { projectName: string; branch: string; autoShip?: boolean; strictMode?: boolean };
         const result = await this.orchestrator.runPipeline({
           projectName,
           branch,

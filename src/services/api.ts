@@ -38,7 +38,7 @@ export async function executeAgentReasoning(prompt: string): Promise<ReasonRespo
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error((errorData as any).error || `Reasoning execution failed with status: ${response.status}`);
+    throw new Error((errorData as { error?: string } | null)?.error || `Reasoning execution failed with status: ${response.status}`);
   }
 
   return response.json();

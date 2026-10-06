@@ -3,7 +3,7 @@ import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { diag, DiagConsoleLogger, DiagLogLevel } from '@opentelemetry/api';
-import { Resource } from '@opentelemetry/resources';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
@@ -21,7 +21,7 @@ export class RyanAITelemetry {
     });
 
     this.sdk = new NodeSDK({
-      resource: new Resource({
+      resource: resourceFromAttributes({
         [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'ryanai-autonomous-platform',
         'service.version': '1.0.0',
       }),
@@ -30,7 +30,7 @@ export class RyanAITelemetry {
         getNodeAutoInstrumentations({
           '@opentelemetry/instrumentation-fs': { enabled: false },
         }),
-      ] as any,
+      ],
     });
 
     try {
