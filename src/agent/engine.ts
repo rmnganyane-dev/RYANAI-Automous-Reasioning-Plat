@@ -6,7 +6,9 @@ import modelCatalog from '../../models/catalog.json';
 import { RYANAI_CORE } from '../config/core.js';
 
 if (!RYANAI_CORE.activeSkills.includes('autonomous-reasoning')) {
-  throw new Error('The active autonomous reasoning skill is missing from RYANAI/core.json.');
+  throw new Error(
+    'The active autonomous reasoning skill is missing from src/config/core.ts.',
+  );
 }
 
 const catalogModels = modelCatalog.models.map((model) => model.id);
@@ -23,7 +25,9 @@ const reasoningAgents = new Map<string, ReturnType<typeof createReactAgent>>();
 export function getReasoningAgent(requestedModel = defaultModel) {
   const model = requestedModel.trim();
   if (!allowedModels.has(model)) {
-    throw new Error(`Model "${model}" is not enabled. Allowed models: ${[...allowedModels].join(', ')}`);
+    throw new Error(
+      `Model "${model}" is not enabled. Allowed models: ${[...allowedModels].join(', ')}`,
+    );
   }
 
   let reasoningAgent = reasoningAgents.get(model);
@@ -32,8 +36,12 @@ export function getReasoningAgent(requestedModel = defaultModel) {
       modelName: model,
       temperature: 0,
       configuration: {
-        ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
-        ...(process.env.OPENAI_API_KEY ? { apiKey: process.env.OPENAI_API_KEY } : {}),
+        ...(process.env.OPENAI_BASE_URL
+          ? { baseURL: process.env.OPENAI_BASE_URL }
+          : {}),
+        ...(process.env.OPENAI_API_KEY
+          ? { apiKey: process.env.OPENAI_API_KEY }
+          : {}),
       },
     });
 
