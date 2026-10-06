@@ -17,6 +17,7 @@ const binding = JSON.parse(
 );
 const target = binding.targets[0];
 
+/** Executes a checked-in GYP shell substitution with an isolated CUDA_PATH value. */
 function evaluateSubstitution(expression: string, cudaPath?: string): string {
   const command = expression.match(/^<!@?\((.*)\)$/)?.[1];
   expect(command, "expected a GYP shell substitution").toBeDefined();
