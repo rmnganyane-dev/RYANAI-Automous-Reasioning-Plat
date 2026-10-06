@@ -47,18 +47,27 @@ export default function App() {
   return (
     <div className="flex h-screen min-h-[480px] flex-col overflow-hidden bg-slate-950 text-slate-100">
       <header className="z-20 flex min-h-14 items-center justify-between border-b border-cyan-400/15 bg-slate-950/95 px-4 sm:px-8">
-        <a href="#/" className="flex items-center gap-2 font-display text-sm font-black tracking-[0.18em] text-cyan-200">
+        <a
+          href="#/"
+          className="flex items-center gap-2 font-display text-sm font-black tracking-[0.18em] text-cyan-200"
+        >
           <Cpu className="h-5 w-5 text-cyan-400" />
           RYANAI
         </a>
-        <nav aria-label="Main navigation" className="flex items-center gap-1 overflow-x-auto">
+        <nav
+          aria-label="Main navigation"
+          className="flex items-center gap-1 overflow-x-auto"
+        >
           {destinations.map(({ id, path, label, icon: Icon }) => (
             <a
               key={id}
               href={id === 'landing' ? '#/' : `#${path}`}
+              aria-label={label}
               aria-current={route === id ? 'page' : undefined}
               className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors sm:text-sm ${
-                route === id ? 'bg-cyan-400/10 text-cyan-200' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                route === id
+                  ? 'bg-cyan-400/10 text-cyan-200'
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -74,7 +83,12 @@ export default function App() {
         {route === 'cockpit' && <RyanAICockpit />}
         {route === 'workspace' && (
           <div className="h-full min-h-[calc(100vh-3.5rem)]">
-            <CommandCenter onSignOut={() => { window.location.hash = '/'; }} userFullName="Operator" />
+            <CommandCenter
+              onSignOut={() => {
+                window.location.hash = '/';
+              }}
+              userFullName="Operator"
+            />
           </div>
         )}
       </main>
