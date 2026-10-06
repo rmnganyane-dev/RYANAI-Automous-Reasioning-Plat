@@ -43,6 +43,7 @@
     "src/store/**/*.ts",
     "src/services/**/*.ts",
     "src/lib/**/*.ts",
+    "src/shared/**/*.ts",
     "src/types.ts",
     "src/main.tsx",
     "src/App.tsx"
