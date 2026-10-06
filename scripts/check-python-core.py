@@ -1,44 +1,37 @@
 #!/usr/bin/env python3
-"""
-scripts/check-python-core.py - Validate Python core modules
-"""
+"""Syntax-check the Python tools shipped with RyanAI (no third-party core exists)."""
+
+import ast
 import sys
-import subprocess
+from pathlib import Path
 
-def check_module(module_name, package_name=None):
-    """Check if Python module exists"""
-    pkg = package_name or module_name
-    try:
-        __import__(module_name)
-        print(f"✓ {pkg}")
-        return True
-    except ImportError:
-        print(f"✗ {pkg}")
-        return False
 
-def main():
-    print("🐍 Checking Python dependencies...\n")
-    
-    modules = [
-        ('langgraph', 'LangGraph'),
-        ('chromadb', 'ChromaDB'),
-        ('fastapi', 'FastAPI'),
-        ('prisma', 'Prisma'),
-        ('pydantic', 'Pydantic'),
-        ('openai', 'OpenAI'),
-    ]
-    
-    passed = sum(check_module(m, p) for m, p in modules)
-    total = len(modules)
-    
-    print(f"\n{passed}/{total} Python packages installed")
-    
-    if passed < total:
-        print("\n📦 Install missing packages:")
-        print("pip install langgraph chromadb fastapi prisma pydantic openai")
+ROOT = Path(__file__).resolve().parent.parent
+PYTHON_TOOLS = (
+    Path("scripts/ryan_cli.py"),
+    Path("scripts/ryan_master_boot.py"),
+    Path("scripts/ryan_benchmark.py"),
+    Path("scripts/ryan_status.py"),
+)
+
+
+def main() -> int:
+    if sys.version_info < (3, 10):
+        print("Python 3.10 or newer is required.", file=sys.stderr)
         return 1
-    
-    return 0
+
+    failed = False
+    for relative_path in PYTHON_TOOLS:
+        source_path = ROOT / relative_path
+        try:
+            ast.parse(source_path.read_text(encoding="utf-8"), filename=str(relative_path))
+            print(f"PASS {relative_path}")
+        except (OSError, SyntaxError) as error:
+            print(f"FAIL {relative_path}: {error}", file=sys.stderr)
+            failed = True
+
+    return int(failed)
+
 
 if __name__ == "__main__":
     sys.exit(main())

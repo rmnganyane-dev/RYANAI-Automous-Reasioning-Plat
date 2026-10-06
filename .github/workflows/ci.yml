@@ -1,4 +1,4 @@
-name: CI - Build & Test
+name: CI - Build, Test, and Integrate
 
 on:
   push:
@@ -15,31 +15,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build & Test (Node ${{ matrix.node-version }})
+  validate:
+    name: Validate (Node 22)
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [20.x, 22.x]
-
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
-          POSTGRES_USER: ryanai_admin
-          POSTGRES_PASSWORD: password_ci
+          POSTGRES_USER: ryanai
+          POSTGRES_PASSWORD: ci_password
           POSTGRES_DB: ryanai_db
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U ryanai_admin"
+          --health-cmd "pg_isready -U ryanai -d ryanai_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
       redis:
         image: redis:7-alpine
         ports:
@@ -51,48 +45,49 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql://ryanai_admin:password_ci@localhost:5432/ryanai_db
-      REDIS_URL: redis://localhost:6379
       NODE_ENV: test
-      PORT: 3001
-      NODE_OPTIONS: --max-old-space-size=8192
+      DATABASE_URL: postgresql://ryanai:ci_password@localhost:5432/ryanai_db
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci_only_secret_at_least_32_characters_long
+      OPENAI_API_KEY: ""
+      API_BASE_URL: http://localhost:3000
+      WEB_BASE_URL: http://localhost:9090
+      NODE_OPTIONS: --max-old-space-size=6144
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+          node-version: 22
+          cache: npm
 
-      - name: Install System Dependencies
+      - name: Install locked dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Validate application
+        run: npm run validate
+
+      - name: Validate Python tooling
+        run: npm run core:check
+
+      - name: Validate standalone MCP manager
+        run: npm run mcp:check
+
+      - name: Start API and frontend and run integration checks
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential python3
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Prisma Generate
-        run: pnpm exec prisma generate
-
-      - name: Build Client
-        run: pnpm run build:client --if-present
-
-      - name: Run Tests
-        run: pnpm test --if-present
-
-      - name: Upload Coverage to Codecov
-        uses: codecov/codecov-action@v4
-        if: always()
-        with:
-          files: ./coverage/coverage-final.json
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
+          npm run start > api.log 2>&1 &
+          api_pid=$!
+          npm run preview -- --host 0.0.0.0 --port 9090 > web.log 2>&1 &
+          web_pid=$!
+          cleanup() {
+            kill "$api_pid" "$web_pid" 2>/dev/null || true
+            wait "$api_pid" "$web_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          npm run startup:verify
+          npm run test:integration
+          npm run test:e2e

@@ -54,7 +54,7 @@ function validateConfig(config: Partial<AppConfig>): AppConfig {
     },
     openai: {
       apiKey: openaiKey,
-      model: process.env.OPENAI_MODEL || 'gpt-4-turbo',
+      model: process.env.OPENAI_MODEL || 'gpt-4o',
       ...openai,
     },
     sentry: {

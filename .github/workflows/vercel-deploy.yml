@@ -31,43 +31,44 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'pnpm'
+          node-version: 22
+          cache: npm
 
-      - name: Check for Conflicting Lockfiles
+      - name: Verify npm lockfile
         run: |
-          if [ -f "package-lock.json" ] || [ -f "yarn.lock" ]; then
-            echo "❌ Error: Found legacy package-lock.json or yarn.lock! Delete them to enforce strict pnpm usage."
+          if [ ! -f "package-lock.json" ]; then
+            echo "Error: package-lock.json is required for reproducible CI installs."
             exit 1
           fi
-          echo "✅ Lockfile validation passed."
+          echo "npm lockfile found."
 
-      - name: Install Monorepo Dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
 
-      - name: Run Build Check across Workspace
-        run: pnpm run build --if-present
+      - name: Typecheck frontend
+        run: npm run typecheck
+
+      - name: Build web application
+        run: npm run build:web
 
       - name: Deploy to Vercel
         if: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push' }}
         run: |
-          if [ -n "${VERCEL_TOKEN:-}" ]; then
+          if [ -n "${VERCEL_TOKEN:-}" ] && [ -n "${VERCEL_ORG_ID:-}" ] && [ -n "${VERCEL_PROJECT_ID:-}" ]; then
+            echo "[*] Linking Vercel project..."
+            npx --yes vercel@latest link --yes --project "$VERCEL_PROJECT_ID" --scope "$VERCEL_ORG_ID" --token "$VERCEL_TOKEN"
+
             echo "[*] Pulling Vercel production environment..."
-            pnpm dlx vercel pull --yes --environment=production
+            npx --yes vercel@latest pull --yes --environment=production --token "$VERCEL_TOKEN"
 
             echo "[*] Building project via Vercel CLI..."
-            pnpm dlx vercel build --prod
+            npx --yes vercel@latest build --prod --token "$VERCEL_TOKEN"
 
             echo "[*] Deploying prebuilt artifacts to Vercel production..."
-            pnpm dlx vercel deploy --prebuilt --prod
+            npx --yes vercel@latest deploy --prebuilt --prod --token "$VERCEL_TOKEN"
           else
-            echo "[!] VERCEL_TOKEN secret is not set. Skipping automated Vercel deployment."
+            echo "[!] Vercel deployment secrets are incomplete; skipping CLI deployment. Git-based Vercel deployments may still run."
           fi

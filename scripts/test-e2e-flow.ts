@@ -1,76 +1,78 @@
-#!/usr/bin/env node
-/**
- * scripts/test-e2e-flow.ts - E2E test flow
- */
-import { createLogger } from '../src/shared/logger.js';
+const apiUrl = (process.env.API_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
+const webUrl = (process.env.WEB_BASE_URL || 'http://localhost:9090').replace(/\/+$/, '');
+const timeoutMs = Number(process.env.E2E_TIMEOUT_MS || 5000);
+const results: { name: string; error?: string }[] = [];
 
-const logger = createLogger('e2e-test');
-
-async function runE2ETests() {
-  logger.info('🧪 Starting E2E tests...\n');
-
-  const tests = [
-    {
-      name: 'API Health Check',
-      fn: async () => {
-        const res = await fetch('http://localhost:3000/health');
-        return res.ok;
-      },
-    },
-    {
-      name: 'WebSocket Connection',
-      fn: async () => {
-        return new Promise((resolve) => {
-          const ws = new WebSocket('ws://localhost:3000/ws');
-          const timeout = setTimeout(() => {
-            ws.close();
-            resolve(false);
-          }, 5000);
-          ws.onopen = () => {
-            clearTimeout(timeout);
-            ws.close();
-            resolve(true);
-          };
-          ws.onerror = () => {
-            clearTimeout(timeout);
-            resolve(false);
-          };
-        });
-      },
-    },
-    {
-      name: 'Reasoning Endpoint',
-      fn: async () => {
-        const res = await fetch('http://localhost:3000/api/reason', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: 'Test' }),
-        });
-        return res.ok;
-      },
-    },
-  ];
-
-  let passed = 0;
-  for (const test of tests) {
-    try {
-      const result = await test.fn();
-      if (result) {
-        logger.info(`✓ ${test.name}`);
-        passed++;
-      } else {
-        logger.error(`✗ ${test.name}`);
-      }
-    } catch (err: any) {
-      logger.error(`✗ ${test.name}: ${err.message}`);
-    }
+async function test(name: string, run: () => Promise<void>): Promise<void> {
+  try {
+    await run();
+    console.log(`PASS ${name}`);
+    results.push({ name });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`FAIL ${name}: ${message}`);
+    results.push({ name, error: message });
   }
-
-  logger.info(`\n✅ ${passed}/${tests.length} tests passed`);
-  process.exit(passed === tests.length ? 0 : 1);
 }
 
-runE2ETests().catch((err) => {
-  logger.error(err);
-  process.exit(1);
+async function main(): Promise<void> {
+  await test('API health endpoint', async () => {
+    const response = await fetch(`${apiUrl}/health`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const health = await response.json();
+    if (health.status !== 'online') throw new Error('API did not report online');
+  });
+
+  await test('Frontend is served', async () => {
+    const response = await fetch(webUrl, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.headers.get('content-type')?.includes('text/html')) {
+      throw new Error('Frontend response is not HTML');
+    }
+  });
+
+  await test('Reasoning endpoint rejects empty prompts', async () => {
+    const response = await fetch(`${apiUrl}/api/reason`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: '  ' }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (response.status !== 400) {
+      throw new Error(`Expected HTTP 400, received HTTP ${response.status}`);
+    }
+  });
+
+  await test('WebSocket endpoint accepts upgrades', async () => {
+    const wsUrl = new URL('/ws', apiUrl);
+    wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+    await new Promise<void>((resolve, reject) => {
+      const socket = new WebSocket(wsUrl);
+      const timeout = setTimeout(() => {
+        socket.close();
+        reject(new Error(`Connection timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      socket.addEventListener('open', () => {
+        clearTimeout(timeout);
+        socket.close();
+        resolve();
+      }, { once: true });
+      socket.addEventListener('error', () => {
+        clearTimeout(timeout);
+        reject(new Error('WebSocket connection failed'));
+      }, { once: true });
+    });
+  });
+
+  const failed = results.filter((result) => result.error);
+  console.log(`\nEnd-to-end checks: ${results.length - failed.length}/${results.length} passed`);
+  if (failed.length) process.exitCode = 1;
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
 });

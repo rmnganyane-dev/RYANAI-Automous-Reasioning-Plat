@@ -1,87 +1,65 @@
-﻿/**
- * @file analyze.ts
- * @description Core analysis workflow module for RyanAI Autonomous Reasoning Platform.
- */
-
 export interface AnalyzeInput {
   targetId: string;
   payload: string;
   mode?: 'deep' | 'fast' | 'diagnostic';
-  options?: Record<string, unknown>;
-}
-
-export interface AnalysisFinding {
-  severity: 'info' | 'warning' | 'error' | 'critical';
-  category: string;
-  message: string;
-  suggestion?: string;
 }
 
 export interface AnalyzeResult {
-  success: boolean;
+  success: true;
   targetId: string;
   timestamp: string;
-  confidenceScore: number;
-  findings: AnalysisFinding[];
-  summary: string;
+  model: string;
+  output: string;
+  reasoningTrace: string[];
 }
 
-/**
- * Executes the analysis workflow pipeline.
- */
 export async function analyzeWorkflow(input: AnalyzeInput): Promise<AnalyzeResult> {
-  const timestamp = new Date().toISOString();
-
-  if (!input.targetId || !input.payload) {
+  if (!input.targetId?.trim() || !input.payload?.trim()) {
     throw new Error('Invalid analysis input: targetId and payload are required.');
   }
-
   const mode = input.mode ?? 'fast';
-
-  try {
-    const findings: AnalysisFinding[] = [];
-
-    if (input.payload.trim().length < 10) {
-      findings.push({
-        severity: 'warning',
-        category: 'PayloadQuality',
-        message: 'Payload is brief, which may reduce analysis confidence.',
-        suggestion: 'Provide additional context or structured data points.'
-      });
-    }
-
-    const confidenceScore = mode === 'deep' ? 0.98 : 0.88;
-
-    findings.push({
-      severity: 'info',
-      category: 'ExecutionStatus',
-      message: `Successfully completed ${mode} analysis pass.`
-    });
-
-    return {
-      success: true,
-      targetId: input.targetId,
-      timestamp,
-      confidenceScore,
-      findings,
-      summary: `Analysis completed successfully for target ${input.targetId} using [${mode}] mode.`
-    };
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error during analysis workflow execution.';
-
-    return {
-      success: false,
-      targetId: input.targetId,
-      timestamp,
-      confidenceScore: 0.0,
-      findings: [
-        {
-          severity: 'critical',
-          category: 'WorkflowFailure',
-          message: errorMessage
-        }
-      ],
-      summary: `Analysis failed for target ${input.targetId}.`
-    };
+  const instructions = {
+    fast: 'Analyze efficiently and provide a concise response.',
+    deep: 'Analyze carefully and describe uncertainty and relevant reasoning.',
+    diagnostic: 'Focus on diagnosis, evidence, risks, and next steps.',
+  } satisfies Record<NonNullable<AnalyzeInput['mode']>, string>;
+  if (!Object.hasOwn(instructions, mode)) {
+    throw new Error(`Unsupported analysis mode: ${String(mode)}`);
   }
+
+  const apiBase = (
+    process.env.RYANAI_API_BASE_URL ||
+    process.env.API_BASE_URL ||
+    'http://localhost:3000'
+  ).replace(/\/+$/, '');
+  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const response = await fetch(`${apiBase}/api/reason`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      prompt: `${instructions[mode]}\n\nTarget: ${input.targetId}\n\n${input.payload}`,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`RyanAI reasoning request failed (${response.status}): ${await response.text()}`);
+  }
+
+  const result = await response.json() as {
+    success?: boolean;
+    output?: string;
+    reasoningTrace?: string[];
+  };
+  if (result.success !== true || typeof result.output !== 'string' || !result.output.trim()) {
+    throw new Error('RyanAI reasoning API returned an invalid or unsuccessful response.');
+  }
+
+  return {
+    success: true,
+    targetId: input.targetId,
+    timestamp: new Date().toISOString(),
+    model,
+    output: result.output,
+    reasoningTrace: Array.isArray(result.reasoningTrace) ? result.reasoningTrace : [],
+  };
 }

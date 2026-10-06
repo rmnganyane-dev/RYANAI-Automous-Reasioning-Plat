@@ -49,7 +49,7 @@ jobs:
       - name: Type-Check & Lint
         run: |
           npx tsc --noEmit --pretty
-          npm run lint --if-present
+          npm run lint
 
       - name: Run Scoped Copilot Feature Tests
         run: |

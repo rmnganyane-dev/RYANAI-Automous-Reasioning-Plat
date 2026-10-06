@@ -1,89 +1,80 @@
-name: Project Ryan Preview Environment & PR Deploy
+name: Pull Request Preview Checks
 
 on:
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
-  pull-requests: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: preview-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  build:
+    name: Build API and web images
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api
+            dockerfile: Dockerfile.api
+          - image: web
+            dockerfile: Dockerfile.web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build image without publishing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          tags: ryanai-${{ matrix.image }}:pr-check
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   vercel-preview:
-    name: Deploy Vercel Preview
+    name: Deploy Vercel preview (trusted pull requests only)
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      CI: "true"
-
+      VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
     steps:
-      - name: Checkout Repository
+      - name: Checkout
+        if: ${{ env.VERCEL_TOKEN != '' }}
         uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Setup Node.js
+      - name: Set up Node.js
+        if: ${{ env.VERCEL_TOKEN != '' }}
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'pnpm'
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Deploy Preview to Vercel
+          node-version: 22
+          cache: npm
+      - name: Validate preview configuration
         if: ${{ env.VERCEL_TOKEN != '' }}
         run: |
-          echo "[*] Pulling Vercel preview environment..."
-          pnpm dlx vercel pull --yes --environment=preview
-
-          echo "[*] Building preview artifacts via Vercel CLI..."
-          pnpm dlx vercel build
-
-          echo "[*] Deploying preview build..."
-          pnpm dlx vercel deploy --prebuilt
-
-  docker-preview:
-    name: Build & Push PR Docker Image
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Lowercase Repository Name
-        id: repo_name
-        run: echo "image_name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and Push PR Container Tag
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/api/Dockerfile
-          push: true
-          tags: ghcr.io/${{ steps.repo_name.outputs.image_name }}/api:pr-${{ github.event.pull_request.number }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          test -n "$VERCEL_ORG_ID" || { echo "::error::Set VERCEL_ORG_ID"; exit 1; }
+          test -n "$VERCEL_PROJECT_ID" || { echo "::error::Set VERCEL_PROJECT_ID"; exit 1; }
+          test -n "$VITE_API_BASE_URL" || { echo "::error::Set VITE_API_BASE_URL"; exit 1; }
+      - name: Install locked dependencies
+        if: ${{ env.VERCEL_TOKEN != '' }}
+        run: npm ci --legacy-peer-deps
+      - name: Build and deploy preview
+        if: ${{ env.VERCEL_TOKEN != '' }}
+        run: |
+          npx --yes vercel@latest pull --yes --environment=preview --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest build --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest deploy --prebuilt --token="$VERCEL_TOKEN"
+      - name: Explain skipped Vercel preview
+        if: ${{ env.VERCEL_TOKEN == '' }}
+        run: echo "Vercel preview skipped because VERCEL_TOKEN is not configured."
