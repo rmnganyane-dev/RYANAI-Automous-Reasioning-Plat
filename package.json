@@ -120,6 +120,7 @@
     "@supabase/server": "^1.6.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
+    "@tailwindcss/postcss": "^4.3.3",
     "@tauri-apps/api": "^2.11.1",
     "@types/pg": "^8.23.1",
     "@vercel/analytics": "^2.0.1",
