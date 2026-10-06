@@ -2,8 +2,13 @@
 import { AppConfig } from './types.js';
 
 function validateConfig(config: Partial<AppConfig>): AppConfig {
+  const environment = process.env.NODE_ENV;
+  const defaultNodeEnv: AppConfig['nodeEnv'] =
+    environment === 'production' || environment === 'staging'
+      ? environment
+      : 'development';
   const {
-    nodeEnv = 'development',
+    nodeEnv = defaultNodeEnv,
     port = 3000,
     host = '0.0.0.0',
     database = {},
