@@ -66,15 +66,58 @@ If `npm run install:all` is missing, your checkout has an older `package.json`.
 Inspect `git status` and `git branch --show-current`, preserve local changes, and
 synchronize the intended branch before following these instructions.
 
-### Step 1: Start Everything
+### Step 1: Configure and start the stack
+
+**Windows Command Prompt:**
+
+```cmd
+if not exist .env copy .env.example .env
+notepad .env
+```
+
+**PowerShell:**
+
+```powershell
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+notepad .env
+```
+
+**Bash (Linux/macOS):**
+
 ```bash
-cp .env.example .env
-# Replace DB_PASSWORD, REDIS_PASSWORD, JWT_SECRET, and MCP_AUTH_TOKEN placeholders in .env.
+[ -f .env ] || cp .env.example .env
+```
+
+Edit `.env` before starting Docker. Replace `DB_PASSWORD`, `REDIS_PASSWORD`,
+`JWT_SECRET`, and `MCP_AUTH_TOKEN` with independent random values. This command
+works in all three shells and prints four values you can use, one per setting:
+
+```text
+node -e "for(let i=0;i<4;i++) console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+For local Node processes, also put the corresponding database/cache passwords
+into `DATABASE_URL` and `REDIS_URL`. Save `.env`, then run:
+
+```text
+docker compose config --quiet
 npm run docker:up
 ```
 
-On Windows, copy the file with `Copy-Item .env.example .env` (PowerShell) or
-`copy .env.example .env` (Command Prompt), if you do not already have a `.env`.
+Continue only after the configuration check succeeds. Compose checks all four
+required variables even when starting only PostgreSQL and Redis.
+
+If Vite reports a missing `RYANAI/core.json` or `src/lib/supabase` module,
+synchronize the current branch with `origin/main` after preserving local changes.
+The merged fix uses the tracked `app/routes.json` and explicitly loads
+`CommandCenter.tsx`. Restart the development processes after updating the files.
+
+`Dockerfile`, `Dockerfile.api`, `Dockerfile.server`, and `Dockerfile.monorepo` all
+build and start the same compiled API launcher. The web image renders its Nginx
+template at startup; `PORT` defaults to 80 and `API_HOST`/`API_PORT` default to
+`api`/3000. Compose fixes these container ports independently of local development
+ports. Browser Supabase settings are supplied as public `VITE_SUPABASE_*` build
+arguments; local `.env` files are excluded from the web build inputs.
 
 Set `OPENAI_API_KEY` in `.env` to enable live model reasoning. Without a provider key, the UI and API still start, but reasoning requests return an explicit configuration error.
 
@@ -109,7 +152,7 @@ integration checks against the local API.
 
 For local development, use `npm run dev:api` (API on port 3001 by default) and `npm run dev:web` (Vite on port 1420). Override ports portably in PowerShell with `$env:PORT='3002'; npm.cmd run dev:api` and `$env:VITE_PORT='5174'; npm.cmd run dev:web`; on bash, use `PORT=3002 npm run dev:api` and `VITE_PORT=5174 npm run dev:web`.
 
-For local Vite development, do not set `NODE_ENV=production` in `.env`; Vite controls development/production mode itself. Docker Compose defaults the API to production without requiring this setting in `.env`. `npm run dev:tunnel` requires ngrok account authentication; set `NGROK_AUTHTOKEN` in the root `.env` or shell. The tunnel uses the same `PORT` value as the API (3001 by default for local development).
+For local Vite development, do not set `NODE_ENV=production` in `.env`; Vite controls development/production mode itself. Docker Compose runs the API in production without requiring this setting in `.env`. `npm run dev:tunnel` requires ngrok account authentication; set `NGROK_AUTHTOKEN` in the root `.env` or shell. The tunnel uses the same `PORT` value as the API (3001 by default for local development).
 
 ### Codespaces and local development
 
