@@ -2,6 +2,7 @@
 /**
  * scripts/tunnel.ts - Ngrok tunnel for webhooks
  */
+import '../src/loadEnv.js';
 import ngrok from '@ngrok/ngrok';
 import { createLogger } from '../src/shared/logger.js';
 
@@ -14,8 +15,13 @@ async function startTunnel() {
   }
 
   try {
+    if (!process.env.NGROK_AUTHTOKEN) {
+      throw new Error(
+        'Set NGROK_AUTHTOKEN in the root .env or shell environment before starting the tunnel.',
+      );
+    }
     logger.info('🔗 Starting ngrok tunnel...');
-    
+
     const url = await ngrok.connect({
       addr: port,
       authtoken: process.env.NGROK_AUTHTOKEN,
@@ -30,9 +36,6 @@ async function startTunnel() {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`Tunnel error: ${message}`);
-    if (!process.env.NGROK_AUTHTOKEN) {
-      logger.error('Set NGROK_AUTHTOKEN in your environment after creating an ngrok account, or authenticate ngrok with its CLI.');
-    }
     process.exitCode = 1;
   }
 }

@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { airGapCache, saveVector, loadVector, clearVectorCache, VectorEntry } from './airGapCache';
+import {
+  airGapCache,
+  saveVector,
+  loadVector,
+  clearVectorCache,
+  deleteVector,
+  VectorEntry,
+} from './airGapCache';
 
 describe('AirGapCache and Vector Operations', () => {
   beforeEach(async () => {
@@ -15,7 +22,7 @@ describe('AirGapCache and Vector Operations', () => {
     const entry: VectorEntry = {
       id: 'vec-1',
       vector: [0.1, 0.2, 0.3],
-      metadata: { source: 'test' }
+      metadata: { source: 'test' },
     };
 
     await saveVector(entry);
@@ -34,7 +41,7 @@ describe('AirGapCache and Vector Operations', () => {
 
     const entry: VectorEntry = {
       id: 'vec-ttl',
-      vector: [0.5, 0.6]
+      vector: [0.5, 0.6],
     };
 
     await airGapCache.set(entry.id, entry, 1000);
@@ -49,6 +56,26 @@ describe('AirGapCache and Vector Operations', () => {
     // Await the expired lookup
     const cachedAfter = await airGapCache.get(entry.id);
     expect(cachedAfter).toBeNull();
+  });
+
+  it('should overwrite and delete persisted vectors', async () => {
+    await saveVector({ id: 'replace', vector: [1] });
+    await saveVector({ id: 'replace', vector: [2], metadata: { revision: 2 } });
+    expect(await loadVector('replace')).toEqual({
+      id: 'replace',
+      vector: [2],
+      metadata: { revision: 2 },
+    });
+    await deleteVector('replace');
+    expect(await loadVector('replace')).toBeNull();
+    await deleteVector('replace');
+  });
+
+  it('should expire at the exact TTL boundary', async () => {
+    vi.useFakeTimers();
+    await airGapCache.set('boundary', 'value', 1000);
+    vi.advanceTimersByTime(1000);
+    expect(await airGapCache.get('boundary')).toBeNull();
   });
 
   it('should clear all cache entries', async () => {
