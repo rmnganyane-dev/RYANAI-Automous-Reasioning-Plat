@@ -1,11 +1,12 @@
+import '../loadEnv.js';
 import Fastify from 'fastify';
 import fastifyRedis from '@fastify/redis';
 import { reasonPlugin } from './routes/reason.js';
 import { RyanMCPServer } from '../mcp/ryanMcpServer.js';
 
-const server = Fastify({ 
+const server = Fastify({
   logger: true,
-  pluginTimeout: 30000 // Increase Avvio plugin timeout to 30 seconds
+  pluginTimeout: 30000, // Increase Avvio plugin timeout to 30 seconds
 });
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -13,7 +14,10 @@ const HOST = process.env.HOST || '0.0.0.0';
 // CORS middleware
 server.addHook('onRequest', (req, reply, done) => {
   reply.header('Access-Control-Allow-Origin', '*');
-  reply.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  reply.header(
+    'Access-Control-Allow-Methods',
+    'GET, POST, PUT, DELETE, OPTIONS',
+  );
   reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
     reply.code(200).send();
@@ -24,11 +28,11 @@ server.addHook('onRequest', (req, reply, done) => {
 
 // Root endpoint
 server.get('/', async () => {
-  return { 
-    status: 'online', 
+  return {
+    status: 'online',
     service: 'RyanAI API Gateway',
     version: '1.0.0',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 });
 
@@ -54,7 +58,7 @@ const healthCheck = async () => {
     architect: 'RyanAI',
     cudaActive: false,
     activeGraph: 'reasoning-agent',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 };
 
@@ -67,13 +71,16 @@ async function setupRoutes() {
   try {
     await server.register(fastifyRedis, {
       url: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
-      family: 4,          // Forces IPv4 to prevent Windows socket resolution hangs
-      connectTimeout: 5000 // Fail fast if unreachable
+      family: 4, // Forces IPv4 to prevent Windows socket resolution hangs
+      connectTimeout: 5000, // Fail fast if unreachable
     });
     console.log('✓ Redis plugin registered successfully');
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.warn('⚠️ Redis connection skipped/failed; running without Redis cache:', errorMsg);
+    console.warn(
+      '⚠️ Redis connection skipped/failed; running without Redis cache:',
+      errorMsg,
+    );
   }
 
   try {

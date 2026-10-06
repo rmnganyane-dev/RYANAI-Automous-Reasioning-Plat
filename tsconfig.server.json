@@ -39,7 +39,11 @@
       "@/utils/*": ["./src/utils/*"]
     }
   },
-  "include": ["src/server/launcher.ts", "src/server/index.ts"],
+  "include": [
+    "src/loadEnv.ts",
+    "src/server/launcher.ts",
+    "src/server/index.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",
