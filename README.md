@@ -174,6 +174,26 @@ vite.config.ts             # Vite config
 
 ## 🛠️ Development
 
+### Load only the UI
+
+```bash
+npm ci --legacy-peer-deps
+npm run dev:web
+```
+
+Open http://localhost:1420. The React UI mounts without waiting for the API,
+PostgreSQL, Redis, MCP, or model credentials. Health checks use `/api/health` and
+time out after five seconds; unavailable services are reported in the UI.
+Navigation and the local workspace remain available, while live reasoning needs
+the configured API. For a built UI, run `npm run build` then `npm run preview`.
+
+Keep `index.html` at the project root and `App.tsx` under `src/`. The supported
+API entrypoint is `src/server/launcher.ts` (`npm run dev:api`); the standalone
+`server.ts` and `src/server.ts` scripts are legacy alternatives and do not serve
+the React UI. Docker Compose serves the UI through `Dockerfile.web`/Nginx on
+http://localhost:9090. Preserve the repository's full `.dockerignore` when
+integrating standalone file copies.
+
 ### All Services at Once
 ```bash
 npm run dev
