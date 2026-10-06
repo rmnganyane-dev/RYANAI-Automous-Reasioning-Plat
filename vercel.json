@@ -1,7 +1,7 @@
 {
+  "framework": "vite",
+  "installCommand": "npm ci --legacy-peer-deps",
   "buildCommand": "npm run build:web",
   "outputDirectory": "dist",
-  "env": {
-    "NODE_ENV": "production"
-  }
+  "devCommand": "npm run dev:web"
 }

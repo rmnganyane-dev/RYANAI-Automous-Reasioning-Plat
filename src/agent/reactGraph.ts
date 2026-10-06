@@ -11,37 +11,49 @@ export interface AgentState {
   steps: string[];
   context: Record<string, any>;
   output: string;
-  confidence: number;
 }
 
-// 1. Configure the primary LLM model (e.g., Nemotron / OpenAI compatible endpoint)
-const primaryLLM = new ChatOpenAI({
-  modelName: process.env.PRIMARY_REASONING_MODEL || "nvidia/nemotron-3-ultra",
-  temperature: 0.2,
-  configuration: {
-    baseURL: process.env.NVIDIA_API_ENDPOINT || "https://integrate.api.nvidia.com/v1",
-    apiKey: process.env.NVIDIA_API_KEY || "dummy-key",
-  },
-});
+const modelName = process.env.PRIMARY_REASONING_MODEL ||
+  (process.env.NVIDIA_API_KEY
+    ? process.env.NVIDIA_MODEL || "nvidia/nemotron-3-ultra"
+    : process.env.OPENAI_MODEL || "gpt-4o");
+let reactAgentGraph: ReturnType<typeof createReactAgent> | undefined;
 
-// 2. Bind tools array (add your custom tool definitions here)
 const agentTools: any[] = [];
 
-// 3. Instantiate the LangGraph ReAct Agent
-const reactAgentGraph = createReactAgent({
-  llm: primaryLLM,
-  tools: agentTools,
-  // Use standard stateModifier to inject the system prompt (replaces deprecated 'prompt')
-  stateModifier: new SystemMessage(
-    AUTONOMOUS_REASONING_SKILL?.systemPrompt || "You are an autonomous reasoning agent."
-  ),
-});
+function getReactAgentGraph() {
+  if (!reactAgentGraph) {
+    const apiKey = process.env.NVIDIA_API_KEY || process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error("Configure NVIDIA_API_KEY or OPENAI_API_KEY before requesting reasoning.");
+    }
 
-// 4. Wrap execution logic into the engine class
+    const llm = new ChatOpenAI({
+      modelName,
+      temperature: 0.2,
+      configuration: {
+        ...(process.env.NVIDIA_API_KEY
+          ? { baseURL: process.env.NVIDIA_API_ENDPOINT || "https://integrate.api.nvidia.com/v1" }
+          : process.env.OPENAI_BASE_URL
+            ? { baseURL: process.env.OPENAI_BASE_URL }
+            : {}),
+        apiKey,
+      },
+    });
+
+    reactAgentGraph = createReactAgent({
+      llm,
+      tools: agentTools,
+      stateModifier: new SystemMessage(AUTONOMOUS_REASONING_SKILL.systemPrompt),
+    });
+  }
+  return reactAgentGraph;
+}
+
 export class RyanReActEngine {
   private cudaEnabled: boolean;
 
-  constructor(cudaEnabled = true) {
+  constructor(cudaEnabled = process.env.CUDA_ENABLED === "true") {
     this.cudaEnabled = cudaEnabled;
   }
 
@@ -61,7 +73,7 @@ export class RyanReActEngine {
 
     try {
       // Invoke the LangGraph execution pipeline
-      const graphState = await reactAgentGraph.invoke(inputs, {
+      const graphState = await getReactAgentGraph().invoke(inputs, {
         recursionLimit: AUTONOMOUS_REASONING_SKILL?.maxIterations || 10,
       });
 
@@ -97,12 +109,11 @@ export class RyanReActEngine {
         steps: reasoningTrace.length ? reasoningTrace : ["[Dispatcher] Direct response synthesized without intermediate tool steps."],
         context: {
           engine: "RyanAI-LangGraph",
-          model: (primaryLLM as any).modelName || (primaryLLM as any).model || "gpt-4o",
+          model: modelName,
           latencyMs,
           cudaEnabled: this.cudaEnabled,
         },
         output: outputText,
-        confidence: 0.95,
       };
 
     } catch (error) {

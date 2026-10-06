@@ -1,0 +1,9 @@
+{
+  "defaultRoute": "landing",
+  "routes": [
+    { "id": "landing", "label": "Home", "path": "/" },
+    { "id": "dashboard", "label": "Dashboard", "path": "/dashboard" },
+    { "id": "cockpit", "label": "Cockpit", "path": "/cockpit" },
+    { "id": "workspace", "label": "Workspace", "path": "/workspace" }
+  ]
+}

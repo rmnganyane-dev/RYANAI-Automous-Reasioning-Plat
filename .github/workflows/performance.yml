@@ -1,96 +1,49 @@
-name: Project Ryan Performance & Inference Benchmark
+name: API Performance Benchmark
 
 on:
-  push:
-    branches: [ "main", "master" ]
   workflow_dispatch:
     inputs:
-      concurrency:
-        description: 'Load test concurrency level'
+      target_url:
+        description: Absolute URL for the API health endpoint
         required: true
-        default: '50'
+        type: string
+      concurrency:
+        description: Number of concurrent requests (1-50)
+        required: false
+        default: "10"
         type: string
       duration:
-        description: 'Test duration in seconds'
-        required: true
-        default: '30'
+        description: Benchmark duration in seconds (1-60)
+        required: false
+        default: "10"
+        type: string
+      max_p95_ms:
+        description: Maximum accepted p95 latency in milliseconds
+        required: false
+        default: "1000"
         type: string
 
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  benchmark-gateway:
-    name: Benchmark API Gateway
+  benchmark:
+    name: Measure API latency and throughput
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: 22
 
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run Gateway Load & Stress Test
+      - name: Run API benchmark
         env:
-          BENCHMARK_CONCURRENCY: ${{ inputs.concurrency || '50' }}
-          BENCHMARK_DURATION: ${{ inputs.duration || '30' }}
-        run: |
-          echo "⚡ Running API Gateway load test with concurrency: $BENCHMARK_CONCURRENCY for ${BENCHMARK_DURATION}s"
-          
-          # Install lightweight HTTP load tester locally via pnpm dlx or global
-          pnpm add -g autocannon || npm install -g autocannon
-          
-          if [ -f "package.json" ] && grep -q "test:load" package.json; then
-            pnpm run test:load
-          else
-            echo "ℹ️ No custom load script found, executing baseline benchmark test..."
-            echo "✅ Benchmark test framework initialized successfully."
-          fi
-
-  benchmark-inference-engine:
-    name: Benchmark C++ / Rust Inference Engine
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Run C++ / Rust Inference Engine Benchmarks
-        run: |
-          echo "🚀 Executing inference engine pipeline benchmarks..."
-          if [ -d "server/rust-engine" ]; then
-            cd server/rust-engine
-            cargo bench --verbose || echo "⚠️ Cargo bench completed with notices."
-          else
-            echo "ℹ️ Rust engine path not found, verifying workspace benchmark targets..."
-            find . -name "Cargo.toml" -not -path "*/node_modules/*" | while read -r cargo_file; do
-              dir=$(dirname "$cargo_file")
-              echo "Checking benchmarks in $dir..."
-              (cd "$dir" && cargo bench --no-run) || true
-            done
-          fi
-          echo "✅ Performance and latency metrics compiled."
+          BENCHMARK_URL: ${{ inputs.target_url }}
+          BENCHMARK_CONCURRENCY: ${{ inputs.concurrency || '10' }}
+          BENCHMARK_DURATION: ${{ inputs.duration || '10' }}
+          BENCHMARK_MAX_P95_MS: ${{ inputs.max_p95_ms || '1000' }}
+        run: npm run benchmark:api

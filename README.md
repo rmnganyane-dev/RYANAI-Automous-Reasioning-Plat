@@ -1,8 +1,8 @@
 # 🚀 RyanAI: Autonomous Reasoning Platform
 
-**Status**: ✅ Production Ready | **Version**: 1.0.0 | **Build**: Complete
+**Status**: Active development | **Version**: 1.0.0
 
-> **Enterprise-grade, multi-model agentic reasoning engine** engineered for dynamic intent classification, LangGraph ReAct loop orchestration, Model Context Protocol (MCP) integrations, and high-performance provider routing.
+> **Agentic reasoning platform** with a React/Vite frontend, Fastify API, LangGraph reasoning, optional MCP integrations, and Docker-based PostgreSQL/Redis services.
 >
 > **Attribution**: Named in honor of Mukhethwa Ryan Ganyane. Developed by RMN Ganyane (Pty) Ltd.
 
@@ -10,18 +10,20 @@
 
 ## 🎯 Key Features
 
-- ✅ **LangGraph ReAct Orchestration** - State-machine architecture with deterministic intent parsing, tool routing, and autonomous task execution
-- ✅ **Multi-Model Gateway Routing** - Configurable fallback supporting Nvidia Nemotron, Qwen, Claude, GPT-4 with local inference guarantees
-- ✅ **Model Context Protocol (MCP) Native** - Integrates external tools and cloud providers via HTTP/SSE transports
-- ✅ **Type-Safe Pipeline** - Strict TypeScript compilation with automated build verification
-- ✅ **Real-time Streaming** - WebSocket bridge for live reasoning updates and multi-turn conversations
-- ✅ **Production Docker** - Multi-stage builds, PostgreSQL + Redis infrastructure, health checks
-- ✅ **Automated CI/CD** - Built-in `npm run ship` pipeline with validation and Git automation
+- **LangGraph ReAct orchestration** - API-side agent orchestration; live reasoning requires a configured provider.
+- **Provider-backed reasoning** - Configure an OpenAI-compatible model endpoint and server-side credentials; unavailable local inference is not claimed.
+- **Model Context Protocol (MCP)** - Standalone stdio and authenticated Streamable HTTP service.
+- **TypeScript validation** - Typecheck, lint, build, and tests are available; run them before deployment.
+- **WebSocket endpoint** - The API includes a WebSocket bridge.
+- **Docker Compose stack** - Multi-stage builds for the API and web frontend with PostgreSQL and Redis dependencies.
+- **Automated CI/CD** - GitHub Actions validation and optional, explicitly configured deployments
 - ✅ **Desktop & Web** - Tauri v2 desktop shell + Vite React frontend + Nginx production server
 
 ---
 
 ## 📊 Architecture
+
+The frontend route manifest lives in [`app/routes.json`](./app/routes.json); the active React app consumes it while implementation remains under `src/`. Canonical RyanAI routes and active skills are described in [`RYANAI/core.json`](./RYANAI/core.json), and the model allowlist is backed by [`models/catalog.json`](./models/catalog.json). The former `ryanai-core.yaml` was removed because it included hard-coded development credentials. Native C++ is a separate optional CMake project, not an npm install step or a GPU inference runtime.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -31,12 +33,12 @@
 │   Frontend     │      Backend     │    Infrastructure       │
 │   (React 18)   │    (Fastify)     │    (Docker Compose)     │
 │                │                  │                          │
-│ • TypeScript   │ • Express +      │ • PostgreSQL 16         │
-│ • Vite         │   Fastify        │ • Redis 7               │
-│ • Tailwind CSS │ • LangGraph      │ • pgvector              │
-│ • Framer Motion│ • WebSocket      │ • Nginx                 │
-│ • Tauri v2     │ • MCP Server     │ • Multi-stage Docker    │
-│                │ • Auth/JWT       │                          │
+│ • TypeScript   │ • Fastify        │ • PostgreSQL 16         │
+│ • Vite         │ • LangGraph      │ • Redis 7               │
+│ • Tailwind CSS │ • WebSocket      │ • pgvector              │
+│ • Framer Motion│ • MCP service    │ • Nginx                 │
+│ • Tauri v2     │ • Auth/JWT       │ • Multi-stage Docker    │
+│                │                  │                          │
 └────────────────┼──────────────────┼──────────────────────────┘
                  │ Shared Types & Config (src/shared/)
                  │ Environment (.env)
@@ -44,17 +46,24 @@
 
 ---
 
-## 🚀 Quick Start (2 Minutes)
+## 🚀 Quick Start
 
 ### Prerequisites
 - Docker Desktop installed
-- Node.js 20+
+- Node.js 22.12+ and npm 10+
 - PowerShell (Windows) or bash (Mac/Linux)
+- Rust toolchain only when building the Tauri desktop application
+- Python 3.10+ only for Python tooling and workflow tests
+- CMake and a C++17 compiler only for `native/local-inference`
 
 ### Step 1: Start Everything
 ```bash
+cp .env.example .env       # PowerShell: Copy-Item .env.example .env
+# Replace DB_PASSWORD, REDIS_PASSWORD, JWT_SECRET, and MCP_AUTH_TOKEN placeholders in .env.
 npm run docker:up          # Builds and starts all containers
 ```
+
+Set `OPENAI_API_KEY` in `.env` to enable live model reasoning. Without a provider key, the UI and API still start, but reasoning requests return an explicit configuration error.
 
 ### Step 2: Access the Platform
 - **Frontend**: http://localhost:9090
@@ -64,6 +73,7 @@ npm run docker:up          # Builds and starts all containers
 ### Step 3: Verify It Works
 ```bash
 npm run docker:health      # Check API endpoint
+npm run startup:verify     # Check API, PostgreSQL, Redis, and frontend health
 npm run test:integration   # Run verification tests
 ```
 
@@ -71,6 +81,10 @@ npm run test:integration   # Run verification tests
 ```bash
 npm run docker:down        # Stop all containers
 ```
+
+For local development, use `npm run dev:api` (API on port 3001) and `npm run dev:web` (Vite on port 1420). Override ports portably in PowerShell with `$env:PORT='3002'; npm.cmd run dev:api` and `$env:VITE_PORT='5174'; npm.cmd run dev:web`; on bash, use `PORT=3002 npm run dev:api` and `VITE_PORT=5174 npm run dev:web`.
+
+For local Vite development, do not set `NODE_ENV=production` in `.env`; Vite controls development/production mode itself. Docker Compose defaults the API to production without requiring this setting in `.env`. `npm run dev:tunnel` requires ngrok account authentication; set `NGROK_AUTHTOKEN` and it forwards to the local API port (3001 by default).
 
 ---
 
@@ -119,12 +133,14 @@ scripts/                      # Build & development scripts
 ├── orchestrate.mjs         # Service orchestrator
 └── ... (12 more)
 
-docker-compose.yml          # Container orchestration
-Dockerfile                  # Frontend build (nginx)
-Dockerfile.api              # Backend build
+docker-compose.yml          # Web, API, PostgreSQL, and Redis services
+Dockerfile                  # API runtime
+Dockerfile.api              # API gateway runtime
+Dockerfile.server           # Reasoning API runtime
+Dockerfile.web              # Frontend build (Nginx)
 .dockerignore               # Docker exclusions
 .env.example                # Environment template
-package.json               # 60+ npm scripts
+package.json               # Build, development, and Docker scripts
 tsconfig.json              # TypeScript config
 vite.config.ts             # Vite config
 ```
@@ -135,16 +151,23 @@ vite.config.ts             # Vite config
 
 ### All Services at Once
 ```bash
-npm run dev                 # API (3001) + Web (5173) + MCP (8765)
+npm run dev                 # API (3001) + Web (1420) + MCP
 ```
 
 ### Individual Services
 ```bash
 npm run dev:api             # Backend API only (port 3001)
-npm run dev:web             # Frontend UI only (port 5173)
+npm run dev:web             # Frontend UI only (port 1420)
 npm run dev:mcp             # MCP system server
 npm run dev:desktop         # Tauri desktop app
 ```
+
+### Install Dependencies for Local Development
+```bash
+npm run install:all         # Root app, standalone MCP manager, and workflow worker
+```
+
+The root and app-specific `package-lock.json` files pin Node dependencies. Desktop dependencies are managed by Cargo; `requirements.txt` is currently empty because the Python tooling has no declared third-party packages.
 
 ### With Webhook Tunnel
 ```bash
@@ -171,22 +194,41 @@ npm run validate            # Full check (typecheck + lint + build)
 | `npm run docker:logs` | Stream logs from all containers |
 | `npm run docker:ps` | Show running containers |
 | `npm run docker:health` | Check API health endpoint |
+| `npm run startup:verify` | Check API, PostgreSQL, Redis, and frontend health |
 
 ### Services
-- **ryanai-api** (Port 3000): Fastify backend with WebSocket, REST, MCP
-- **ryanai-web** (Port 9090): Nginx serving React frontend
-- **ryanai-db** (Port 5432): PostgreSQL with pgvector for embeddings
-- **ryanai-redis** (Port 6379): Redis for caching and rate limiting
+- **api** (Port 3000): Fastify backend with WebSocket, REST, MCP, and LangGraph reasoning
+- **web** (Port 9090): Nginx serving the React frontend and proxying API calls
+- **postgres** (Port 5432): PostgreSQL with pgvector for embeddings
+- **redis** (Port 6379): Redis for caching and rate limiting
+
+The desktop shell and Render workflow worker remain separate applications. The standalone MCP service starts with Compose at `http://localhost:8765/mcp`; its health endpoint is `http://localhost:8765/health`. The Compose service binds only to loopback and requires `MCP_AUTH_TOKEN` in `.env`.
 
 ### Verify Everything Works
 ```bash
 docker compose ps                              # Show status
-curl http://localhost:3000/health | jq        # API health
+curl http://localhost:3000/health              # API health
 curl http://localhost:9090 | head -20         # Frontend
 
 # Or use the npm command
 npm run docker:health
+npm run mcp:health
 ```
+
+### MCP Server
+
+The standalone server supports stdio for editor/agent clients and Streamable HTTP for a live service:
+
+```bash
+npm run install:all
+npm run mcp:check
+npm run mcp:start                # stdio transport
+npm run mcp:http                 # HTTP on localhost:8765
+npm run docker:up                # includes the authenticated MCP HTTP service
+npm run mcp:health
+```
+
+For local HTTP use outside Compose, `MCP_HOST` defaults to `127.0.0.1`. Binding to a non-loopback interface requires an `MCP_AUTH_TOKEN` with at least 32 characters and a matching `MCP_ALLOWED_HOSTS` entry. Configure provider credentials with `NVIDIA_API_KEY` or `QWEN_API_KEY`; reasoning calls fail clearly if a key is not configured. MCP does not claim a local-model fallback unless one is actually running.
 
 ---
 
@@ -194,7 +236,8 @@ npm run docker:health
 
 ### Production Build
 ```bash
-npm run build               # TypeScript compilation + Vite build
+npm run build               # Frontend TypeScript + Vite production bundle
+npm run build:server        # Backend TypeScript production bundle
 ```
 
 ### Type-Safe Pipeline
@@ -202,10 +245,16 @@ npm run build               # TypeScript compilation + Vite build
 npm run validate            # typecheck + lint + build
 ```
 
-### Deploy to Production
+### Build Production Containers
 ```bash
-npm run ship                # validate + build + git commit + git push
+npm run ship                # validate, test, and build Docker images (does not publish)
 ```
+
+For Vercel, set `VITE_API_BASE_URL` to the HTTPS origin of a separately hosted RyanAI API. Vercel hosts the static web frontend; it does not host this repository's API, PostgreSQL, or Redis services.
+
+GitHub Actions publishes production images after validation on the configured default branch. To enable the GitHub Actions Vercel deployment, configure repository secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`, plus repository variables `VERCEL_DEPLOY_ENABLED=true` and `VITE_API_BASE_URL` (the deployed API origin). The repository's [`vercel.json`](./vercel.json) sets `npm ci --legacy-peer-deps` as the install command and `npm run build:web` as the build command. Do not set `npm run build:web` as Vercel's install command. Older commits do not contain these configuration changes; deploy a commit that includes them.
+
+The scheduled and manually triggered smoke tests require `PROD_GATEWAY_URL` (the full API health URL, e.g. the API origin plus `/health`) and `PROD_FRONTEND_URL` secrets. Preview checks additionally require `PREVIEW_GATEWAY_URL` and `PREVIEW_FRONTEND_URL`.
 
 ### Windows Installers
 ```powershell
@@ -224,6 +273,8 @@ npm run release             # Build Windows MSI + NSIS installers
 | `npm run test:e2e` | End-to-end flow tests |
 | `npm run test:integration` | Integration test suite |
 | `npm run test:platform` | Platform-specific tests |
+
+`npm run test` runs the local Vitest suite. `npm run test:e2e` and `npm run test:integration` require the API and web stack to be running; integration tests also need reachable PostgreSQL and Redis configured with `DATABASE_URL` and `REDIS_URL`. These are commands to execute in your environment, not a claim that production deployment has been verified.
 
 ### Sandbox Test Console
 Open http://localhost:9090/sandbox.html to test:
@@ -245,12 +296,7 @@ npm run db:push             # Push schema to database
 npm run db:migrate          # Run migrations
 ```
 
-### Schema Includes
-- Users & authentication
-- Conversations & messages
-- Memory vault entries
-- Vector embeddings (pgvector)
-- Agent state checkpoints
+The `prisma/schema.prisma` schema currently targets SQLite for Prisma-generated client use. The Compose API separately connects to PostgreSQL via `pg.Pool`; PostgreSQL initialization is managed separately. Do not assume Prisma migrations create or migrate the Compose API's PostgreSQL tables.
 
 ---
 
@@ -270,12 +316,14 @@ HOST=0.0.0.0
 LOG_LEVEL=info
 
 # Database
-DATABASE_URL=postgresql://postgres:[REDACTED]@localhost:5432/ryanai
+DB_PASSWORD=replace-with-a-unique-password
+DATABASE_URL=postgresql://ryanai:${DB_PASSWORD}@localhost:5432/ryanai_db
 DB_MAX_CONNECTIONS=20
 DB_TIMEOUT_MS=2000
 
 # Redis
-REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=replace-with-a-different-password
+REDIS_URL=redis://:${REDIS_PASSWORD}@localhost:6379
 REDIS_TIMEOUT=5000
 
 # Authentication
@@ -287,10 +335,10 @@ API_BASE_URL=http://localhost:3000
 API_TIMEOUT=30000
 
 # LLM Providers
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4-turbo
-VITE_ANTHROPIC_API_KEY=sk-ant-...
-VITE_GOOGLE_API_KEY=...
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o
+ANTHROPIC_API_KEY=
+GOOGLE_API_KEY=
 
 # Optional Services
 NGROK_AUTHTOKEN=...                    # For webhook testing
@@ -355,12 +403,12 @@ npm run docker:up
 ```
 
 ### Port Already in Use
-**Problem**: EADDRINUSE on port 3000 or 5173
+**Problem**: EADDRINUSE on port 3000, 3001, 1420, or 9090
 
 **Solution**: Use different port
 ```bash
 PORT=3002 npm run dev:api              # Custom API port
-VITE_PORT=5174 npm run dev:web         # Custom web port
+npm run dev:web -- --port 1421        # Custom Vite port
 ```
 
 ### Docker Won't Start
@@ -483,7 +531,7 @@ npm run ship               # Deploy pipeline
 npm run telemetry:collect  # Telemetry
 ```
 
-**Full reference**: See `SCRIPTS_REFERENCE.md`
+**Full reference**: See [SCRIPTS_REFERENCE.md](./SCRIPTS_REFERENCE.md)
 
 ---
 
@@ -640,7 +688,7 @@ For issues, questions, or feedback:
 
 **RyanAI Autonomous Reasoning Platform v1.0.0**
 
-✅ Production Ready | ✅ All Systems Operational | ✅ Fully Documented
+Status and supported behavior are documented above; run the validation commands before deployment.
 
 Built with:
 - React 18 + TypeScript

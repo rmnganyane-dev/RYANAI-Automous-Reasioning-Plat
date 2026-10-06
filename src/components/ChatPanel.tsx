@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Send, Download, Mic, Square, MoreVertical } from 'lucide-react';
 import type { Message, ModelId } from '@/lib/types';
+import { getAvailableModels, modelMeta } from '@/lib/models';
 
 interface ChatPanelProps {
   messages: Message[];
@@ -50,7 +51,7 @@ export default function ChatPanel(props: ChatPanelProps) {
     }
   };
 
-  const models: ModelId[] = ['claude-sonnet-4.6', 'gpt-5.4', 'gemini-3.1-pro'];
+  const models: ModelId[] = getAvailableModels().map((model) => model.id);
 
   return (
     <div className="h-full flex flex-col gap-3 glass rounded-lg border border-cyan-500/20 overflow-hidden">
@@ -101,7 +102,7 @@ export default function ChatPanel(props: ChatPanelProps) {
                   : 'bg-ink-800/30 border border-cyan-500/10 text-ink-400 hover:bg-ink-800/50'
               }`}
             >
-              {m}
+              {modelMeta(m).label}
             </button>
           ))}
         </motion.div>

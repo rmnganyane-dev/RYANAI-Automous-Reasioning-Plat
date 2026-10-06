@@ -1,20 +1,40 @@
 FROM node:22-alpine AS builder
 
 WORKDIR /app
+
+RUN apk add --no-cache python3 make g++ build-base libc6-compat
+
 COPY package.json package-lock.json ./
 RUN npm ci --legacy-peer-deps
-COPY . .
-RUN npm run build:web
 
-FROM nginx:1.27-alpine AS runner
+COPY tsconfig.base.json tsconfig.server.json ./
+COPY src ./src
+COPY prisma ./prisma
 
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+RUN if [ -f prisma/schema.prisma ]; then npx prisma generate; fi
+RUN npm run build:server
+RUN npm prune --omit=dev --legacy-peer-deps
 
-ENV PORT=80
-EXPOSE 80
+FROM node:22-alpine AS runner
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://127.0.0.1/health || exit 1
+WORKDIR /app
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=3000
 
-CMD ["nginx", "-g", "daemon off;"]
+RUN apk add --no-cache dumb-init libstdc++ libc6-compat wget \
+    && mkdir -p /app/logs \
+    && chown -R node:node /app
+
+COPY --from=builder --chown=node:node /app/package.json ./package.json
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/dist/server ./dist/server
+
+USER node
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:3000/health || exit 1
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["node", "dist/server/server/launcher.js"]

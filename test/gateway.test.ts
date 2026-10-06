@@ -1,20 +1,11 @@
 // File path: ./test/gateway.test.ts
-import assert from "assert";
-import fs from "fs";
+import { describe, expect, it } from "vitest";
+import { existsSync } from "node:fs";
+import path from "node:path";
 
-async function runIntegrationTests() {
-  console.log("Initializing RyanAI gateway integration checks...");
-  
-  const indexHtmlExists = fs.existsSync("./index.html");
-  assert.strictEqual(indexHtmlExists, true, "index.html must exist as the primary platform container.");
-
-  const appTsxExists = fs.existsSync("./src/App.tsx");
-  assert.strictEqual(appTsxExists, true, "App.tsx must be present for root component rendering.");
-
-  console.log("All pipeline assertions passed successfully.");
-}
-
-runIntegrationTests().catch((err) => {
-  console.error("Test execution failed:", err);
-  process.exit(1);
+describe("RyanAI gateway entrypoints", () => {
+  it("contains the application shell and API launcher", () => {
+    expect(existsSync(path.resolve("src/App.tsx"))).toBe(true);
+    expect(existsSync(path.resolve("src/server/launcher.ts"))).toBe(true);
+  });
 });

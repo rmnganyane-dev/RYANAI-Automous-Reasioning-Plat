@@ -2,29 +2,39 @@
 
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { DynamicTool } from "@langchain/core/tools";
+import { totalmem, freemem } from "node:os";
+import { db } from "../database/db.js";
 
-// Sovereign telemetry tool
 const systemStatusTool = new DynamicTool({
   name: "query_system_state",
-  description: "Queries the local RyanAI sovereign platform hardware and memory state.",
+  description: "Returns real host process and memory telemetry. CUDA is reported as configured only when CUDA_ENABLED=true.",
   func: async () => {
-    return JSON.stringify({ 
+    const memoryTotalBytes = totalmem();
+    const memoryFreeBytes = freemem();
+    return JSON.stringify({
       architecture: process.arch,
       platform: process.platform,
-      memoryUsage: process.memoryUsage(),
-      cudaAvailable: true,
-      uptime: process.uptime()
+      processMemoryBytes: process.memoryUsage(),
+      hostMemoryBytes: { total: memoryTotalBytes, free: memoryFreeBytes, used: memoryTotalBytes - memoryFreeBytes },
+      cudaConfigured: process.env.CUDA_ENABLED === "true",
+      uptimeSeconds: process.uptime(),
     });
   },
 });
 
-// Prisma Database Context Tool
 const databaseQueryTool = new DynamicTool({
   name: "query_agent_memory",
-  description: "Queries the local PostgreSQL Prisma database for historical session context.",
+  description: "Searches recent RyanAI agent-memory records in the configured database.",
   func: async (query: string) => {
-    // In production: PrismaClient lookup
-    return `Retrieved sovereign context for: ${query}. Isolated from external networks.`;
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery) throw new Error("A non-empty memory search query is required.");
+    const records = await db.agentMessage.findMany({
+      where: { content: { contains: normalizedQuery } },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: { sessionId: true, role: true, content: true, reasoningSteps: true, createdAt: true },
+    });
+    return JSON.stringify({ query: normalizedQuery, count: records.length, records });
   },
 });
 
