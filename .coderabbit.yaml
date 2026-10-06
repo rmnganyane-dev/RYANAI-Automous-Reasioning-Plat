@@ -1,20 +1,20 @@
-language: "en-US"
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+early_access: true
+
+inheritance: true
 
 reviews:
-  profile: "chill"
-  request_changes_workflow: false
-  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  auto_apply_labels: true
   poem: true
-  review_status: true
-  review_details: false
-  auto_review:
-    enabled: true
-    drafts: false
+  finishing_touches:
+    simplify:
+      enabled: true
+    custom:
+      - enabled: true
+        name: clean up
+        instructions: Test
 
-chat:
-  auto_reply: true
-
-remote_config:
-  repository: "shared-configs"
-  ref: "main"
-  path: ".shared-coderabbit.yaml"
+knowledge_base:
+  opt_out: true
+  automatic_linking_mode: enabled
