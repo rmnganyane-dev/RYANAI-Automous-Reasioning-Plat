@@ -23,7 +23,7 @@
 
 ## 📊 Architecture
 
-The frontend route manifest lives in [`app/routes.json`](./app/routes.json); the active React app consumes it while implementation remains under `src/`. Canonical RyanAI routes and active skills are described in [`RYANAI/core.json`](./RYANAI/core.json), and the model allowlist is backed by [`models/catalog.json`](./models/catalog.json). The former `ryanai-core.yaml` was removed because it included hard-coded development credentials. Native C++ is a separate optional CMake project, not an npm install step or a GPU inference runtime.
+The frontend route manifest lives in [`app/routes.json`](./app/routes.json); the active React app consumes it while implementation remains under `src/`. Canonical RyanAI routes and active skills are described in [`RYANAI/core.json`](./RYANAI/core.json), and the model allowlist is backed by [`models/catalog.json`](./models/catalog.json). The former `ryanai-core.yaml` was removed because it included hard-coded development credentials. The C++ project under `native/local-inference` uses an optional CMake build. The legacy Node addon is also opt-in (see [Optional native Node addon](#optional-native-node-addon)); neither build runs during npm install or enables GPU inference by itself.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -605,6 +605,27 @@ npm run docker:up
 # Deploy with docker-compose push to registry
 # Or: docker buildx build --push
 ```
+
+### Optional native Node addon
+
+Root `npm install` / `npm ci` skips automatic node-gyp compilation via
+`gypfile: false`. Vercel builds only the web frontend; dependency lifecycle
+scripts remain enabled (do not use `--ignore-scripts` as a workaround).
+
+To explicitly build the legacy Node addon on a host with Python, a C++ build
+toolchain, and the CUDA toolkit installed:
+
+```bash
+npm ci --legacy-peer-deps
+npm run native:addon:build
+```
+
+The addon build uses the declared `node-gyp` and `node-addon-api` development
+dependencies, so install dev dependencies on the build host. Its existing Linux
+configuration expects CUDA at `/usr/local/cuda`; Windows uses `CUDA_PATH` or the
+existing CUDA v12.0 default. The current target links the CUDA runtime but does
+not compile the CUDA kernels; this command alone does not enable GPU inference.
+This is separate from the optional CMake project (`npm run native:build`).
 
 ### AWS/GCP/Azure
 1. Build Docker image
