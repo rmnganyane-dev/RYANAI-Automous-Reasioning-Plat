@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Activity, Cpu, LayoutDashboard, MessageSquareText, Orbit, type LucideIcon } from 'lucide-react';
+import {
+  Cpu,
+  LayoutDashboard,
+  MessageSquareText,
+  Orbit,
+  type LucideIcon,
+} from 'lucide-react';
 import appManifest from '../app/routes.json';
 import { UI_CONFIG } from '@/config/core';
 import RyanAICockpit from '@/components/dashboard/RyanAICockpit';
-import CommandCenter from '@/pages/CommandCenter';
+import CommandCenter from '@/pages/CommandCenter.tsx';
 import DashboardPage from '@/pages/Dashboard';
 import LandingPage from '@/pages/LandingPage';
 
@@ -11,7 +17,10 @@ type Route = (typeof appManifest.routes)[number]['id'];
 
 const routeFromHash = (): Route => {
   const route = window.location.hash.replace(/^#\/?/, '').split('/')[0];
-  return appManifest.routes.find((candidate) => candidate.id === route)?.id ?? UI_CONFIG.defaultRoute;
+  return (
+    appManifest.routes.find((candidate) => candidate.id === route)?.id ??
+    UI_CONFIG.defaultRoute
+  );
 };
 
 const routeIcons: Record<Route, LucideIcon> = {
