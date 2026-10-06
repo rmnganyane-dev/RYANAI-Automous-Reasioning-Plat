@@ -37,7 +37,7 @@ class RyanAIClient {
   /**
    * Make API request
    */
-  async request<T = any>(
+  async request<T = unknown>(
     endpoint: string,
     options: RequestInit & { method?: string } = {}
   ): Promise<T> {
@@ -151,8 +151,8 @@ declare global {
     __DEV__?: {
       apiClient: RyanAIClient;
       logs: Console;
-      simulatePipeline: () => Promise<any>;
-      simulateError: (errorId: string) => Promise<any>;
+      simulatePipeline: () => Promise<unknown>;
+      simulateError: (errorId: string) => Promise<unknown>;
       checkHealth: () => Promise<boolean>;
     };
   }
@@ -310,9 +310,3 @@ if (APP_ENV === 'development') {
     'color: #00f3ff; font-size: 12px; font-family: monospace;'
   );
 }
-
-// ============================================================================
-// EXPORT FOR TYPE SAFETY
-// ============================================================================
-
-export { apiClient, APP_VERSION, API_BASE_URL, APP_ENV };

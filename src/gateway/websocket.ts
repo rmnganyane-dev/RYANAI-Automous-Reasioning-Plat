@@ -8,7 +8,7 @@ import { HumanMessage } from '@langchain/core/messages';
 export async function registerWebsocketGateway(fastify: FastifyInstance) {
   await fastify.register(fastifyWebsocket);
 
-  fastify.get('/api/v1/stream', { websocket: true }, (connection, req) => {
+  fastify.get('/api/v1/stream', { websocket: true }, (connection, _req) => {
     console.log("[WebSocket] Client connected to live reasoning stream.");
 
     connection.on('message', async (message: Buffer) => {
@@ -40,8 +40,8 @@ export async function registerWebsocketGateway(fastify: FastifyInstance) {
 
         connection.send(JSON.stringify({ done: true }));
 
-      } catch (error: any) {
-        connection.send(JSON.stringify({ error: error.message }));
+      } catch (error: unknown) {
+        connection.send(JSON.stringify({ error: (error instanceof Error ? error.message : String(error)) }));
       }
     });
 

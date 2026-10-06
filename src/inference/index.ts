@@ -16,11 +16,11 @@ let cudaEngine: NativeCudaEngine | null = null;
 try {
   cudaEngine = require('../../build/Release/ryan_cuda_engine.node') as NativeCudaEngine;
   console.log("[Hardware] Native CUDA Engine (ryan_cuda_engine) loaded successfully.");
-} catch (_err1) {
+} catch {
   try {
     cudaEngine = require('../../build/Release/cuda_inference_bridge.node') as NativeCudaEngine;
     console.log("[Hardware] CUDA Inference Bridge loaded successfully.");
-  } catch (_err2) {
+  } catch {
     console.warn("[Hardware] Native CUDA bindings not loaded. Operating in CPU Fallback mode.");
   }
 }

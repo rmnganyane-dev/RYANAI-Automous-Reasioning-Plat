@@ -9,7 +9,7 @@ import { AUTONOMOUS_REASONING_SKILL } from "../skills/autonomousReasoning.js";
 export interface AgentState {
   input: string;
   steps: string[];
-  context: Record<string, any>;
+  context: Record<string, unknown>;
   output: string;
 }
 
@@ -19,7 +19,7 @@ const modelName = process.env.PRIMARY_REASONING_MODEL ||
     : process.env.OPENAI_MODEL || "gpt-4o");
 let reactAgentGraph: ReturnType<typeof createReactAgent> | undefined;
 
-const agentTools: any[] = [];
+const agentTools: Parameters<typeof createReactAgent>[0]['tools'] = [];
 
 function getReactAgentGraph() {
   if (!reactAgentGraph) {
@@ -85,7 +85,7 @@ export class RyanReActEngine {
         .slice(1, -1)
         .map((msg) => {
           if (msg._getType() === "ai" && msg.additional_kwargs?.tool_calls) {
-             const tools = msg.additional_kwargs.tool_calls.map((t: any) => t.function.name).join(", ");
+             const tools = msg.additional_kwargs.tool_calls.map((t) => t.function.name).join(", ");
              return `[Action] Invoking tool(s): ${tools}`;
           }
           if (msg._getType() === "tool") {

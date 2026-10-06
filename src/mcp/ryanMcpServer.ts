@@ -93,8 +93,8 @@ export class RyanMCPServer {
 
       try {
         if (name === "read_workspace_file") {
-          const filePath = (args as any)?.filePath;
-          if (!filePath) {
+          const filePath = args?.filePath;
+          if (typeof filePath !== 'string' || !filePath) {
             throw new Error("Missing required argument: 'filePath'");
           }
           
@@ -110,26 +110,30 @@ export class RyanMCPServer {
         }
 
         if (name === "execute_sandbox_script") {
-          const { scriptContent, fileName } = args as any;
-          if (!scriptContent) {
+          const { scriptContent, fileName } = args ?? {};
+          if (typeof scriptContent !== 'string' || !scriptContent) {
             throw new Error("Missing required argument: 'scriptContent'");
           }
 
-          const result = await RyanAISandbox.executeInSandbox(scriptContent, fileName || "mcp_payload.js");
+          const result = await RyanAISandbox.executeInSandbox(scriptContent, typeof fileName === "string" ? fileName : "mcp_payload.js");
           return {
             content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
           };
         }
 
         if (name === "system_diagnostics") {
-          const result = await systemDiagnosticsTool.invoke(args as any);
+          const result = await systemDiagnosticsTool.invoke(await systemDiagnosticsTool.schema.parseAsync(args));
           return {
             content: [{ type: "text", text: typeof result === "string" ? result : JSON.stringify(result, null, 2) }],
           };
         }
 
         if (name === "self_patch_workspace") {
-          const result = await SelfPatchSkill.applyAndVerifyPatch(args as any);
+          const { filePath, patchContent, testScript } = args ?? {};
+          if (typeof filePath !== 'string' || typeof patchContent !== 'string' || (testScript !== undefined && typeof testScript !== 'string')) {
+            throw new Error('filePath and patchContent must be strings; testScript must be a string when supplied');
+          }
+          const result = await SelfPatchSkill.applyAndVerifyPatch({ filePath, patchContent, testScript });
           return {
             content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
             isError: result.status === "failed",
@@ -137,9 +141,9 @@ export class RyanMCPServer {
         }
 
         throw new Error(`Unknown MCP tool requested: ${name}`);
-      } catch (error: any) {
+      } catch (error: unknown) {
         return {
-          content: [{ type: "text", text: `Error executing tool [${name}]: ${error.message}` }],
+          content: [{ type: "text", text: `Error executing tool [${name}]: ${(error instanceof Error ? error.message : String(error))}` }],
           isError: true,
         };
       }

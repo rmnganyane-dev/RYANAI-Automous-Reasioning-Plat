@@ -56,8 +56,8 @@ async function checkHealth(check: HealthCheck): Promise<boolean> {
       return await checkPostgres(check.timeout);
     }
     return false;
-  } catch (err: any) {
-    logger.debug(`${check.name} check failed: ${err.message}`);
+  } catch (err: unknown) {
+    logger.debug(`${check.name} check failed: ${(err instanceof Error ? err.message : String(err))}`);
     return false;
   }
 }

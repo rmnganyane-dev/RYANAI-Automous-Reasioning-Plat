@@ -111,6 +111,63 @@ For local development, use `npm run dev:api` (API on port 3001 by default) and `
 
 For local Vite development, do not set `NODE_ENV=production` in `.env`; Vite controls development/production mode itself. Docker Compose defaults the API to production without requiring this setting in `.env`. `npm run dev:tunnel` requires ngrok account authentication; set `NGROK_AUTHTOKEN` in the root `.env` or shell. The tunnel uses the same `PORT` value as the API (3001 by default for local development).
 
+### Codespaces and local development
+
+If `startup:verify` is missing or `dev` cannot find `scripts/dev-all.mjs`, inspect
+`git status` and synchronize your intended branch after preserving local changes.
+`npm run` lists available scripts; `npm run3` is not an npm command.
+
+The dev container includes Node 22 and Docker Compose. After updating its
+configuration, run **Codespaces: Rebuild Container** from the command palette.
+An existing container will not gain Docker until it is rebuilt. Confirm readiness:
+
+```bash
+node --version
+docker info
+docker compose version
+```
+
+Node must be 22.12 or newer. If `docker` is missing or its daemon is unavailable,
+resolve that before running any `docker:*` commands. Outside Codespaces, install
+and start Docker with Compose, or provide running PostgreSQL and Redis services
+and set their connection URLs in `.env`.
+
+For the API, Vite UI, and MCP development processes:
+
+```bash
+npm run install:all
+```
+
+Create `.env` from `.env.example` only if it does not already exist. Replace the
+four secret placeholders, and also replace the matching password portions of
+`DATABASE_URL` and `REDIS_URL`. Set `PORT=3001` and remove any old
+`NODE_ENV=production` line. Start only the database and cache containers, then
+keep this terminal running:
+
+```bash
+docker compose up -d --wait postgres redis
+npm run dev
+```
+
+Open http://localhost:1420 (or forward port 1420 in Codespaces). In a second terminal:
+
+```bash
+npm run startup:verify -- --local
+npm run test:integration -- --local
+npm run mcp:health
+```
+
+`--local` uses `PORT` (default 3001) and `VITE_PORT` (default 1420), overriding
+the Compose HTTP URLs in `.env`. Without it, checks use `API_BASE_URL` and
+`WEB_BASE_URL` (defaults 3000 and 9090). Both checks load `.env`; exported shell
+values take precedence. Redis must authenticate successfully before the API
+starts. A connection failure now exits with setup guidance instead of waiting
+for a Fastify plugin timeout. Integration checks fail if dependencies are down.
+
+Use Ctrl+C to stop development processes, then `npm run docker:down` to stop
+the database and cache containers. The Tauri desktop process is optional and
+should be started in its own terminal only when working on the desktop app.
+
 ---
 
 ## 📁 Project Structure

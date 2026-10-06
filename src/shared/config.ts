@@ -23,7 +23,7 @@ function validateConfig(config: Partial<AppConfig>): AppConfig {
   const sentryDsn = process.env.SENTRY_DSN || '';
 
   return {
-    nodeEnv: (nodeEnv as any) || 'development',
+    nodeEnv: nodeEnv || 'development',
     port: parseInt(process.env.PORT || String(port), 10),
     host,
     database: {
