@@ -207,7 +207,7 @@ export class DispatchService {
     </div>
     <div class="content">
       <p style="color: #cbd5e1; margin-top: 0;">Automated pipeline execution finished for <strong>${p.projectName}</strong>.</p>
-      
+
       <div class="grid">
         <div class="card">
           <div class="card-label">Target Branch</div>
@@ -233,8 +233,8 @@ export class DispatchService {
       <div class="card" style="margin-bottom: 16px;">
         <div class="card-label">Code Diff Summary</div>
         <div class="card-value" style="color: #38bdf8;">
-          ${p.codeDiffSummary.filesChanged} files changed | 
-          <span style="color: #4ade80;">+${p.codeDiffSummary.insertions}</span> | 
+          ${p.codeDiffSummary.filesChanged} files changed |
+          <span style="color: #4ade80;">+${p.codeDiffSummary.insertions}</span> |
           <span style="color: #f87171;">-${p.codeDiffSummary.deletions}</span>
         </div>
       </div>
