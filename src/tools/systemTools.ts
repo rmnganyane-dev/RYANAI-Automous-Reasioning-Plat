@@ -21,8 +21,8 @@ export const systemDiagnosticsTool = tool(
         return `Nvidia GPU Telemetry:\n${stdout}`;
       }
       return "General system nominal.";
-    } catch (error: any) {
-      return `Diagnostics failed: ${error.message}`;
+    } catch (error: unknown) {
+      return `Diagnostics failed: ${(error instanceof Error ? error.message : String(error))}`;
     }
   },
   {

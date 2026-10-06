@@ -51,7 +51,7 @@ export const authPlugin: FastifyPluginAsync = async (fastify) => {
     try {
       await request.jwtVerify();
       return { authenticated: true };
-    } catch (err) {
+    } catch {
       reply.status(401);
       return { authenticated: false, error: 'Unauthorized' };
     }

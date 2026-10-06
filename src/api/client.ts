@@ -1,5 +1,6 @@
+import type { WebSocketMessage } from '../shared/types.js';
 // src/api/client.ts - Frontend WebSocket client
-import { ref, reactive } from 'vue';
+import { ref } from 'vue';
 
 export interface ClientOptions {
   url?: string;
@@ -15,8 +16,8 @@ export class RyanAIClient {
   private reconnectInterval: number;
   private maxReconnectAttempts: number;
   private reconnectAttempts = 0;
-  private messageHandlers: Map<string, (data: any) => void> = new Map();
-  private eventHandlers: Map<string, (data: any) => void[]> = new Map();
+  private messageHandlers: Map<string, (data: WebSocketMessage) => void> = new Map();
+  private eventHandlers: Map<string, ((data: unknown) => void)[]> = new Map();
 
   public connected = ref(false);
   public authenticated = ref(false);
@@ -78,7 +79,7 @@ export class RyanAIClient {
     }
   }
 
-  public send(channel: string, data: any): Promise<any> {
+  public send(channel: string, data: unknown): Promise<unknown> {
     return new Promise((resolve, reject) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         reject(new Error('WebSocket not connected'));
@@ -95,7 +96,7 @@ export class RyanAIClient {
       };
 
       // Register handler for response
-      const handler = (response: any) => {
+      const handler = (response: WebSocketMessage) => {
         this.messageHandlers.delete(id);
         if (response.error) {
           reject(new Error(response.error.message));
@@ -117,7 +118,7 @@ export class RyanAIClient {
     });
   }
 
-  public on(channel: string, handler: (data: any) => void): () => void {
+  public on(channel: string, handler: (data: unknown) => void): () => void {
     if (!this.eventHandlers.has(channel)) {
       this.eventHandlers.set(channel, []);
     }
@@ -133,22 +134,22 @@ export class RyanAIClient {
     };
   }
 
-  public async reasoning(prompt: string, context?: Record<string, any>): Promise<string> {
+  public async reasoning(prompt: string, context?: Record<string, unknown>): Promise<string> {
     const response = await this.send('reasoning.start', {
       prompt,
       context,
       sessionId: `session-${Date.now()}`,
     });
-    return response?.result || '';
+    return typeof response === 'object' && response !== null && 'result' in response && typeof response.result === 'string' ? response.result : '';
   }
 
-  private handleMessage(message: any) {
+  private handleMessage(message: WebSocketMessage<{ authenticated?: boolean }>) {
     const { id, type, channel, data, error } = message;
 
     // Handle response to request
     if (type === 'response' && this.messageHandlers.has(id)) {
       const handler = this.messageHandlers.get(id)!;
-      handler({ ...data, error });
+      handler({ ...message, error });
     }
 
     // Handle events/streams
@@ -182,7 +183,7 @@ export function useRyanAI(options?: ClientOptions) {
     return await client.reasoning(prompt);
   };
 
-  const subscribe = (channel: string, handler: (data: any) => void) => {
+  const subscribe = (channel: string, handler: (data: unknown) => void) => {
     return client.on(channel, handler);
   };
 

@@ -5,8 +5,8 @@ import querystring from 'querystring';
 import { verifySlackSignature } from '../../utils/slackVerification.js';
 import { humanInTheLoopAgent } from '../../agent/approvalEngine.js';
 
-const extractContent = (content: any): string => 
-  typeof content === 'string' ? content : JSON.stringify(content);
+const extractContent = (content: unknown): string =>
+  typeof content === 'string' ? content : JSON.stringify(content) ?? '';
 
 export const slackInteractionsPlugin: FastifyPluginAsync = async (fastify) => {
   // 1. Register raw-body plugin to preserve original request string
@@ -29,12 +29,12 @@ export const slackInteractionsPlugin: FastifyPluginAsync = async (fastify) => {
         if (!signingSecret) {
           fastify.log.error('SLACK_SIGNING_SECRET is not configured');
           reply.status(500);
-          return { error: 'Server security configuration error' };
+          return reply.send({ error: 'Server security configuration error' });
         }
 
         const signature = request.headers['x-slack-signature'] as string;
         const timestamp = request.headers['x-slack-request-timestamp'] as string;
-        const rawBody = (request as any).rawBody || '';
+        const rawBody = request.rawBody?.toString() || '';
 
         const isValid = verifySlackSignature({
           signingSecret,
@@ -46,13 +46,14 @@ export const slackInteractionsPlugin: FastifyPluginAsync = async (fastify) => {
         if (!isValid) {
           fastify.log.warn('Unauthorized Slack interaction request failed HMAC verification');
           reply.status(401);
-          return { error: 'Invalid Slack request signature' };
+          return reply.send({ error: 'Invalid Slack request signature' });
         }
+        return;
       },
     },
     async (request, reply) => {
       // Parse form payload from verified raw body
-      const rawBody = (request as any).rawBody;
+      const rawBody = request.rawBody?.toString() || '';
       const parsedBody = querystring.parse(rawBody);
 
       if (!parsedBody.payload) {

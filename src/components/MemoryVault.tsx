@@ -2,7 +2,7 @@ import Modal from './Modal';
 import { Brain } from 'lucide-react';
 import { useState } from 'react';
 import type { MemoryEntry } from '@/lib/types';
-import { loadMemory, saveMemory, addMemoryEntry, deleteMemoryEntry } from '@/lib/storage';
+import { loadMemory, addMemoryEntry, deleteMemoryEntry } from '@/lib/storage';
 
 interface MemoryVaultProps {
   open: boolean;

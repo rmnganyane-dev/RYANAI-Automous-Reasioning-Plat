@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import type { Conversation, ModelId } from '@/lib/types';
+import type { Conversation } from '@/lib/types';
 
 interface SidebarProps {
   conversations: Conversation[];
@@ -20,14 +19,12 @@ export default function Sidebar({
   activeId,
   onSelect,
   onNew,
-  onDelete,
   onAbout,
   onMemory,
   onConsole,
   onGithub,
   githubConnected,
 }: SidebarProps) {
-  const [showMenu, setShowMenu] = useState(false);
 
   return (
     <div className="h-full flex flex-col glass rounded-lg border border-cyan-500/20 overflow-hidden">

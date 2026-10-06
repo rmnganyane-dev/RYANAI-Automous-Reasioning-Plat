@@ -2,7 +2,7 @@ import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { ChatOpenAI } from '@langchain/openai';
 import { commsTools } from './tools/commsTools.js';
 import { AUTONOMOUS_REASONING_SKILL } from '../skills/index.js';
-import modelCatalog from '../../models/catalog.json';
+import modelCatalog from '../../models/catalog.json' with { type: 'json' };
 import { RYANAI_CORE } from '../config/core.js';
 
 if (!RYANAI_CORE.activeSkills.includes('autonomous-reasoning')) {

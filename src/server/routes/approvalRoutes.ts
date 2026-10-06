@@ -24,7 +24,7 @@ export const approvalRoutes: FastifyPluginAsync = async (fastify) => {
       if (typeof request.jwtVerify === 'function') {
         await request.jwtVerify();
       }
-    } catch (err) {
+    } catch {
       reply.status(401);
       return reply.send({ error: 'Unauthorized: Missing or invalid authentication token' });
     }
@@ -50,7 +50,7 @@ export const approvalRoutes: FastifyPluginAsync = async (fastify) => {
     const currentState = await humanInTheLoopAgent.getState(config);
 
     if (currentState.next && currentState.next.includes('tools')) {
-      const lastMessage = currentState.values?.messages?.at(-1) as any;
+      const lastMessage = currentState.values?.messages?.at(-1);
       const pendingTool = lastMessage?.tool_calls?.[0];
 
       // Dispatch notification asynchronously
@@ -77,7 +77,7 @@ export const approvalRoutes: FastifyPluginAsync = async (fastify) => {
 
     return {
       status: 'COMPLETED',
-      response: (currentState.values?.messages?.at(-1) as any)?.content,
+      response: (currentState.values?.messages?.at(-1))?.content,
     };
   });
 
@@ -103,7 +103,7 @@ export const approvalRoutes: FastifyPluginAsync = async (fastify) => {
           ],
         },
         config
-      )) as any;
+      ));
 
       return {
         status: 'REJECTED',
@@ -112,7 +112,7 @@ export const approvalRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // User approved: Passing `null` resumes execution from the saved checkpoint
-    const approvedResult = (await humanInTheLoopAgent.invoke(null, config)) as any;
+    const approvedResult = (await humanInTheLoopAgent.invoke(null, config));
 
     return {
       status: 'EXECUTED',

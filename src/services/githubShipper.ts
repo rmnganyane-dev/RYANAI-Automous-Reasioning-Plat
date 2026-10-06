@@ -58,8 +58,8 @@ export class GitHubShipper {
         ref: `heads/${branch}`,
       });
       masterRefSha = refData.object.sha;
-    } catch (error: any) {
-      if (error.status === 404 && createBranchIfMissing) {
+    } catch (error: unknown) {
+      if (typeof error === 'object' && error !== null && 'status' in error && error.status === 404 && createBranchIfMissing) {
         // Fallback: Get main/master SHA and create the branch
         const { data: mainRef } = await this.octokit.git.getRef({
           owner,

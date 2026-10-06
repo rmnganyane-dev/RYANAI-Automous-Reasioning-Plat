@@ -21,11 +21,11 @@ export async function dispatchRoutes(fastify: FastifyInstance) {
           email: { id: emailId, status: 'DELIVERED' },
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       fastify.log.error(error, 'Multi-channel dispatch failed');
       return reply.status(500).send({
         error: 'DISPATCH_FAILURE',
-        details: error.message,
+        details: (error instanceof Error ? error.message : String(error)),
       });
     }
   });
@@ -35,8 +35,8 @@ export async function dispatchRoutes(fastify: FastifyInstance) {
     try {
       const whatsappSid = await dispatch.sendWhatsAppSecurityAlert(req.body);
       return reply.send({ success: true, whatsappSid });
-    } catch (error: any) {
-      return reply.status(500).send({ error: error.message });
+    } catch (error: unknown) {
+      return reply.status(500).send({ error: (error instanceof Error ? error.message : String(error)) });
     }
   });
 }
