@@ -8,6 +8,7 @@ declare module '*.html?raw' {
 
 // Strongly-typed Vite environment variables
 interface ImportMetaEnv {
+  readonly VITE_API_BASE_URL?: string;
   readonly VITE_API_URL?: string;
   readonly VITE_TELEMETRY_WS_URL?: string;
 }

@@ -39,19 +39,7 @@
       "@/utils/*": ["./src/utils/*"]
     }
   },
-  "include": [
-    "src/server/**/*.ts",
-    "src/mcp/**/*.ts",
-    "src/db/**/*.ts",
-    "src/agent/**/*.ts",
-    "src/api/**/*.ts",
-    "src/routes/**/*.ts",
-    "src/services/**/*.ts",
-    "src/types/**/*.ts",
-    "src/config/**/*.ts",
-    "src/utils/**/*.ts",
-    "src/index.ts"
-  ],
+  "include": ["src/server/launcher.ts", "src/server/index.ts"],
   "exclude": [
     "node_modules",
     "dist",

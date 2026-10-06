@@ -2,11 +2,14 @@
 import '../instrument.js';
 import '../telemetry.js';
 
-import Fastify from 'fastify';
+import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
+import fastifyWebsocket from '@fastify/websocket';
 import fastifyRedis from '@fastify/redis';
 import fastifyRateLimit from '@fastify/rate-limit';
 import pg from 'pg';
 
+import { getReasoningAgent } from '../agent/engine.js';
+import { registerWebSocketRoutes } from '../api/websocket.js';
 import { authPlugin } from './routes/auth.js';
 import { commsPlugin } from './comms/index.js';
 import { approvalRoutes } from './routes/approvalRoutes.js';
@@ -15,14 +18,6 @@ import { twilioWebhookPlugin } from './routes/twilioWebhook.js';
 import { metricsRoutes } from './routes/metrics.js';
 import { initializeAgentDatabase } from '../agent/approvalEngine.js';
 
-await fastify.register(import('@fastify/redis'), {
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: Number(process.env.REDIS_PORT) || 6379,
-  lazyConnect: true,
-  connectTimeout: 5000,
-  closeServerOnFirstError: false,
-});
-
 const { Pool } = pg;
 
 console.log('🚀 RyanAI Platform Initialization');
@@ -30,7 +25,10 @@ console.log('==================================\n');
 
 // Configuration
 const config = {
-  port: parseInt(process.env.PORT || '3000', 10),
+  port: parseInt(
+    process.env.PORT || (process.env.NODE_ENV === 'development' ? '3001' : '3000'),
+    10,
+  ),
   host: process.env.HOST || '0.0.0.0',
   nodeEnv: process.env.NODE_ENV || 'production',
   database: {
@@ -46,22 +44,6 @@ console.log(`   - Node Env: ${config.nodeEnv}`);
 console.log(`   - Host: ${config.host}:${config.port}`);
 console.log(`   - Database: Configured`);
 console.log(`   - Redis: Configured\n`);
-
-// src/server/launcher.ts
-try {
-  await server.register(fastifyRedis, {
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: Number(process.env.REDIS_PORT) || 6379,
-    family: 4,               // Force IPv4 on Windows
-    connectTimeout: 3000,    // Fail fast after 3 seconds
-    enableReadyCheck: false, // Prevent hanging Avvio initialization
-    maxRetriesPerRequest: 1
-  });
-  console.log('✓ Redis plugin registered');
-} catch (err) {
-  console.warn('⚠️ Redis offline, continuing without cache:', err instanceof Error ? err.message : err);
-}
-
 
 // Initialize Fastify instance with trustProxy and telemetry-aware logger
 const fastify = Fastify({
@@ -95,6 +77,9 @@ const serviceStatus = {
 // ============================================================================
 
 async function registerPlugins() {
+  await fastify.register(fastifyWebsocket);
+  await registerWebSocketRoutes(fastify);
+
   // CORS Hook
   fastify.addHook('onRequest', (req, reply, done) => {
     reply.header('Access-Control-Allow-Origin', '*');
@@ -181,16 +166,23 @@ async function verifyRedis() {
 // API ROUTES
 // ============================================================================
 
-// Health check
-fastify.get('/health', async () => {
-  fastify.log.info('Health check pinged');
+const healthCheck = async (_request: FastifyRequest, reply: FastifyReply) => {
+  const healthy = serviceStatus.database && serviceStatus.redis && serviceStatus.api;
+  reply.code(healthy ? 200 : 503);
   return {
-    status: 'online',
+    status: healthy ? 'online' : 'degraded',
     service: 'ryanai-api-gateway',
     timestamp: new Date().toISOString(),
     services: serviceStatus,
+    engine: 'LangGraph ReAct',
+    architect: 'RyanAI',
+    cudaActive: false,
+    activeGraph: 'reasoning-agent',
   };
-});
+};
+
+fastify.get('/health', healthCheck);
+fastify.get('/api/health', healthCheck);
 
 // Sentry integration test route
 fastify.get('/debug-sentry', async () => {
@@ -207,22 +199,56 @@ fastify.get('/', async () => {
   };
 });
 
-// Legacy reasoning endpoint
-fastify.post<{ Body: { prompt?: string } }>('/api/reason', async (request) => {
-  const { prompt } = request.body || {};
+function contentToText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  return JSON.stringify(content) ?? String(content);
+}
+
+async function runReasoning(prompt: string, model?: string) {
+  const result = await getReasoningAgent(model).invoke({
+    messages: [{ role: 'user', content: prompt }],
+  });
+  const reasoningTrace = result.messages.map((message) => contentToText(message.content));
+  const output = reasoningTrace.at(-1) ?? '';
+
   return {
     success: true,
-    engine: 'RyanAI LangGraph ReAct + CUDA',
-    response: `Autonomous reasoning processed: "${prompt || 'No prompt provided'}"`,
+    objective: prompt,
+    output,
+    reasoningTrace,
+    engine: 'RyanAI LangGraph ReAct',
+    response: output,
+    trace: reasoningTrace,
     timestamp: new Date().toISOString(),
   };
+}
+
+fastify.post<{ Body: { prompt?: string; model?: string } }>('/api/reason', async (request, reply) => {
+  const prompt = request.body?.prompt?.trim();
+  if (!prompt) {
+    return reply.code(400).send({ success: false, error: 'A non-empty prompt is required' });
+  }
+
+  try {
+    return await runReasoning(prompt, request.body?.model);
+  } catch (err) {
+    fastify.log.error({ err }, 'Reasoning request failed');
+    return reply.code(502).send({
+      success: false,
+      error: err instanceof Error ? err.message : 'Reasoning provider request failed',
+    });
+  }
 });
 
 // Reasoning stream endpoint
-fastify.post<{ Body: { prompt?: string; sessionId?: string } }>(
+fastify.post<{ Body: { prompt?: string; sessionId?: string; model?: string } }>(
   '/api/reasoning/stream',
   async (request, reply) => {
-    const { prompt, sessionId } = request.body || {};
+    const prompt = request.body?.prompt?.trim();
+    const { sessionId } = request.body || {};
+    if (!prompt) {
+      return reply.code(400).send({ success: false, error: 'A non-empty prompt is required' });
+    }
 
     reply.hijack();
     const { raw } = reply;
@@ -232,40 +258,24 @@ fastify.post<{ Body: { prompt?: string; sessionId?: string } }>(
     raw.setHeader('Connection', 'keep-alive');
     raw.setHeader('X-Accel-Buffering', 'no');
 
-    let isAborted = false;
-    request.raw.on('close', () => {
-      isAborted = true;
+    let isDisconnected = false;
+    raw.on('close', () => {
+      isDisconnected = true;
     });
 
     const sendEvent = (data: Record<string, unknown>) => {
-      if (!isAborted && !raw.writableEnded) {
+      if (!isDisconnected && !raw.writableEnded) {
         raw.write(`data: ${JSON.stringify(data)}\n\n`);
       }
     };
 
     try {
-      const steps = [
-        'Initializing LangGraph ReAct state graph...',
-        `Parsing input context for session: ${sessionId || 'default'}`,
-        'Executing CUDA C++ tensor inference module...',
-        'Evaluating tool-call routing and vector memory match...',
-        'Synthesizing autonomous reasoning output.',
-      ];
-
-      for (const step of steps) {
-        if (isAborted) break;
-        sendEvent({ status: 'processing', message: step });
-        await new Promise((resolve) => setTimeout(resolve, 350));
-      }
-
-      if (!isAborted) {
-        sendEvent({
-          status: 'complete',
-          result: `RyanAI processed: "${prompt || 'No prompt provided'}"`,
-        });
-      }
+      sendEvent({ status: 'processing', message: `Running reasoning for ${sessionId || 'default'}...` });
+      const result = await runReasoning(prompt, request.body?.model);
+      sendEvent({ status: 'complete', result: result.output, reasoningTrace: result.reasoningTrace });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Internal Server Error';
+      fastify.log.error({ err }, 'Streaming reasoning request failed');
       sendEvent({ error: errorMessage });
     } finally {
       if (!raw.writableEnded) {

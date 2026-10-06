@@ -1,13 +1,13 @@
 // File path: ./src/hooks/useReasoningStream.ts
 
 import { useState, useCallback } from 'react';
-
-export type StreamEventType = 'step' | 'token' | 'done';
+import { API_BASE_URL } from '../lib/apiBaseUrl';
 
 export interface StreamEventData {
-  type: StreamEventType;
+  status?: 'processing' | 'complete';
   message?: string;
-  content?: string;
+  result?: string;
+  error?: string;
 }
 
 export function useRyanStream() {
@@ -21,12 +21,15 @@ export function useRyanStream() {
   ) => {
     setIsStreaming(true);
     try {
-      const response = await fetch('http://localhost:3000/api/v1/reasoning/stream', {
+      const response = await fetch(`${API_BASE_URL}/api/reasoning/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt })
       });
 
+      if (!response.ok) {
+        throw new Error(`Reasoning request failed with status ${response.status}`);
+      }
       if (!response.body) throw new Error('ReadableStream not supported.');
 
       const reader = response.body.getReader();
@@ -47,26 +50,21 @@ export function useRyanStream() {
             if (!rawData) continue;
             try {
               const data = JSON.parse(rawData) as StreamEventData;
-              if (data.type === 'step' && data.message) {
+              if (data.status === 'processing' && data.message) {
                 onStep(data.message);
-              } else if (data.type === 'token' && data.content) {
-                onToken(data.content);
-              } else if (data.type === 'done') {
+              } else if (data.status === 'complete' && data.result) {
+                onToken(data.result);
                 onComplete();
+              } else if (data.error) {
+                throw new Error(data.error);
               }
             } catch (parseErr) {
+              if (parseErr instanceof Error) throw parseErr;
               console.error('Failed to parse SSE line data:', parseErr);
             }
           }
         }
       }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('Streaming connection error:', errorMessage);
-      // Fallback simulation if backend server isn't active locally
-      onStep('Fallback: Local LangGraph simulation mode active');
-      onToken('Autonomous reasoning response generated successfully via local fallback.');
-      onComplete();
     } finally {
       setIsStreaming(false);
     }

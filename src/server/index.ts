@@ -33,7 +33,7 @@ server.get('/', async () => {
 });
 
 // Health check endpoint with live Redis ping
-server.get('/health', async () => {
+const healthCheck = async () => {
   let redisStatus = 'not-configured';
   try {
     if (server.redis) {
@@ -50,9 +50,16 @@ server.get('/health', async () => {
     database: process.env.DATABASE_URL ? 'configured' : 'not-configured',
     redis: redisStatus,
     cudaDevice: process.env.CUDA_DEVICE_ID || '0',
+    engine: 'LangGraph ReAct',
+    architect: 'RyanAI',
+    cudaActive: false,
+    activeGraph: 'reasoning-agent',
     timestamp: new Date().toISOString()
   };
-});
+};
+
+server.get('/health', healthCheck);
+server.get('/api/health', healthCheck);
 
 // Register plugins and feature routes
 async function setupRoutes() {

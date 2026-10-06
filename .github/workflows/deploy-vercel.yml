@@ -1,66 +1,35 @@
-name: Deploy to Vercel
+name: Deploy Vercel Production
 
 on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+  workflow_run:
+    workflows: ["CI - Build, Test, and Integrate"]
+    branches: [main, master]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: vercel-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
-    name: Build & Deploy to Vercel
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      # --- PREVIEW DEPLOYMENT (PULL REQUESTS) ---
-      - name: Pull Vercel Environment Information (Preview)
-        if: github.event_name == 'pull_request'
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Build Project Artifacts (Preview)
-        if: github.event_name == 'pull_request'
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy Project Artifacts to Vercel (Preview)
-        if: github.event_name == 'pull_request'
-        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      # --- PRODUCTION DEPLOYMENT (MAIN / MASTER BRANCH) ---
-      - name: Pull Vercel Environment Information (Production)
-        if: github.event_name != 'pull_request'
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Build Project Artifacts (Production)
-        if: github.event_name != 'pull_request'
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy Project Artifacts to Vercel (Production)
-        if: github.event_name != 'pull_request'
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    name: Deploy validated commit
+    if: >-
+      ${{
+        vars.VERCEL_DEPLOY_ENABLED == 'true' &&
+        (
+          github.event_name == 'workflow_dispatch' ||
+          (
+            github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.event == 'push' &&
+            (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'master')
+          )
+        )
+      }}
+    uses: ./.github/workflows/deploy.yml
+    with:
+      commit_sha: ${{ github.event.workflow_run.head_sha || github.sha }}
+    secrets: inherit

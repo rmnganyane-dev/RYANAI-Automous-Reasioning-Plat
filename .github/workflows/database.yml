@@ -1,19 +1,17 @@
-name: Project Ryan Database Schema & Migration CI
+name: Database Schema Validation
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [main, master]
     paths:
-      - '**/prisma/**'
-      - '**/*.prisma'
-      - 'database/**'
+      - 'prisma/**'
+      - 'src/db/**'
       - '.github/workflows/database.yml'
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [main, master]
     paths:
-      - '**/prisma/**'
-      - '**/*.prisma'
-      - 'database/**'
+      - 'prisma/**'
+      - 'src/db/**'
       - '.github/workflows/database.yml'
   workflow_dispatch:
 
@@ -26,61 +24,43 @@ concurrency:
 
 jobs:
   validate-database:
-    name: Validate Schema & Run Migration Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     services:
       postgres:
         image: pgvector/pgvector:pg16
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: ryan_app_migration_test
+          POSTGRES_USER: ryanai
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ryanai_db
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U ryanai -d ryanai_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+    env:
+      DATABASE_URL: postgresql://ryanai:ci_password@localhost:5432/ryanai_db
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: 22
+          cache: npm
 
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install locked dependencies
+        run: npm ci --legacy-peer-deps
 
-      - name: Validate Prisma Schemas
-        run: |
-          echo "🔍 Searching and validating Prisma schema files..."
-          find . -name "schema.prisma" -not -path "*/node_modules/*" | while read -r schema_file; do
-            echo "Validating $schema_file..."
-            pnpm exec prisma validate --schema="$schema_file"
-          done
-          echo "✅ All Prisma schemas successfully validated."
+      - name: Validate Prisma schema
+        run: npx prisma validate --schema=prisma/schema.prisma
 
-      - name: Generate Prisma Client & Test Migrations
-        env:
-          DATABASE_URL: postgresql://postgres:password@localhost:5432/ryan_app_migration_test?schema=public
-        run: |
-          echo "🚀 Generating Prisma Clients and running migration dry-run..."
-          find . -name "schema.prisma" -not -path "*/node_modules/*" | while read -r schema_file; do
-            dir=$(dirname "$schema_file")
-            echo "Processing database schema in $dir..."
-            (cd "$dir" && pnpm exec prisma generate --schema="schema.prisma")
-            (cd "$dir" && pnpm exec prisma migrate deploy --schema="schema.prisma" || pnpm exec prisma db push --skip-generate --schema="schema.prisma")
-          done
-          echo "✅ Database migration dry-run completed successfully."
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=prisma/schema.prisma
+
+      - name: Apply schema to ephemeral PostgreSQL
+        run: npx prisma db push --schema=prisma/schema.prisma --skip-generate

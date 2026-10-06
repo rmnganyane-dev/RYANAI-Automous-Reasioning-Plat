@@ -1,44 +1,40 @@
 // src/config/brains.ts
 import { ChatOpenAI } from "@langchain/openai";
 
-// Define the local LM Studio server endpoint
-const LM_STUDIO_URL = process.env.LM_STUDIO_URL || "http://localhost:1234/v1";
+const apiKey = (providerKey?: string) =>
+  providerKey || process.env.OPENAI_API_KEY || process.env.LM_STUDIO_API_KEY || 'local-runtime';
 
-/**
- * Primary Brain: ./models/nvidia
- * Role: Core synthesis, heavy reasoning, and primary context handling.
- */
-export const primaryBrain = new ChatOpenAI({
-  modelName: "./models/nvidia",
-  temperature: 0.2,
-  openAIApiKey: "not-needed-for-local", 
-  configuration: {
-    baseURL: LM_STUDIO_URL,
-  },
-});
+function createBrain(
+  modelName: string,
+  temperature: number,
+  baseURL: string,
+  key?: string,
+) {
+  return new ChatOpenAI({
+    modelName,
+    temperature,
+    openAIApiKey: apiKey(key),
+    configuration: { baseURL },
+  });
+}
 
-/**
- * Secondary Brain: ./models/qwen
- * Role: Parallel reasoning, cross-checking, and fallback context.
- */
-export const secondaryBrain = new ChatOpenAI({
-  modelName: "./models/qwen",
-  temperature: 0.4,
-  openAIApiKey: "not-needed-for-local",
-  configuration: {
-    baseURL: LM_STUDIO_URL,
-  },
-});
+export const primaryBrain = createBrain(
+  process.env.PRIMARY_REASONING_MODEL || process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-ultra',
+  0.2,
+  process.env.NVIDIA_API_ENDPOINT || process.env.LM_STUDIO_URL || 'https://integrate.api.nvidia.com/v1',
+  process.env.NVIDIA_API_KEY,
+);
 
-/**
- * Logic & Processing Brain: ./lmstudio-community
- * Role: Structural parsing, systemic execution pipelines, and ReAct routing.
- */
-export const logicBrain = new ChatOpenAI({
-  modelName: "./lmstudio-community",
-  temperature: 0.1, // Low temp for deterministic structural logic
-  openAIApiKey: "not-needed-for-local",
-  configuration: {
-    baseURL: LM_STUDIO_URL,
-  },
-});
+export const secondaryBrain = createBrain(
+  process.env.SECONDARY_REASONING_MODEL || process.env.QWEN_MODEL || 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+  0.4,
+  process.env.QWEN_API_ENDPOINT || process.env.LM_STUDIO_URL || 'https://api.together.xyz/v1',
+  process.env.QWEN_API_KEY,
+);
+
+export const logicBrain = createBrain(
+  process.env.LOGIC_REASONING_MODEL || process.env.LM_STUDIO_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  0.1,
+  process.env.LOGIC_API_ENDPOINT || process.env.LM_STUDIO_URL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+  process.env.LOGIC_API_KEY || process.env.LM_STUDIO_API_KEY || process.env.OPENAI_API_KEY,
+);

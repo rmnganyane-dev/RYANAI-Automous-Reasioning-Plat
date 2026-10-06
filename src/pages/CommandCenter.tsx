@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, LogOut, Terminal } from 'lucide-react';
 import type { Conversation, ModelId, ToolStep, SystemStatus } from '@/lib/types';
-import { modelMeta } from '@/lib/models';
+import { DEFAULT_MODEL, modelMeta, MODELS } from '@/lib/models';
 import { createConversation, createMessage, generateTitle, loadConversations as loadLocalConversations, saveConversations } from '@/lib/storage';
 import { streamReasoning } from '@/lib/reasoning';
 import { useVoiceRecognition, VOICE_COMMANDS } from '@/lib/useVoiceRecognition';
@@ -16,8 +16,6 @@ import GithubModal from '@/components/GithubModal';
 import CodeRain from '@/components/CodeRain';
 import ChatInterface from '@/components/ChatInterface';
 import Modal from '@/components/Modal';
-
-const DEFAULT_MODEL: ModelId = 'claude-sonnet-4.6';
 
 interface CommandCenterProps {
   onSignOut: () => void;
@@ -41,19 +39,28 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   const [status, setStatus] = useState<SystemStatus>({
-    cpu: 23, memory: 41, latency: 128, tokensIn: 0, tokensOut: 0,
+    cpu: null, memory: null, latency: null, tokensIn: 0, tokensOut: 0,
     uptime: '00:00:00', model: DEFAULT_MODEL, state: 'idle',
   });
   const startTimeRef = useRef(Date.now());
+  const requestStartRef = useRef<number | null>(null);
   const voiceStopRef = useRef<() => void>(() => undefined);
 
   const loadConversations = useCallback(async () => {
     if (!isSupabaseConfigured) {
       const localConversations = loadLocalConversations();
-      setConversations(localConversations);
-      if (localConversations.length > 0) {
-        setActiveId(localConversations[0].id);
-        setModel(localConversations[0].model);
+      const supportedConversations = localConversations.map((conversation) => ({
+        ...conversation,
+        model: MODELS[conversation.model] ? conversation.model : DEFAULT_MODEL,
+        messages: conversation.messages.map((message) => ({
+          ...message,
+          model: message.model && MODELS[message.model] ? message.model : undefined,
+        })),
+      }));
+      setConversations(supportedConversations);
+      if (supportedConversations.length > 0) {
+        setActiveId(supportedConversations[0].id);
+        setModel(supportedConversations[0].model);
       }
       return;
     }
@@ -85,7 +92,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
         return {
           id: conv.id,
           title: conv.title,
-          model: conv.model as ModelId,
+          model: MODELS[conv.model as ModelId] ? conv.model as ModelId : DEFAULT_MODEL,
           messages: (msgs ?? []).map((m: any) => ({
             id: m.id,
             role: m.role,
@@ -112,7 +119,6 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     setGithubConnected(localStorage.getItem('ryanai_github_connected') === 'true');
   }, [loadConversations]);
 
-  // Simulated telemetry ticker
   useEffect(() => {
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTimeRef.current;
@@ -123,9 +129,6 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
 
       setStatus((prev) => ({
         ...prev,
-        cpu: sending ? 45 + Math.random() * 30 : 18 + Math.random() * 12,
-        memory: sending ? 55 + Math.random() * 15 : 38 + Math.random() * 8,
-        latency: sending ? 80 + Math.random() * 60 : 100 + Math.random() * 50,
         uptime,
         model: sending ? liveModel : model,
         state: sending ? 'thinking' : 'idle',
@@ -244,6 +247,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     }
 
     setSending(true);
+    requestStartRef.current = performance.now();
     setLiveText('');
     setLiveSteps([]);
     setLiveModel(model);
@@ -297,12 +301,33 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
 
           setStatus((prev) => ({
             ...prev,
+            latency: requestStartRef.current === null ? prev.latency : Math.round(performance.now() - requestStartRef.current),
             tokensIn: prev.tokensIn + Math.floor(text.length / 4),
             tokensOut: prev.tokensOut + Math.floor(accText.length / 4),
+            state: 'idle',
           }));
+          requestStartRef.current = null;
         },
         onError: (msg) => {
           console.error('Reasoning error:', msg);
+          const errorMessage = createMessage('assistant', `Reasoning request failed: ${msg}`, model, accSteps);
+          setConversations((prev) => {
+            const next = prev.map((c) =>
+              c.id === convId
+                ? { ...c, messages: [...c.messages, errorMessage], updatedAt: Date.now() }
+                : c
+            );
+            if (!isSupabaseConfigured) saveConversations(next);
+            return next;
+          });
+          setLiveText('');
+          setLiveSteps([]);
+          setStatus((prev) => ({
+            ...prev,
+            latency: requestStartRef.current === null ? prev.latency : Math.round(performance.now() - requestStartRef.current),
+            state: 'error',
+          }));
+          requestStartRef.current = null;
         },
       });
     } catch {

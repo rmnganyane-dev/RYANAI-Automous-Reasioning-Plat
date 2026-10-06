@@ -1,57 +1,55 @@
 #!/usr/bin/env python3
+"""Measure real API health-request latency; this does not infer model or GPU performance."""
+
+import argparse
+import json
+import os
+import statistics
+import sys
 import time
-import random
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
-def benchmark_tier_1_llm():
-    print("[Benchmarking Level 1] Testing CUDA C++ inference engine tokens/sec...")
-    start_time = time.time()
-    # Simulated token generation payload
-    token_count = 256
-    time.sleep(0.15) # Simulated GPU latency
-    duration = time.time() - start_time
-    tps = token_count / duration
-    print(f" -> Level 1 Result: {tps:.2f} tokens/sec (VRAM Pinned)")
-    return tps
 
-def benchmark_tier_2_rag():
-    print("[Benchmarking Level 2] Testing vector store retrieval latency...")
-    start_time = time.time()
-    # Simulated ChromaDB query latency
-    time.sleep(0.04)
-    duration = (time.time() - start_time) * 1000
-    print(f" -> Level 2 Result: {duration:.2f} ms average retrieval latency")
-    return duration
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--iterations", type=int, default=10)
+    parser.add_argument(
+        "--url",
+        default=os.environ.get("API_HEALTH_URL", "http://localhost:3000/health"),
+    )
+    args = parser.parse_args()
+    if not 1 <= args.iterations <= 1000:
+        parser.error("--iterations must be between 1 and 1000")
 
-def benchmark_tier_3_agent():
-    print("[Benchmarking Level 3] Testing LangGraph ReAct loop iteration speed...")
-    start_time = time.time()
-    # Simulated multi-turn reasoning and tool execution
-    iterations = 3
-    time.sleep(0.35)
-    duration = time.time() - start_time
-    print(f" -> Level 3 Result: Completed {iterations} ReAct iterations in {duration:.2f}s")
-    return duration
+    durations_ms = []
+    timeout = float(os.environ.get("API_TIMEOUT", "5"))
+    try:
+        for _ in range(args.iterations):
+            start = time.perf_counter()
+            with urlopen(args.url, timeout=timeout) as response:
+                health = json.loads(response.read().decode("utf-8"))
+                if response.status >= 400 or health.get("status") != "online":
+                    raise RuntimeError("The API health endpoint did not report online.")
+            durations_ms.append((time.perf_counter() - start) * 1000)
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, UnicodeDecodeError, RuntimeError) as error:
+        print(f"API health benchmark failed: {error}", file=sys.stderr)
+        return 1
 
-def benchmark_tier_4_orchestrator():
-    print("[Benchmarking Level 4] Testing multi-agent shared state synchronization...")
-    start_time = time.time()
-    # Simulated multi-agent coordination
-    time.sleep(0.50)
-    duration = time.time() - start_time
-    print(f" -> Level 4 Result: Synchronized 3 sub-agents in {duration:.2f}s")
-    return duration
+    ordered = sorted(durations_ms)
+    p95_index = max(0, (len(ordered) * 95 + 99) // 100 - 1)
+    print(json.dumps({
+        "endpoint": args.url,
+        "request": "GET health",
+        "iterations": len(durations_ms),
+        "meanMs": round(statistics.mean(durations_ms), 2),
+        "medianMs": round(statistics.median(durations_ms), 2),
+        "p95Ms": round(ordered[p95_index], 2),
+        "minMs": round(ordered[0], 2),
+        "maxMs": round(ordered[-1], 2),
+    }, indent=2))
+    return 0
 
-def run_full_benchmark():
-    print("================================================================")
-    print("         RyanAI Platform Performance & Latency Benchmark        ")
-    print("================================================================")
-    benchmark_tier_1_llm()
-    benchmark_tier_2_rag()
-    benchmark_tier_3_agent()
-    benchmark_tier_4_orchestrator()
-    print("================================================================")
-    print("[Benchmark Summary] All tiers met defense-grade latency criteria.")
-    print("================================================================")
 
 if __name__ == "__main__":
-    run_full_benchmark()
+    raise SystemExit(main())

@@ -28,12 +28,14 @@ jobs:
           scan-ref: .
           format: sarif
           output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('trivy-results.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         with:
           sarif_file: trivy-results.sarif
-        continue-on-error: true
 
   dependencies:
     name: Check Dependencies
@@ -46,26 +48,31 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24.x
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+          node-version: 22
+          cache: npm
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-        continue-on-error: true
+        run: npm ci --legacy-peer-deps
 
       - name: npm audit
-        run: npm audit --audit-level=moderate
-        continue-on-error: true
+        run: npm audit --audit-level=high
+
+      - name: Check Snyk token availability
+        id: snyk-token
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [[ -n "$SNYK_TOKEN" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "SNYK_TOKEN is not configured; skipping the optional Snyk scan."
+          fi
 
       - name: Snyk scan
         uses: snyk/actions/node@master
+        if: steps.snyk-token.outputs.configured == 'true'
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        continue-on-error: true
 
   codeql:
     name: CodeQL Analysis
@@ -74,7 +81,7 @@ jobs:
 
     strategy:
       matrix:
-        language: ['typescript']
+        language: ['javascript-typescript']
 
     steps:
       - uses: actions/checkout@v4
@@ -87,17 +94,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24.x
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+          node-version: 22
+          cache: npm
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-        continue-on-error: true
+        run: npm ci --legacy-peer-deps
 
       - name: CodeQL analysis
         uses: github/codeql-action/analyze@v3
-        continue-on-error: true

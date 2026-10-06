@@ -1,30 +1,22 @@
-name: Project Ryan Native Engines (Go & Rust) CI
+name: Native Rust and C++ CI
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [main, master]
     paths:
-      - 'engine/**'
-      - 'native/**'
-      - 'microservices/native/**'
-      - '**/*.go'
-      - '**/go.mod'
-      - '**/go.sum'
-      - '**/*.rs'
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
+      - "native/**"
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - ".github/workflows/native-engine.yml"
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [main, master]
     paths:
-      - 'engine/**'
-      - 'native/**'
-      - 'microservices/native/**'
-      - '**/*.go'
-      - '**/go.mod'
-      - '**/go.sum'
-      - '**/*.rs'
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
+      - "native/**"
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - ".github/workflows/native-engine.yml"
   workflow_dispatch:
 
 permissions:
@@ -35,97 +27,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  go-engine:
-    name: Go Core Engine Pipeline
+  rust:
+    name: Format, lint, test, and build Rust apps
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-          cache: true
-
-      - name: Install Go Dependencies
+      - name: Install Tauri Linux dependencies
         run: |
-          echo "📦 Downloading Go modules across monorepo..."
-          find . -name "go.mod" -not -path "*/node_modules/*" | while read -r mod; do
-            dir=$(dirname "$mod")
-            echo "Processing Go module in $dir..."
-            (cd "$dir" && go mod download)
-          done
+          sudo apt-get update
+          sudo apt-get install --yes build-essential curl file libayatana-appindicator3-dev libgtk-3-dev libssl-dev librsvg2-dev libwebkit2gtk-4.1-dev libxdo-dev
 
-      - name: Run Go Linters & Tests
-        run: |
-          echo "🧪 Running Go tests with race detection..."
-          find . -name "go.mod" -not -path "*/node_modules/*" | while read -r mod; do
-            dir=$(dirname "$mod")
-            echo "Testing Go package in $dir..."
-            (cd "$dir" && go test -v -race -coverprofile=coverage.out ./...)
-          done
-
-      - name: Build Go Binaries
-        run: |
-          echo "🔨 Compiling Go binaries for Linux..."
-          find . -name "go.mod" -not -path "*/node_modules/*" | while read -r mod; do
-            dir=$(dirname "$mod")
-            echo "Building Go binaries in $dir..."
-            (cd "$dir" && CGO_ENABLED=0 GOOS=linux go build -v ./...)
-          done
-
-  rust-engine:
-    name: Rust Inference Engine Pipeline
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust Toolchain
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
-      - name: Rust Cache
+      - name: Rust cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Check Code Formatting
+      - name: Validate all Rust manifests
+        shell: bash
         run: |
-          echo "🎨 Verifying Rust code formatting..."
-          find . -name "Cargo.toml" -not -path "*/target/*" -not -path "*/node_modules/*" | while read -r cargo; do
-            dir=$(dirname "$cargo")
-            echo "Checking cargo fmt in $dir..."
-            (cd "$dir" && cargo fmt --all -- --check)
+          set -euo pipefail
+          mapfile -d '' manifests < <(find . -type f -name Cargo.toml -not -path '*/target/*' -not -path '*/node_modules/*' -print0)
+          if [ "${#manifests[@]}" -eq 0 ]; then
+            echo "::error::No Cargo.toml files were found."
+            exit 1
+          fi
+          for manifest in "${manifests[@]}"; do
+            dir="$(dirname "$manifest")"
+            echo "Validating Rust package in $dir"
+            cargo fmt --manifest-path "$manifest" --all -- --check
+            cargo clippy --manifest-path "$manifest" --all-targets -- -D warnings
+            cargo test --manifest-path "$manifest" --release
+            cargo build --manifest-path "$manifest" --release
           done
 
-      - name: Run Cargo Clippy
-        run: |
-          echo "🔍 Executing Cargo Clippy linter..."
-          find . -name "Cargo.toml" -not -path "*/target/*" -not -path "*/node_modules/*" | while read -r cargo; do
-            dir=$(dirname "$cargo")
-            echo "Running Clippy in $dir..."
-            (cd "$dir" && cargo clippy -- -D warnings)
-          done
+  cpp:
+    name: Build local C++ inference target
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-      - name: Run Cargo Tests
-        run: |
-          echo "🧪 Running Rust unit and integration tests..."
-          find . -name "Cargo.toml" -not -path "*/target/*" -not -path "*/node_modules/*" | while read -r cargo; do
-            dir=$(dirname "$cargo")
-            echo "Running Cargo tests in $dir..."
-            (cd "$dir" && cargo test --release)
-          done
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Build Rust Release Binaries
-        run: |
-          echo "🚀 Compiling Rust release targets..."
-          find . -name "Cargo.toml" -not -path "*/target/*" -not -path "*/node_modules/*" | while read -r cargo; do
-            dir=$(dirname "$cargo")
-            echo "Building release binary in $dir..."
-            (cd "$dir" && cargo build --release)
-          done
+      - name: Configure C++ project
+        run: cmake -S native/local-inference -B "$RUNNER_TEMP/ryanai-local-inference" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build C++ target
+        run: cmake --build "$RUNNER_TEMP/ryanai-local-inference" --config Release --parallel 2

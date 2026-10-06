@@ -78,13 +78,13 @@ export default function TelemetryPanel({ status, steps, sending }: TelemetryPane
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
               <span className="text-ink-500">CPU</span>
-              <span className="text-cyan-300 font-mono">{status.cpu.toFixed(1)}%</span>
+              <span className="text-cyan-300 font-mono">{status.cpu === null ? 'Not reported' : `${status.cpu.toFixed(1)}%`}</span>
             </div>
             <div className="w-full bg-ink-800/50 rounded-full h-1.5 overflow-hidden">
               <motion.div
                 className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400"
                 initial={{ width: 0 }}
-                animate={{ width: `${Math.min(status.cpu, 100)}%` }}
+                animate={{ width: `${Math.min(status.cpu ?? 0, 100)}%` }}
                 transition={{ duration: 0.3 }}
               />
             </div>
@@ -93,13 +93,13 @@ export default function TelemetryPanel({ status, steps, sending }: TelemetryPane
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
               <span className="text-ink-500">Memory</span>
-              <span className="text-cyan-300 font-mono">{status.memory.toFixed(1)}%</span>
+              <span className="text-cyan-300 font-mono">{status.memory === null ? 'Not reported' : `${status.memory.toFixed(1)}%`}</span>
             </div>
             <div className="w-full bg-ink-800/50 rounded-full h-1.5 overflow-hidden">
               <motion.div
                 className="h-full bg-gradient-to-r from-purple-500 to-purple-400"
                 initial={{ width: 0 }}
-                animate={{ width: `${Math.min(status.memory, 100)}%` }}
+                animate={{ width: `${Math.min(status.memory ?? 0, 100)}%` }}
                 transition={{ duration: 0.3 }}
               />
             </div>
@@ -108,21 +108,21 @@ export default function TelemetryPanel({ status, steps, sending }: TelemetryPane
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-cyan-500/10">
             <div>
               <div className="text-[10px] text-ink-600 font-mono">Latency</div>
-              <div className="text-sm font-mono text-cyan-300">{Math.round(status.latency)}ms</div>
+              <div className="text-sm font-mono text-cyan-300">{status.latency === null ? '—' : `${Math.round(status.latency)}ms`}</div>
             </div>
             <div>
-              <div className="text-[10px] text-ink-600 font-mono">Uptime</div>
+              <div className="text-[10px] text-ink-600 font-mono">Session</div>
               <div className="text-sm font-mono text-cyan-300">{status.uptime}</div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-cyan-500/10">
             <div>
-              <div className="text-[10px] text-ink-600 font-mono">In</div>
+              <div className="text-[10px] text-ink-600 font-mono">In (est.)</div>
               <div className="text-sm font-mono text-purple-300">{status.tokensIn.toLocaleString()}</div>
             </div>
             <div>
-              <div className="text-[10px] text-ink-600 font-mono">Out</div>
+              <div className="text-[10px] text-ink-600 font-mono">Out (est.)</div>
               <div className="text-sm font-mono text-emerald-300">{status.tokensOut.toLocaleString()}</div>
             </div>
           </div>
