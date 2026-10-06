@@ -1,11 +1,7 @@
 {
   "name": "RyanAI Reasoning Platform",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-20-bookworm",
-  
-  // Automatically install dependencies when the container is created
-  "postCreateCommand": "npm install",
-
-  // Useful VS Code extensions for TypeScript and AI development
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+  "postCreateCommand": "npm ci --legacy-peer-deps",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -17,6 +13,5 @@
     }
   },
 
-  // Configure user permissions
   "remoteUser": "node"
 }

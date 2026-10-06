@@ -1,132 +1,48 @@
-name: Docker - Build, Push & Deploy
+name: Publish RyanAI API Image (Manual)
 
 on:
-  push:
-    branches: [main, master]
-    tags: ['v*']
-  workflow_run:
-    workflows: ['CI - Build & Test']
-    branches: [main, master]
-    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: read
   packages: write
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  docker-build-push:
-    name: Build & Push Docker Images
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+  publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-
+    timeout-minutes: 45
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Lowercase repo owner
-        id: repo_owner
-        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
+      - name: Normalize image name
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: echo "name=$(echo "ghcr.io/${REPOSITORY}/api" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Build API image
-      - name: Extract metadata (API)
-        id: meta-api
+      - name: Extract image metadata
+        id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ steps.repo_owner.outputs.owner }}/ryanai-api
+          images: ${{ steps.image.outputs.name }}
           tags: |
             type=ref,event=branch
-            type=semver,pattern={{version}}
             type=sha,format=short
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-
-      - name: Build and push API
+      - name: Build and publish API image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.api
           push: true
-          tags: ${{ steps.meta-api.outputs.tags }}
-          labels: ${{ steps.meta-api.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      # Build Web image
-      - name: Extract metadata (Web)
-        id: meta-web
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ steps.repo_owner.outputs.owner }}/ryanai-web
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=sha,format=short
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-
-      - name: Build and push Web
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile.web
-          push: true
-          tags: ${{ steps.meta-web.outputs.tags }}
-          labels: ${{ steps.meta-web.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy:
-    name: Deploy to Production
-    needs: docker-build-push
-    if: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Deploy via SSH
-        if: ${{ secrets.SSH_HOST != '' }}
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_USER: ${{ github.actor }}
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          envs: GHCR_TOKEN,GHCR_USER
-          script: |
-            set -e
-            cd /opt/ryanai
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            docker compose pull
-            docker compose up -d --remove-orphans
-            docker image prune -af
-        continue-on-error: true
-
-      - name: Trigger Render deploy
-        if: ${{ secrets.RENDER_DEPLOY_HOOK != '' }}
-        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK }}"
-        continue-on-error: true
-
-      - name: Trigger Railway deploy
-        if: ${{ secrets.RAILWAY_DEPLOY_HOOK != '' }}
-        run: curl -X POST -s "${{ secrets.RAILWAY_DEPLOY_HOOK }}"
-        continue-on-error: true

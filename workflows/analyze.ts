@@ -1,9 +1,3 @@
-﻿/**
- * @file analyze.ts
- * @description Core analysis workflow for processing telemetry, code snippets, 
- * or system payloads through the RyanAI reasoning platform.
- */
-
 export interface AnalyzeWorkflowInput {
   targetId: string;
   payload: string;
@@ -11,85 +5,71 @@ export interface AnalyzeWorkflowInput {
   metadata?: Record<string, unknown>;
 }
 
-export interface AnalysisFinding {
-  severity: 'info' | 'warning' | 'error' | 'critical';
-  category: string;
-  message: string;
-  recommendation?: string;
-}
-
 export interface AnalyzeWorkflowResult {
-  success: boolean;
+  success: true;
   targetId: string;
   timestamp: string;
-  confidenceScore: number;
-  findings: AnalysisFinding[];
-  summary: string;
+  model: string;
+  output: string;
+  reasoningTrace: string[];
 }
 
-/**
- * Executes the analysis workflow pipeline.
- * 
- * @param input - The target identifier, payload, and analysis parameters.
- * @returns Structured analysis result including findings and confidence score.
- */
-export async function analyzeWorkflow(input: AnalyzeWorkflowInput): Promise<AnalyzeWorkflowResult> {
-  const timestamp = new Date().toISOString();
+interface ReasoningResponse {
+  success?: boolean;
+  output?: string;
+  reasoningTrace?: string[];
+  engine?: string;
+}
 
-  // 1. Pre-flight validation
-  if (!input.targetId || !input.payload) {
+const modeInstructions: Record<NonNullable<AnalyzeWorkflowInput['mode']>, string> = {
+  deep: 'Analyze carefully and explain the reasoning and relevant uncertainties.',
+  fast: 'Analyze efficiently and provide a concise, useful response.',
+  diagnostic: 'Focus on diagnosis, evidence, risks, and actionable next steps.',
+};
+
+export async function analyzeWorkflow(
+  input: AnalyzeWorkflowInput,
+): Promise<AnalyzeWorkflowResult> {
+  if (!input.targetId?.trim() || !input.payload?.trim()) {
     throw new Error('Invalid analysis input: both targetId and payload are required.');
   }
-
-  const analysisMode = input.mode ?? 'fast';
-
-  try {
-    const findings: AnalysisFinding[] = [];
-
-    // 2. Sample heuristic or reasoning checks
-    if (input.payload.trim().length < 15) {
-      findings.push({
-        severity: 'warning',
-        category: 'PayloadValidation',
-        message: 'Payload length is short, which may limit deep reasoning accuracy.',
-        recommendation: 'Provide more context or data points for a comprehensive sweep.'
-      });
-    }
-
-    const confidenceScore = analysisMode === 'deep' ? 0.96 : 0.88;
-
-    findings.push({
-      severity: 'info',
-      category: 'WorkflowExecution',
-      message: `Successfully executed analysis using [${analysisMode}] mode.`
-    });
-
-    // 3. Construct and return successful result
-    return {
-      success: true,
-      targetId: input.targetId,
-      timestamp,
-      confidenceScore,
-      findings,
-      summary: `Analysis completed successfully for target ${input.targetId}.`
-    };
-
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred during workflow execution.';
-
-    return {
-      success: false,
-      targetId: input.targetId,
-      timestamp,
-      confidenceScore: 0.0,
-      findings: [
-        {
-          severity: 'critical',
-          category: 'WorkflowError',
-          message: errorMessage
-        }
-      ],
-      summary: `Analysis pipeline failed for target ${input.targetId}.`
-    };
+  const mode = input.mode ?? 'fast';
+  if (!(mode in modeInstructions)) {
+    throw new Error(`Unsupported analysis mode: ${String(mode)}`);
   }
+
+  const apiBase = (process.env.RYANAI_API_BASE_URL || process.env.API_BASE_URL || 'http://localhost:3000')
+    .replace(/\/+$/, '');
+  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const response = await fetch(`${apiBase}/api/reason`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      prompt: [
+        modeInstructions[mode],
+        `Target: ${input.targetId}`,
+        input.payload,
+      ].join('\n\n'),
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`RyanAI reasoning request failed (${response.status}): ${detail}`);
+  }
+
+  const result = await response.json() as ReasoningResponse;
+  if (result.success !== true || typeof result.output !== 'string' || !result.output.trim()) {
+    throw new Error('RyanAI reasoning API returned an invalid or unsuccessful response.');
+  }
+
+  return {
+    success: true,
+    targetId: input.targetId,
+    timestamp: new Date().toISOString(),
+    model,
+    output: result.output,
+    reasoningTrace: Array.isArray(result.reasoningTrace) ? result.reasoningTrace : [],
+  };
 }

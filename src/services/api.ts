@@ -1,6 +1,6 @@
 // File path: ./src/services/api.ts
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:9090";
+import { API_BASE_URL } from '../lib/apiBaseUrl';
 
 export interface ReasonResponse {
   success: boolean;

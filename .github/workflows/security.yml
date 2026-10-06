@@ -1,93 +1,104 @@
-﻿name: Project Ryan Enterprise Security & Vulnerability Audit
+name: Security - Scan & Analyze
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
   schedule:
-    - cron: '0 0 * * 1'
-  workflow_dispatch:
+    - cron: '0 2 * * *'
 
 permissions:
   contents: read
   security-events: write
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  audit-dependencies:
-    name: Audit Monorepo Dependencies
+  trivy:
+    name: Trivy Filesystem Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('trivy-results.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        with:
+          sarif_file: trivy-results.sarif
+
+  dependencies:
+    name: Check Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 22
+          cache: npm
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
 
-      - name: Audit Node.js Dependencies
+      - name: npm audit
+        run: npm audit --audit-level=high
+
+      - name: Check Snyk token availability
+        id: snyk-token
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          echo "🔍 Auditing Node.js dependencies across workspace..."
-          pnpm audit --prod --audit-level=high || echo "⚠️ Node audit reported potential advisories."
-
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Audit Rust Dependencies
-        run: |
-          echo "🔍 Auditing Rust crates..."
-          cargo install cargo-audit --locked || true
-          if [ -f "Cargo.toml" ]; then
-            cargo audit || echo "⚠️ Rust audit reported potential advisories."
+          if [[ -n "$SNYK_TOKEN" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
           else
-            echo "ℹ️️ No top-level Cargo.toml found, checking subdirectories..."
-            find . -name "Cargo.toml" -maxdepth 3 -not -path "*/node_modules/*" | while read -r file; do
-              dir=$(dirname "$file")
-              echo "Auditing $dir..."
-              (cd "$dir" && cargo audit) || echo "⚠️ Rust audit failed for $dir"
-            done
+            echo "SNYK_TOKEN is not configured; skipping the optional Snyk scan."
           fi
 
-      - name: Datadog Static Analysis
-        uses: DataDog/datadog-static-analyzer-action@v3
+      - name: Snyk scan
+        uses: snyk/actions/node@master
+        if: steps.snyk-token.outputs.configured == 'true'
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      - name: Setup Python & Astral uv
-        uses: astral-sh/setup-uv@v5
-
-      - name: Audit Python Dependencies
-        run: |
-          echo "🔍 Auditing Python packages..."
-          uv pip install pip-audit || true
-          pip-audit || echo "⚠️ Python audit reported potential advisories."
-
-  trivy-scan:
-    name: Trivy Container & Repository Scan
+  codeql:
+    name: CodeQL Analysis
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      security-events: write
+    timeout-minutes: 60
+
+    strategy:
+      matrix:
+        language: ['javascript-typescript']
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.28.0
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
         with:
-          scan-type: 'fs'
-          ignore-unfixed: true
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
+          languages: ${{ matrix.language }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: CodeQL analysis
+        uses: github/codeql-action/analyze@v3

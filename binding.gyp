@@ -4,10 +4,10 @@
       "target_name": "ryan_cuda_engine",
       "sources": [ "src/inference/cuda_engine.cpp" ],
       "include_dirs": [
-        "<!@(node -p \"require('node-addon-api').include.replace(/\\\\/g, '/')\")"
+        "<!(node -p \"require('node-addon-api').include.split('\\\\').join('/')\")" 
       ],
       "dependencies": [
-        "<!@(node -p \"require('node-addon-api').gyp.replace(/\\\\/g, '/')\")"
+        "<!(node -p \"require('node-addon-api').gyp.split('\\\\').join('/')\")" 
       ],
       "cflags!": [ "-fno-exceptions" ],
       "cflags_cc!": [ "-fno-exceptions" ],
@@ -15,10 +15,10 @@
       "conditions": [
         ["OS=='win'", {
           "include_dirs": [
-            "<!(node -p \"(process.env.CUDA_PATH ? process.env.CUDA_PATH + '/include' : 'C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.0/include').replace(/\\\\/g, '/')\")"
+            "<!(node -p \"(process.env.CUDA_PATH ? process.env.CUDA_PATH + '/include' : 'C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.0/include').split('\\\\').join('/')\")" 
           ],
           "libraries": [
-            "<!(node -p \"(process.env.CUDA_PATH ? process.env.CUDA_PATH + '/lib/x64/cudart.lib' : 'C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.0/lib/x64/cudart.lib').replace(/\\\\/g, '/')\")"
+            "<!(node -p \"(process.env.CUDA_PATH ? process.env.CUDA_PATH + '/lib/x64/cudart.lib' : 'C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.0/lib/x64/cudart.lib').split('\\\\').join('/')\")" 
           ],
           "msvs_settings": {
             "VCCLCompilerTool": {

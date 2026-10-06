@@ -1,30 +1,24 @@
-name: Project Ryan Documentation & API Spec Validation
+name: API Specification Validation
 
 on:
   push:
     branches: [ "main", "master" ]
     paths:
-      - 'docs/**'
-      - '**/swagger/**'
       - '**/*.openapi.json'
       - '**/*.openapi.yaml'
       - '**/*.openapi.yml'
       - '**/*.swagger.json'
       - '**/*.swagger.yaml'
       - '**/*.swagger.yml'
-      - '.github/workflows/docs.yml'
   pull_request:
     branches: [ "main", "master" ]
     paths:
-      - 'docs/**'
-      - '**/swagger/**'
       - '**/*.openapi.json'
       - '**/*.openapi.yaml'
       - '**/*.openapi.yml'
       - '**/*.swagger.json'
       - '**/*.swagger.yaml'
       - '**/*.swagger.yml'
-      - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 permissions:
@@ -44,48 +38,29 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+          node-version: '22'
 
       - name: Validate OpenAPI & Swagger Specs
         run: |
-          echo "🔍 Scanning and validating OpenAPI/Swagger specifications..."
-          
-          # Validate JSON specs safely
-          find . \( -name "*.openapi.json" -o -name "*.swagger.json" \) -not -path "*/node_modules/*" | while read -r spec; do
-            echo "Validating JSON spec: $spec"
-            node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$spec"
-          done
-
-          # Validate YAML specs safely
-          find . \( -name "*.openapi.yaml" -o -name "*.openapi.yml" -o -name "*.swagger.yaml" -o -name "*.swagger.yml" \) -not -path "*/node_modules/*" | while read -r spec; do
-            echo "Validating YAML spec: $spec"
-            python3 -c "import sys, yaml; yaml.safe_load(open(sys.argv[1]))" "$spec"
-          done
-
-          echo "✅ API specifications validation completed successfully."
-
-      - name: Build Documentation Artifacts
-        run: |
-          if [ -d "docs" ]; then
-            echo "📚 Building project documentation..."
-            if grep -q '"docs:build"' package.json; then
-              pnpm run docs:build
-            else
-              echo "ℹ️ No dedicated docs:build script found in root package.json."
-            fi
-          else
-            echo "ℹ️ No docs directory found."
+          set -euo pipefail
+          mapfile -d '' specs < <(find . -type f \( -name '*.openapi.json' -o -name '*.swagger.json' \) -not -path '*/node_modules/*' -print0)
+          mapfile -d '' yaml_specs < <(find . -type f \( -name '*.openapi.yaml' -o -name '*.openapi.yml' -o -name '*.swagger.yaml' -o -name '*.swagger.yml' \) -not -path '*/node_modules/*' -print0)
+          if [ "${#specs[@]}" -eq 0 ] && [ "${#yaml_specs[@]}" -eq 0 ]; then
+            echo "::error::This workflow only runs for API specification changes, but no OpenAPI or Swagger specification was found."
+            exit 1
           fi
-          echo "✅ Documentation pipeline verified."
+          for spec in "${specs[@]}"; do
+            echo "Validating $spec"
+            node --input-type=commonjs -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$spec"
+          done
+
+          if [ "${#yaml_specs[@]}" -gt 0 ]; then
+            python -m pip install --disable-pip-version-check PyYAML
+            for spec in "${yaml_specs[@]}"; do
+              echo "Validating $spec"
+              python -c 'import pathlib, sys, yaml; yaml.safe_load(pathlib.Path(sys.argv[1]).read_text())' "$spec"
+            done
+          fi

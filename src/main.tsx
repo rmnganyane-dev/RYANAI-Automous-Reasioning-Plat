@@ -8,12 +8,12 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { API_BASE_URL } from './lib/apiBaseUrl';
 
 // ============================================================================
 // ENVIRONMENT CONFIGURATION
 // ============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 const APP_VERSION = '4.5.0-matrix';
 const APP_ENV = import.meta.env.MODE || 'development';
 

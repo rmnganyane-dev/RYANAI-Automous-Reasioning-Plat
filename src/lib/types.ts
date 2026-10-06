@@ -1,7 +1,9 @@
 // src/lib/types.ts
 // Complete TypeScript type definitions for RyanAI
 
-export type ModelId = 'claude-sonnet-4.6' | 'gpt-5.4' | 'gemini-3.1-pro' | string;
+import modelCatalog from '../../models/catalog.json';
+
+export type ModelId = (typeof modelCatalog.models)[number]['id'];
 
 export interface ModelMeta {
   id: string;
@@ -36,9 +38,9 @@ export interface ToolStep {
 }
 
 export interface SystemStatus {
-  cpu: number;
-  memory: number;
-  latency: number;
+  cpu: number | null;
+  memory: number | null;
+  latency: number | null;
   tokensIn: number;
   tokensOut: number;
   uptime: string;

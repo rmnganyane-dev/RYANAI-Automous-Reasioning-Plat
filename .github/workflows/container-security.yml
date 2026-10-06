@@ -1,17 +1,27 @@
-name: Project Ryan Container Image Security Scan
+name: Container Security Scan
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [main, master]
     paths:
-      - '**/Dockerfile'
-      - 'docker/**'
+      - 'Dockerfile*'
+      - 'docker-compose.yml'
+      - 'nginx.conf'
+      - '.dockerignore'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'src/**'
       - '.github/workflows/container-security.yml'
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [main, master]
     paths:
-      - '**/Dockerfile'
-      - 'docker/**'
+      - 'Dockerfile*'
+      - 'docker-compose.yml'
+      - 'nginx.conf'
+      - '.dockerignore'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'src/**'
       - '.github/workflows/container-security.yml'
   workflow_dispatch:
 
@@ -24,98 +34,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  scan-containers:
-    name: Scan Container Images
+  scan:
+    name: Scan ${{ matrix.image }} image
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api
+            dockerfile: Dockerfile.api
+          - image: web
+            dockerfile: Dockerfile.web
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      # --- API GATEWAY SCAN ---
-      - name: Build API Gateway Test Image
-        if: hashFiles('apps/api/Dockerfile') != ''
+      - name: Build image for scanning
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: apps/api/Dockerfile
+          file: ${{ matrix.dockerfile }}
           load: true
-          tags: ryan-app-api:local-scan
-
-      - name: Run Trivy Scanner on API Image
-        if: hashFiles('apps/api/Dockerfile') != ''
+          tags: ryanai-${{ matrix.image }}:scan
+      - name: Scan for high and critical vulnerabilities
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: 'ryan-app-api:local-scan'
-          format: 'sarif'
-          output: 'trivy-api-results.sarif'
-          severity: 'CRITICAL,HIGH'
+          image-ref: ryanai-${{ matrix.image }}:scan
+          format: sarif
+          output: trivy-${{ matrix.image }}.sarif
+          severity: HIGH,CRITICAL
           ignore-unfixed: true
-
-      - name: Upload API Scan Results to Security Tab
-        if: hashFiles('trivy-api-results.sarif') != ''
+          exit-code: '1'
+      - name: Upload scan results
+        if: always() && github.event_name != 'pull_request'
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-api-results.sarif'
-          category: 'container-api'
-
-      # --- LLM MICROSERVICE SCAN ---
-      - name: Build LLM Microservice Test Image
-        if: hashFiles('microservices/llm/Dockerfile') != ''
-        uses: docker/build-push-action@v6
-        with:
-          context: ./microservices/llm
-          file: ./microservices/llm/Dockerfile
-          load: true
-          tags: ryan-app-llm:local-scan
-
-      - name: Run Trivy Scanner on LLM Image
-        if: hashFiles('microservices/llm/Dockerfile') != ''
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: 'ryan-app-llm:local-scan'
-          format: 'sarif'
-          output: 'trivy-llm-results.sarif'
-          severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
-
-      - name: Upload LLM Scan Results to Security Tab
-        if: hashFiles('trivy-llm-results.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: 'trivy-llm-results.sarif'
-          category: 'container-llm'
-
-      # --- WEB APP SCAN ---
-      - name: Build Web App Test Image
-        if: hashFiles('apps/web/Dockerfile') != ''
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/web/Dockerfile
-          load: true
-          tags: ryan-app-web:local-scan
-
-      - name: Run Trivy Scanner on Web Image
-        if: hashFiles('apps/web/Dockerfile') != ''
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: 'ryan-app-web:local-scan'
-          format: 'sarif'
-          output: 'trivy-web-results.sarif'
-          severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
-
-      - name: Upload Web Scan Results to Security Tab
-        if: hashFiles('trivy-web-results.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: 'trivy-web-results.sarif'
-          category: 'container-web'
-
-      - name: Container Security Audit Completed
-        run: echo "✅ All container image security scans finished successfully."
+          sarif_file: trivy-${{ matrix.image }}.sarif
+          category: container-${{ matrix.image }}
