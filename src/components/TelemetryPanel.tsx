@@ -1,24 +1,8 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, CheckCircle2, Clock, Zap } from 'lucide-react';
+import { CheckCircle2, Clock, Zap } from 'lucide-react';
 
-interface SystemStatus {
-  cpu: number;
-  memory: number;
-  latency: number;
-  tokensIn: number;
-  tokensOut: number;
-  uptime: string;
-  model: string;
-  state: 'idle' | 'thinking' | 'error';
-}
-
-interface ToolStep {
-  type: string;
-  name: string;
-  result?: string;
-  args?: Record<string, unknown>;
-}
+import type { SystemStatus, ToolStep } from '@/lib/types';
 
 interface TelemetryPanelProps {
   status: SystemStatus;
@@ -26,7 +10,11 @@ interface TelemetryPanelProps {
   sending: boolean;
 }
 
-export default function TelemetryPanel({ status, steps, sending }: TelemetryPanelProps) {
+export default function TelemetryPanel({
+  status,
+  steps,
+  sending,
+}: TelemetryPanelProps) {
   const [displaySteps, setDisplaySteps] = useState<ToolStep[]>([]);
 
   useEffect(() => {
@@ -68,8 +56,13 @@ export default function TelemetryPanel({ status, steps, sending }: TelemetryPane
             <span className="text-xs font-mono text-ink-500">Status</span>
             <motion.div
               className={`px-2 py-1 rounded-md text-xs font-bold bg-gradient-to-r ${getStateColor()} text-ink-950`}
-              animate={{ scale: status.state === 'thinking' ? [1, 1.05, 1] : 1 }}
-              transition={{ duration: 0.8, repeat: status.state === 'thinking' ? Infinity : 0 }}
+              animate={{
+                scale: status.state === 'thinking' ? [1, 1.05, 1] : 1,
+              }}
+              transition={{
+                duration: 0.8,
+                repeat: status.state === 'thinking' ? Infinity : 0,
+              }}
             >
               {getStateLabel()}
             </motion.div>
@@ -78,7 +71,11 @@ export default function TelemetryPanel({ status, steps, sending }: TelemetryPane
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
               <span className="text-ink-500">CPU</span>
-              <span className="text-cyan-300 font-mono">{status.cpu === null ? 'Not reported' : `${status.cpu.toFixed(1)}%`}</span>
+              <span className="text-cyan-300 font-mono">
+                {status.cpu === null
+                  ? 'Not reported'
+                  : `${status.cpu.toFixed(1)}%`}
+              </span>
             </div>
             <div className="w-full bg-ink-800/50 rounded-full h-1.5 overflow-hidden">
               <motion.div
@@ -93,7 +90,11 @@ export default function TelemetryPanel({ status, steps, sending }: TelemetryPane
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
               <span className="text-ink-500">Memory</span>
-              <span className="text-cyan-300 font-mono">{status.memory === null ? 'Not reported' : `${status.memory.toFixed(1)}%`}</span>
+              <span className="text-cyan-300 font-mono">
+                {status.memory === null
+                  ? 'Not reported'
+                  : `${status.memory.toFixed(1)}%`}
+              </span>
             </div>
             <div className="w-full bg-ink-800/50 rounded-full h-1.5 overflow-hidden">
               <motion.div
@@ -108,22 +109,36 @@ export default function TelemetryPanel({ status, steps, sending }: TelemetryPane
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-cyan-500/10">
             <div>
               <div className="text-[10px] text-ink-600 font-mono">Latency</div>
-              <div className="text-sm font-mono text-cyan-300">{status.latency === null ? '—' : `${Math.round(status.latency)}ms`}</div>
+              <div className="text-sm font-mono text-cyan-300">
+                {status.latency === null
+                  ? '—'
+                  : `${Math.round(status.latency)}ms`}
+              </div>
             </div>
             <div>
               <div className="text-[10px] text-ink-600 font-mono">Session</div>
-              <div className="text-sm font-mono text-cyan-300">{status.uptime}</div>
+              <div className="text-sm font-mono text-cyan-300">
+                {status.uptime}
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-cyan-500/10">
             <div>
-              <div className="text-[10px] text-ink-600 font-mono">In (est.)</div>
-              <div className="text-sm font-mono text-purple-300">{status.tokensIn.toLocaleString()}</div>
+              <div className="text-[10px] text-ink-600 font-mono">
+                In (est.)
+              </div>
+              <div className="text-sm font-mono text-purple-300">
+                {status.tokensIn.toLocaleString()}
+              </div>
             </div>
             <div>
-              <div className="text-[10px] text-ink-600 font-mono">Out (est.)</div>
-              <div className="text-sm font-mono text-emerald-300">{status.tokensOut.toLocaleString()}</div>
+              <div className="text-[10px] text-ink-600 font-mono">
+                Out (est.)
+              </div>
+              <div className="text-sm font-mono text-emerald-300">
+                {status.tokensOut.toLocaleString()}
+              </div>
             </div>
           </div>
         </div>
@@ -156,9 +171,15 @@ export default function TelemetryPanel({ status, steps, sending }: TelemetryPane
               >
                 <div className="flex items-start gap-2">
                   {step.result ? (
-                    <CheckCircle2 size={12} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2
+                      size={12}
+                      className="text-emerald-500 flex-shrink-0 mt-0.5"
+                    />
                   ) : (
-                    <Clock size={12} className="text-amber-500 flex-shrink-0 mt-0.5 animate-spin" />
+                    <Clock
+                      size={12}
+                      className="text-amber-500 flex-shrink-0 mt-0.5 animate-spin"
+                    />
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="text-cyan-300">
@@ -166,7 +187,9 @@ export default function TelemetryPanel({ status, steps, sending }: TelemetryPane
                       <span className="text-amber-300">{step.name}</span>
                     </div>
                     {step.result && (
-                      <div className="text-emerald-400/80 truncate mt-1">{step.result}</div>
+                      <div className="text-emerald-400/80 truncate mt-1">
+                        {step.result}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -184,7 +207,9 @@ export default function TelemetryPanel({ status, steps, sending }: TelemetryPane
         transition={{ delay: 0.2 }}
       >
         <div className="text-xs text-ink-600 font-mono mb-1">Active Model</div>
-        <div className="text-sm font-mono text-cyan-300 truncate">{status.model}</div>
+        <div className="text-sm font-mono text-cyan-300 truncate">
+          {status.model}
+        </div>
       </motion.div>
     </div>
   );
