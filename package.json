@@ -161,7 +161,7 @@
     "@types/bcrypt": "^6.0.0",
     "@types/exceljs": "^0.5.3",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^22.20.3",
+    "@types/node": "^26.6.4",
     "@types/nodemailer": "^8.0.2",
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^18.3.5",
