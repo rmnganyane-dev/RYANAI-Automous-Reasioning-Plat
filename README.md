@@ -1,5 +1,46 @@
 # 🚀 RyanAI: Autonomous Reasoning Platform
 
+## User authentication
+
+The public landing page links to **Sign in** and **Create account**. Dashboard,
+cockpit, and workspace require a Supabase email/password session. Sign-up may
+require email confirmation depending on your Supabase project settings; users
+return to sign in after confirming. Sign-out clears the browser session and
+revokes its refresh tokens through Supabase. Existing access tokens follow
+Supabase's expiry policy; use a suitably short JWT lifetime for your deployment.
+
+Configure the same Supabase project on both sides:
+
+- Browser build: `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- API runtime: `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`.
+- In Supabase Auth, enable email/password sign-up, configure your Site URL and
+  allowed redirect URLs, and configure production email delivery.
+- Apply the repository's `supabase/migrations` to that project so conversations,
+  messages, profiles, and memory use the existing per-user row-level policies.
+
+Never put a Supabase secret/service-role key into a `VITE_` setting. Missing
+configuration blocks protected screens and APIs; it does not enable demo access.
+Local notes and conversation caches are namespaced by account; old unowned demo
+storage is retained in the browser but is not automatically assigned to a user.
+Vite settings are embedded at build time, so rebuild the frontend after setting
+them. Docker Compose forwards API settings and browser build arguments separately.
+
+API clients send `Authorization: Bearer <Supabase access token>`. The API verifies
+users with Supabase Auth on each HTTP request. Normal accounts can use reasoning;
+approvals, communications, metrics, and shared WebSocket channels require
+`app_metadata.role = "admin"`, assigned through a trusted Supabase admin process.
+Self-editable `user_metadata` does not grant privileges. `/api/auth/verify` returns
+the verified identity. The former shared-password `/api/auth/login` and cookie
+logout endpoint return HTTP 410; use Supabase Auth instead.
+
+Health endpoints remain public. Slack callbacks retain signature verification;
+Twilio callbacks require `TWILIO_AUTH_TOKEN` and the exact public
+`TWILIO_WHATSAPP_WEBHOOK_URL` configured in Twilio. Browser sessions are not a
+substitute for webhook signatures. WebSocket upgrades require an admin bearer
+header (no tokens in query strings) and reconnect after five minutes; the current
+browser UI uses authenticated HTTP/SSE for reasoning.
+
+
 **Status**: Active development | **Version**: 1.0.0
 
 > **Agentic reasoning platform** with a React/Vite frontend, Fastify API, LangGraph reasoning, optional MCP integrations, and Docker-based PostgreSQL/Redis services.
@@ -539,11 +580,10 @@ TAURI_ENABLED=false
 - ✅ GitHub OAuth integration
 
 ### Security & Authentication
-- ✅ JWT-based authentication
-- ✅ Email sign-in
-- ✅ GitHub OAuth
-- ✅ Demo mode for testing
-- ✅ Session persistence
+- ✅ Supabase email/password sign-in and registration
+- ✅ Verified bearer sessions and administrator permissions
+- ✅ Session restoration and real sign-out
+- Authentication provider OAuth buttons and demo bypasses are not enabled.
 - ✅ Rate limiting (100 requests/minute)
 - ✅ CORS properly configured
 
@@ -709,7 +749,7 @@ npm run telemetry:collect
 - ⚠️ Enable HTTPS/TLS
 - ⚠️ Restrict CORS to your domain
 - ⚠️ Use environment secrets manager
-- ⚠️ Enable API authentication middleware
+- ✅ API authentication middleware enabled (configure Supabase before use)
 - ⚠️ Set up rate limiting rules
 - ⚠️ Regular security audits
 
