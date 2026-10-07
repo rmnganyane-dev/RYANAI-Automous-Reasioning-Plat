@@ -3,6 +3,11 @@
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    # Required to upload the SARIF results to the GitHub Security tab
+    permissions:
+      contents: read
+      security-events: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -12,6 +17,12 @@
         with:
           node-version: 22
 
+      # Required if your project uses pnpm workspaces
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9 
+
       - name: Run Trivy scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -20,15 +31,28 @@
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
-          exit-code: 0
+          exit-code: '0'
+
+      # Critical missing step: Uploads the generated file to GitHub
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install
+          elif [ -f package-lock.json ]; then
             npm ci --legacy-peer-deps
           else
             npm install --legacy-peer-deps
           fi
 
-      - name: npm audit
-        run: npm audit --audit-level=high || true
+      - name: Audit dependencies
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm audit --audit-level high || true
+          else
+            npm audit --audit-level=high || true
+          fi
