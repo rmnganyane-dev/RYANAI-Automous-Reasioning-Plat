@@ -8,6 +8,7 @@ import {
   UserPlus,
   type LucideIcon,
 } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 import appManifest from '../app/routes.json';
 import { UI_CONFIG } from '@/config/core';
 import RyanAICockpit from '@/components/dashboard/RyanAICockpit';
@@ -156,6 +157,7 @@ export default function App() {
           </>
         )}
       </main>
+      <Analytics />
     </div>
   );
 }
