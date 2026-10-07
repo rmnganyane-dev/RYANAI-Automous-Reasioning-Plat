@@ -22,17 +22,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run Trivy scan
-        uses: aquasecurity/trivy-action@0.29.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: sarif
-          output: trivy-results.sarif
-          severity: CRITICAL,HIGH
-          exit-code: "0"
+      - name: Run Trivy Security Scan
+        run: |
+          # 1. Install official Trivy CLI binary
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
-      - name: Upload Trivy results
+          # 2. Run Trivy bypassing node_modules clutter
+          trivy fs . \
+            --scanners vuln \
+            --severity CRITICAL,HIGH \
+            --format sarif \
+            --output trivy-results.sarif \
+            --exit-code 0 \
+            --skip-dirs "node_modules,**/node_modules,.cache"
+
+      - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         if: always() && hashFiles('trivy-results.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         with:
@@ -54,14 +58,22 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
+          if [ -f pnpm-lock.yaml ]; then
+            corepack enable && corepack prepare pnpm@latest --activate
+            pnpm install --no-frozen-lockfile
+          elif [ -f package-lock.json ]; then
             npm ci --legacy-peer-deps
           else
             npm install --legacy-peer-deps
           fi
 
-      - name: npm audit
-        run: npm audit --audit-level=high || true
+      - name: Audit dependencies
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm audit --audit-level high || true
+          else
+            npm audit --audit-level=high || true
+          fi
 
       - name: Check Snyk token availability
         id: snyk-token
@@ -105,7 +117,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
+          if [ -f pnpm-lock.yaml ]; then
+            corepack enable && corepack prepare pnpm@latest --activate
+            pnpm install --no-frozen-lockfile
+          elif [ -f package-lock.json ]; then
             npm ci --legacy-peer-deps
           else
             npm install --legacy-peer-deps
