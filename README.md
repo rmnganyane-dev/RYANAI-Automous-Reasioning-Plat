@@ -454,6 +454,23 @@ npm run release
 
 `npm run test` runs the local Vitest suite. `npm run test:e2e` and `npm run test:integration` require the API and web stack to be running; integration tests also need reachable PostgreSQL and Redis configured with `DATABASE_URL` and `REDIS_URL`. These are commands to execute in your environment, not a claim that production deployment has been verified.
 
+Both smoke scripts load `.env` (existing shell values take precedence). For a local
+API/Vite session, use `npm run test:e2e -- --local` or
+`npm run test:integration -- --local`; these use `PORT` (default 3001) and
+`VITE_PORT` (default 1420) instead of the Compose URLs. Otherwise configure
+`API_BASE_URL`, `WEB_BASE_URL`, and optionally `API_HEALTH_URL`.
+
+Anonymous reasoning requests and WebSocket upgrades must return HTTP 401.
+To also check authenticated behavior, supply short-lived Supabase access tokens
+in your local environment: `TEST_USER_ACCESS_TOKEN` for the end-to-end empty-prompt
+check (HTTP 400), and `TEST_ADMIN_ACCESS_TOKEN` for successful WebSocket upgrades
+in both scripts. The latter account must have trusted `app_metadata.role=admin`.
+Tokens are sent only in authorization headers; do not commit them. Use trusted
+API targets when supplying tokens. Missing tokens produce explicit `SKIP` lines
+and a separate skipped count; supplied invalid/expired tokens or a non-admin
+WebSocket token fail the checks. A pass with skipped checks does not validate
+sign-in, authenticated reasoning, or administrator access.
+
 ### Sandbox Test Console
 Open http://localhost:9090/sandbox.html to test:
 - API connectivity
