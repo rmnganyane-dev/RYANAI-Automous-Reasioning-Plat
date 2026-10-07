@@ -1,7 +1,10 @@
 {
-  "name": "RyanAI Reasoning Platform",
+  "name": "RYANAI Development",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
   "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
   "postCreateCommand": "npm ci --legacy-peer-deps",
@@ -15,6 +18,5 @@
       ]
     }
   },
-
   "remoteUser": "node"
 }

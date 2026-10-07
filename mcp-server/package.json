@@ -14,6 +14,6 @@
     "check": "node --check index.js && node --check stdio.js && node --check http.js && node --check provider-router.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.31.0"
   }
 }
