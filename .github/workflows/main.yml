@@ -1,5 +1,24 @@
+  dependencies:
+    name: Check Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          # NO "cache: npm" line here
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --legacy-peer-deps
+          else
+            npm install --legacy-peer-deps
+          fi
+
+      - name: npm audit
+        run: npm audit --audit-level=high || true
