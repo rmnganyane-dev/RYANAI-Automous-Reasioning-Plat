@@ -29,7 +29,14 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance) {
   // Upgrade HTTP to WebSocket
   fastify.get(
     '/ws',
-    { websocket: true, preValidation: requireAdmin },
+    {
+      websocket: true,
+      // Explicit upgrade limit applies before Supabase verification, even when
+      // this route is registered outside the launcher's global authentication.
+      config: { rateLimit: false },
+      onRequest: fastify.rateLimit({ max: 10, timeWindow: '1 minute' }),
+      preValidation: requireAdmin,
+    },
     async (socket, request: FastifyRequest) => {
       const connId = uuid();
       const auth = extractAuth(request);
@@ -50,7 +57,23 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance) {
       connections.set(connId, context);
       logger.info({ connId, auth: auth?.email }, 'WebSocket connected');
 
+      let windowStartedAt = Date.now();
+      let messageCount = 0;
+      let rateLimited = false;
       socket.on('message', async (data: Buffer) => {
+        if (rateLimited) return;
+        const now = Date.now();
+        if (now - windowStartedAt >= 60_000) {
+          windowStartedAt = now;
+          messageCount = 0;
+        }
+        messageCount += 1;
+        if (messageCount > 60) {
+          rateLimited = true;
+          sendError(socket, 'RATE_LIMITED', 'Too many messages');
+          socket.close(1008, 'Message rate limit exceeded');
+          return;
+        }
         try {
           const message = JSON.parse(data.toString()) as WebSocketMessage;
           await handleMessage(context, message);
