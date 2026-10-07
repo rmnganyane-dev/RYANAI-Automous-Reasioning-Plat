@@ -11,6 +11,10 @@ import fastifyRedis from '@fastify/redis';
 import fastifyRateLimit from '@fastify/rate-limit';
 import pg from 'pg';
 import { connectRedis } from './connectRedis.js';
+import {
+  databaseFailureDiagnostic,
+  startupSummary,
+} from './startupDiagnostics.js';
 
 import { getReasoningAgent } from '../agent/engine.js';
 import { registerWebSocketRoutes } from '../api/websocket.js';
@@ -143,9 +147,7 @@ async function initializeDatabase() {
       connectionTimeoutMillis: 2000,
     });
 
-    const client = await dbPool.connect();
-    const result = await client.query('SELECT NOW()');
-    client.release();
+    const result = await dbPool.query('SELECT NOW()');
 
     console.log(`✓ Database connected: ${result.rows[0].now}`);
     serviceStatus.database = true;
@@ -157,7 +159,7 @@ async function initializeDatabase() {
     } catch (agentErr) {
       console.warn(
         '⚠️ Agent PostgresSaver checkpointer setup deferred/failed:',
-        agentErr instanceof Error ? agentErr.message : agentErr,
+        databaseFailureDiagnostic(agentErr),
       );
     }
 
@@ -165,7 +167,7 @@ async function initializeDatabase() {
   } catch (err) {
     console.error(
       `✗ Database connection failed:`,
-      err instanceof Error ? err.message : err,
+      databaseFailureDiagnostic(err),
     );
     return false;
   }
@@ -416,9 +418,17 @@ async function start() {
     console.log(
       `   - Admin Metrics: GET http://${config.host}:${config.port}/api/admin/metrics`,
     );
-    console.log(`\n🟢 All services ready!\n`);
-
     serviceStatus.api = true;
+    const summary = startupSummary(serviceStatus);
+    if (
+      serviceStatus.database &&
+      serviceStatus.redis &&
+      serviceStatus.agentCheckpointer
+    ) {
+      console.log(`\n${summary}\n`);
+    } else {
+      console.warn(`\n${summary}\n`);
+    }
   } catch (err) {
     fastify.log.fatal(err);
     process.exit(1);
