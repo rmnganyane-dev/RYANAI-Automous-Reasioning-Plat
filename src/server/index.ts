@@ -1,6 +1,7 @@
 import '../loadEnv.js';
 import Fastify from 'fastify';
 import fastifyRedis from '@fastify/redis';
+import { installAuthentication, authPlugin } from './routes/auth.js';
 import { reasonPlugin } from './routes/reason.js';
 import { RyanMCPServer } from '../mcp/ryanMcpServer.js';
 
@@ -25,6 +26,9 @@ server.addHook('onRequest', (req, reply, done) => {
   }
   done();
 });
+
+installAuthentication(server);
+server.register(authPlugin);
 
 // Root endpoint
 server.get('/', async () => {

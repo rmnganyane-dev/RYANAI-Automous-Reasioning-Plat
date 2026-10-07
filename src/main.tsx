@@ -1,3 +1,4 @@
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
 /**
  * RyanAI Command Center - Main Frontend Entry Point
  * Integrates React frontend with Fastify backend
@@ -49,7 +50,7 @@ class RyanAIClient {
     const method = options.method || 'GET';
 
     try {
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         ...options,
         method,
         headers: {

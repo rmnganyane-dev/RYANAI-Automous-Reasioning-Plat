@@ -18,7 +18,7 @@ import {
 
 import { getReasoningAgent } from '../agent/engine.js';
 import { registerWebSocketRoutes } from '../api/websocket.js';
-import { authPlugin } from './routes/auth.js';
+import { authPlugin, installAuthentication } from './routes/auth.js';
 import { commsPlugin } from './comms/index.js';
 import { approvalRoutes } from './routes/approvalRoutes.js';
 import { slackInteractionsPlugin } from './routes/slackInteractions.js';
@@ -76,6 +76,23 @@ const fastify = Fastify({
   },
 });
 
+// CORS Hook
+fastify.addHook('onRequest', (req, reply, done) => {
+  reply.header('Access-Control-Allow-Origin', '*');
+  reply.header(
+    'Access-Control-Allow-Methods',
+    'GET, POST, PUT, DELETE, OPTIONS',
+  );
+  reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    reply.code(200).send();
+    return;
+  }
+  done();
+});
+
+installAuthentication(fastify);
+
 // Database pool
 let dbPool: pg.Pool;
 
@@ -94,21 +111,6 @@ const serviceStatus = {
 async function registerPlugins() {
   await fastify.register(fastifyWebsocket);
   await registerWebSocketRoutes(fastify);
-
-  // CORS Hook
-  fastify.addHook('onRequest', (req, reply, done) => {
-    reply.header('Access-Control-Allow-Origin', '*');
-    reply.header(
-      'Access-Control-Allow-Methods',
-      'GET, POST, PUT, DELETE, OPTIONS',
-    );
-    reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (req.method === 'OPTIONS') {
-      reply.code(200).send();
-      return;
-    }
-    done();
-  });
 
   // Check readiness before Avvio's plugin timeout obscures connection failures.
   const redis = await connectRedis(config.redis.url);
@@ -391,7 +393,7 @@ async function start() {
     );
     console.log(`   - System: http://${config.host}:${config.port}/api/system`);
     console.log(
-      `   - Auth Login: POST http://${config.host}:${config.port}/api/auth/login`,
+      `   - Sign-in: Supabase Auth (use the frontend Sign in / Create account screens)`,
     );
     console.log(
       `   - Auth Verify: GET http://${config.host}:${config.port}/api/auth/verify`,
