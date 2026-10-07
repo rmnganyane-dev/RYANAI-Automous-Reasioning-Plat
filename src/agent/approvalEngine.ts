@@ -3,6 +3,7 @@ import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { ChatOpenAI } from '@langchain/openai';
 import { commsTools } from './tools/commsTools.js';
 import { sendWhatsAppTool } from './tools/whatsappTool.js';
+import { databaseFailureDiagnostic } from '../server/startupDiagnostics.js';
 
 const llm = new ChatOpenAI({
   modelName: 'gpt-4o',
@@ -18,15 +19,21 @@ export const checkpointer = PostgresSaver.fromConnString(databaseUrl);
 
 // Safe, non-blocking initialization function
 let isInitialized = false;
+/** Initialize checkpoint storage, retaining failures for the startup caller. */
 export async function initializeAgentDatabase() {
   if (isInitialized) return;
   try {
-    console.log('[DB] Connecting and setting up LangGraph PostgresSaver checkpointer...');
+    console.log(
+      '[DB] Connecting and setting up LangGraph PostgresSaver checkpointer...',
+    );
     await checkpointer.setup();
     isInitialized = true;
     console.log('[DB] PostgresSaver checkpointer successfully initialized.');
   } catch (error) {
-    console.error('[CRITICAL] Failed to initialize PostgresSaver checkpointer:', error);
+    console.error(
+      '[CRITICAL] Failed to initialize PostgresSaver checkpointer:',
+      databaseFailureDiagnostic(error),
+    );
     throw error;
   }
 }

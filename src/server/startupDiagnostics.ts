@@ -21,8 +21,10 @@ const connectionHints: Record<string, string> = {
     'PostgreSQL is not accepting connections yet. Check server readiness and retry.',
 };
 
-// Only emit known codes and authored hints: raw errors can contain connection
-// strings, credentials, query text, and server-provided details.
+/**
+ * Summarize recognized database failures without exposing raw error details.
+ * Traversal is bounded and handles cyclic causes and aggregate errors.
+ */
 export function databaseFailureDiagnostic(error: unknown): string {
   const pending: unknown[] = [error];
   const seen = new Set<object>();
@@ -61,6 +63,7 @@ export interface StartupServices {
   api: boolean;
 }
 
+/** Describe the startup service snapshot, naming any unavailable services. */
 export function startupSummary(services: StartupServices): string {
   const unavailable = (
     Object.keys(services) as (keyof StartupServices)[]
