@@ -2,39 +2,36 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache python3 make g++ build-base libc6-compat
+# Build-time only: Vite bakes this into the JS bundle.
+# Leave empty to call the API on the same origin (nginx proxies /api, /ws, /health).
+# Set it to the API's HTTPS origin when the API is hosted elsewhere.
+ARG VITE_API_BASE_URL=
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+ARG VITE_SUPABASE_URL=
+ARG VITE_SUPABASE_PUBLISHABLE_KEY=
+ARG VITE_SUPABASE_ANON_KEY=
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
+    VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY \
+    VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 
 COPY package.json package-lock.json ./
-RUN npm ci --legacy-peer-deps
+RUN npm ci --include=dev --legacy-peer-deps
 
-COPY tsconfig.base.json tsconfig.server.json ./
-COPY src ./src
-COPY prisma ./prisma
+COPY . .
+RUN npm run build
 
-RUN if [ -f prisma/schema.prisma ]; then npx prisma generate; fi
-RUN npm run build:server
-RUN npm prune --omit=dev --legacy-peer-deps
+FROM nginx:stable-alpine AS runner
 
-FROM node:22-alpine AS runner
+# The official nginx image renders /etc/nginx/templates/*.template with envsubst
+# at startup, so no custom entrypoint script is needed.
+ENV PORT=80 \
+    API_UPSTREAM=http://api:3000
 
-WORKDIR /app
-ENV NODE_ENV=production \
-    HOST=0.0.0.0 \
-    PORT=3000
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-RUN apk add --no-cache dumb-init libstdc++ libc6-compat wget \
-    && mkdir -p /app/logs \
-    && chown -R node:node /app
+EXPOSE 80
 
-COPY --from=builder --chown=node:node /app/package.json ./package.json
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/dist/server ./dist/server
-
-USER node
-EXPOSE 3000
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://127.0.0.1:3000/health || exit 1
-
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["node", "dist/server/server/launcher.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:${PORT}/healthz || exit 1
