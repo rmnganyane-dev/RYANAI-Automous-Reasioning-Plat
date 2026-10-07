@@ -9,6 +9,7 @@ import cors from "@fastify/cors";
 import formbody from "@fastify/formbody";
 import websocket from "@fastify/websocket";
 import crypto from "node:crypto";
+import { cpus, totalmem } from "node:os";
 import twilio from "twilio";
 import dotenv from "dotenv";
 import path from "node:path";
@@ -28,7 +29,7 @@ import { voiceRealtimeGateway } from "./gateway/voiceRealtimeGateway.js";
 import transcendPlugin from "./plugins/transcendGovernance.js";
 import nativeInferencePlugin from "./plugins/nativeInference.js";
 import { eBPFSentinel } from "./security/sentinelLoader.js";
-import { TelemetryData, LogEntry, OutgoingMessage, IncomingMessage } from "./types.js";
+import { TelemetryData, OutgoingMessage, IncomingMessage } from "./types.js";
 
 dotenv.config();
 
@@ -36,10 +37,10 @@ dotenv.config();
 declare module 'fastify' {
   interface FastifyInstance {
     cppEngine?: {
-      evaluate: (prompt: string) => any;
+      evaluate: (prompt: string) => unknown;
     };
     transcend?: {
-      evaluate: (payload: Record<string, any>) => any;
+      evaluate: (payload: Record<string, unknown>) => { allow: boolean; requires_human_approval: boolean; violations: string[] };
     };
   }
 }
@@ -65,7 +66,7 @@ const RyanAICheckpointer = {
   getLatestCheckpoint: async (_threadId: string) => {
     return null;
   },
-  saveCheckpoint: async (_threadId: string, _step: number, _state: any) => {
+  saveCheckpoint: async (_threadId: string, _step: number, _state: unknown) => {
     // Persists checkpoint state
   },
 };
@@ -123,23 +124,40 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
-// Real-time telemetry generator for HUD
-function generateTelemetry(): TelemetryData {
+let previousCpuSample = cpus().map((cpu) => ({ ...cpu.times }));
+
+function readTelemetry(): TelemetryData {
+  const currentCpuSample = cpus().map((cpu) => ({ ...cpu.times }));
+  let cpuUsage: number | null = null;
+  if (currentCpuSample.length === previousCpuSample.length && currentCpuSample.length > 0) {
+    const current = currentCpuSample.reduce(
+      (result, cpu) => ({
+        idle: result.idle + cpu.idle,
+        total: result.total + Object.values(cpu).reduce((sum, value) => sum + value, 0),
+      }),
+      { idle: 0, total: 0 },
+    );
+    const previous = previousCpuSample.reduce(
+      (result, cpu) => ({
+        idle: result.idle + cpu.idle,
+        total: result.total + Object.values(cpu).reduce((sum, value) => sum + value, 0),
+      }),
+      { idle: 0, total: 0 },
+    );
+    const elapsed = current.total - previous.total;
+    cpuUsage = elapsed > 0
+      ? Math.round(((elapsed - (current.idle - previous.idle)) / elapsed) * 100)
+      : null;
+  }
+  previousCpuSample = currentCpuSample;
+
   return {
-    cpuUsage: Math.floor(20 + Math.random() * 45),
-    memoryUsage: Math.floor(55 + Math.random() * 15),
-    networkLatency: Math.floor(6 + Math.random() * 12),
-    activeThreads: Math.floor(120 + Math.random() * 20),
+    cpuUsage,
+    memoryUsage: Math.round((process.memoryUsage().rss / totalmem()) * 100),
+    networkLatency: null,
+    activeThreads: null,
   };
 }
-
-// Random log generator for kernel streams
-const sampleLogs = [
-  { level: 'INFO', message: 'eBPF Ring Buffer consumed 2048 bytes.' },
-  { level: 'INFO', message: 'TLS 1.3 Keep-alive ACK received from edge proxy.' },
-  { level: 'WARN', message: 'Inbound SYN flood threshold reached on port 443; filtering applied.' },
-  { level: 'ERROR', message: 'Dropped corrupted packet frame on eth0 [CRC checksum mismatch].' },
-] as const;
 
 /**
  * Builds and configures the unified Fastify application instance.
@@ -181,10 +199,10 @@ async function buildApp(): Promise<FastifyInstance> {
       service: "ryanai-api-gateway",
       timestamp: new Date().toISOString(),
       services: {
-        database: true,
-        cudaEngine: true,
-        swarmMesh: true,
-        ebpfSentinel: true,
+        database: "unknown",
+        cudaEngine: Boolean(app.cppEngine),
+        swarmMesh: "started",
+        ebpfSentinel: sentinel.getStatus(),
       },
     };
   });
@@ -194,7 +212,7 @@ async function buildApp(): Promise<FastifyInstance> {
       status: "ONLINE",
       engine: "RyanAI Sovereign Autonomous Reasoning Platform",
       architect: "Ntsiyeni Ganyane",
-      cudaActive: true,
+      cudaActive: Boolean(app.cppEngine),
       activeGraph: "ReAct-v4",
       timestamp: new Date().toISOString(),
     };
@@ -206,7 +224,7 @@ async function buildApp(): Promise<FastifyInstance> {
       status: "online",
       service: "ryanai-api-gateway",
       timestamp: new Date().toISOString(),
-      services: { database: true, cuda: true, swarm: true, sentinel: true },
+      services: { database: "unknown", cuda: Boolean(app.cppEngine), swarm: "started", sentinel: sentinel.getStatus() },
     };
   });
 
@@ -231,9 +249,10 @@ async function buildApp(): Promise<FastifyInstance> {
         });
       }
 
-      const cppOutput = app.cppEngine
-        ? app.cppEngine.evaluate(prompt)
-        : { result: "Native C++ engine simulated execution", prompt };
+      if (!app.cppEngine) {
+        return reply.status(503).send({ success: false, error: "Native inference engine is not configured." });
+      }
+      const cppOutput = await app.cppEngine.evaluate(prompt);
 
       return reply.send({
         success: true,
@@ -360,9 +379,10 @@ async function buildApp(): Promise<FastifyInstance> {
   app.post(
     "/api/v1/transcend/check",
     async (req: FastifyRequest, reply: FastifyReply) => {
-      const result = app.transcend
-        ? app.transcend.evaluate(req.body as Record<string, any>)
-        : { allowed: true };
+      if (!app.transcend) {
+        return reply.status(503).send({ success: false, error: "Governance engine is not configured." });
+      }
+      const result = app.transcend.evaluate(req.body as Record<string, unknown>);
       return reply.send(result);
     }
   );
@@ -379,7 +399,7 @@ async function buildApp(): Promise<FastifyInstance> {
       const {
         to = process.env.DEFAULT_RECIPIENT_PHONE,
         reason = "System Telemetry Alert",
-        message = "This is Ryan. All automated build pipelines completed successfully.",
+        message = "RyanAI administrator notification.",
       } = req.body || {};
 
       if (!to) {
@@ -455,10 +475,7 @@ async function buildApp(): Promise<FastifyInstance> {
         `Greetings. This is Ryan, your system architect. Notification brief: ${reason}. ${message}. Press 1 or speak 'status' to review live telemetry. Press 2 to acknowledge.`
       );
 
-      twiml.say(
-        { voice: "Polly.Matthew" },
-        "No response detected. Dispatching diagnostic logs via WhatsApp and email. Goodbye."
-      );
+      twiml.say({ voice: "Polly.Matthew" }, "No response detected. Goodbye.");
       twiml.hangup();
 
       reply.header("Content-Type", "text/xml");
@@ -476,23 +493,20 @@ async function buildApp(): Promise<FastifyInstance> {
       app.log.info({ input, Digits, SpeechResult }, "Received interactive input during call");
 
       if (input === "1" || input.includes("status") || input.includes("telemetry")) {
-        twiml.say(
-          { voice: "Polly.Matthew" },
-          "Current system telemetry: All 5 pipeline stages are nominal. CPU usage is stable, eBPF sentinel memory allocation is stable. Deployment ready."
-        );
+        twiml.say({ voice: "Polly.Matthew" }, "Live system telemetry is not available through this call.");
         twiml.pause({ length: 1 });
         twiml.say({ voice: "Polly.Matthew" }, "Acknowledged. Ending voice session. Have a productive session.");
         twiml.hangup();
       } else if (input === "2" || input.includes("acknowledge") || input.includes("ok")) {
         twiml.say(
           { voice: "Polly.Matthew" },
-          "Alert status acknowledged and logged in Transcend decision registry. Standby for summary email."
+          "Acknowledged. This acknowledgement has not been forwarded to an external registry."
         );
         twiml.hangup();
       } else {
         twiml.say(
           { voice: "Polly.Matthew" },
-          `Received ${input ? `'${input}'` : "unrecognized input"}. Transferring context to WhatsApp dispatch. Signing off.`
+          `Received ${input ? `'${input}'` : "unrecognized input"}. No external dispatch is configured.`
         );
         twiml.hangup();
       }
@@ -528,7 +542,7 @@ async function buildApp(): Promise<FastifyInstance> {
      ========================================================================== */
 
   app.get('/ws/telemetry', { websocket: true }, (connection, _req) => {
-    const socket = (connection as any).socket || connection;
+    const socket = connection;
     app.log.info('HUD Client connected to telemetry stream');
 
     // 1. Broadcast telemetry every 1.5 seconds
@@ -536,27 +550,11 @@ async function buildApp(): Promise<FastifyInstance> {
       if (socket.readyState === 1 /* OPEN */) {
         const msg: OutgoingMessage = {
           type: 'TELEMETRY',
-          payload: generateTelemetry(),
+          payload: readTelemetry(),
         };
         socket.send(JSON.stringify(msg));
       }
     }, 1500);
-
-    // 2. Broadcast periodic system logs
-    const logInterval = setInterval(() => {
-      if (Math.random() > 0.4 && socket.readyState === 1 /* OPEN */) {
-        const randomLog = sampleLogs[Math.floor(Math.random() * sampleLogs.length)];
-        const logEntry: LogEntry = {
-          id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          timestamp: new Date().toLocaleTimeString(),
-          level: randomLog.level,
-          message: randomLog.message,
-        };
-
-        const msg: OutgoingMessage = { type: 'LOG', payload: logEntry };
-        socket.send(JSON.stringify(msg));
-      }
-    }, 4000);
 
     // 3. Handle messages sent from the HUD client
     socket.on('message', (rawMessage: Buffer) => {
@@ -573,7 +571,7 @@ async function buildApp(): Promise<FastifyInstance> {
                 id: Date.now().toString(),
                 timestamp: new Date().toLocaleTimeString(),
                 level: 'INFO',
-                message: `SERVER ACK: Processed '${data.command}' via eBPF control path.`,
+                message: `Command '${data.command}' was received but not executed by this telemetry endpoint.`,
               },
             };
             socket.send(JSON.stringify(ackLog));
@@ -581,17 +579,7 @@ async function buildApp(): Promise<FastifyInstance> {
         }
 
         if (data.type === 'SWEEP_START') {
-          app.log.info('Running network diagnostic sweep...');
-
-          setTimeout(() => {
-            if (socket.readyState === 1) {
-              const sweepResult: OutgoingMessage = {
-                type: 'SWEEP_COMPLETE',
-                payload: { anomalies: 0 },
-              };
-              socket.send(JSON.stringify(sweepResult));
-            }
-          }, 2000);
+          app.log.warn('A diagnostic sweep was requested, but no sweep provider is configured.');
         }
       } catch (err) {
         app.log.error({ err }, 'Failed to parse incoming WebSocket message');
@@ -602,7 +590,6 @@ async function buildApp(): Promise<FastifyInstance> {
     socket.on('close', () => {
       app.log.info('HUD Client disconnected');
       clearInterval(telemetryInterval);
-      clearInterval(logInterval);
     });
   });
 

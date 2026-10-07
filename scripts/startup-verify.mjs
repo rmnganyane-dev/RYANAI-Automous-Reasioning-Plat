@@ -1,152 +1,40 @@
 #!/usr/bin/env node
-/**
- * System Health Check & Startup Verification
- * Ensures all services are operational before returning control
- */
-import { createLogger } from '../src/shared/logger.js';
-import { spawn } from 'node:child_process';
 
-const logger = createLogger('startup-verify');
+import { apiHealthUrl, webUrl, mcpHealthUrl } from './health-config.mjs';
+const timeoutMs = Number(process.env.STARTUP_TIMEOUT_MS || 60_000);
+const retryDelayMs = Number(process.env.STARTUP_RETRY_DELAY_MS || 2_000);
 
-interface HealthCheck {
-  name: string;
-  endpoint: string;
-  timeout: number;
-  critical: boolean;
-}
+async function checkEndpoint(label, url, validate = () => {}) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
 
-const healthChecks: HealthCheck[] = [
-  {
-    name: 'API Server',
-    endpoint: 'http://localhost:3000/health',
-    timeout: 5000,
-    critical: true,
-  },
-  {
-    name: 'Redis Cache',
-    endpoint: 'redis://localhost:6379',
-    timeout: 3000,
-    critical: true,
-  },
-  {
-    name: 'PostgreSQL Database',
-    endpoint: 'postgresql://postgres:[REDACTED]@localhost:5432/ryanai',
-    timeout: 5000,
-    critical: true,
-  },
-  {
-    name: 'Web Frontend',
-    endpoint: 'http://localhost:9090',
-    timeout: 3000,
-    critical: false,
-  },
-];
-
-async function checkHealth(check: HealthCheck): Promise<boolean> {
-  try {
-    if (check.endpoint.startsWith('http')) {
-      const signal = AbortSignal.timeout(check.timeout);
-      const res = await fetch(check.endpoint, { signal });
-      return res.ok;
-    } else if (check.endpoint.startsWith('redis')) {
-      // Redis check via redis-cli
-      return await checkRedis(check.timeout);
-    } else if (check.endpoint.startsWith('postgresql')) {
-      // PostgreSQL check via psql
-      return await checkPostgres(check.timeout);
-    }
-    return false;
-  } catch (err: any) {
-    logger.debug(`${check.name} check failed: ${err.message}`);
-    return false;
-  }
-}
-
-async function checkRedis(timeout: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const proc = spawn('redis-cli', ['ping'], { timeout });
-    proc.on('close', (code) => resolve(code === 0));
-    proc.on('error', () => resolve(false));
-  });
-}
-
-async function checkPostgres(timeout: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const proc = spawn('psql', [
-      '-U', 'postgres',
-      '-h', 'localhost',
-      '-d', 'ryanai',
-      '-c', 'SELECT 1',
-    ], { timeout });
-    proc.on('close', (code) => resolve(code === 0));
-    proc.on('error', () => resolve(false));
-  });
-}
-
-async function runStartupVerification() {
-  logger.info('🔍 Starting system health verification...\n');
-
-  let passed = 0;
-  let failed = 0;
-  const failedCritical: string[] = [];
-
-  for (const check of healthChecks) {
-    process.stdout.write(`  Checking ${check.name}... `);
-    
-    let attempts = 0;
-    const maxAttempts = 3;
-    let healthy = false;
-
-    while (attempts < maxAttempts && !healthy) {
-      healthy = await checkHealth(check);
-      if (!healthy && attempts < maxAttempts - 1) {
-        await new Promise(r => setTimeout(r, 1000));
-      }
-      attempts++;
-    }
-
-    if (healthy) {
-      logger.info(`✅ OK\n`);
-      passed++;
-    } else {
-      const status = check.critical ? '❌ CRITICAL' : '⚠️  WARNING';
-      logger.warn(`${status}\n`);
-      failed++;
-      if (check.critical) {
-        failedCritical.push(check.name);
-      }
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      await validate(response);
+      console.log(`PASS ${label}`);
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
     }
   }
 
-  logger.info('\n📊 Verification Summary');
-  logger.info(`─`.repeat(40));
-  logger.info(`✅ Passed: ${passed}/${healthChecks.length}`);
-  logger.info(`❌ Failed: ${failed}/${healthChecks.length}`);
-
-  if (failedCritical.length > 0) {
-    logger.error(`\n🚨 Critical Services Down:`);
-    failedCritical.forEach(name => logger.error(`   • ${name}`));
-    logger.error('\nTroubleshooting:');
-    logger.error('  1. Check Docker containers: docker compose ps');
-    logger.error('  2. View logs: docker compose logs -f');
-    logger.error('  3. Rebuild: docker compose down -v && docker compose up -d');
-    return 1;
-  }
-
-  logger.info('\n🎉 All critical services healthy!');
-  logger.info('\n📍 Access Points:');
-  logger.info('   API:      http://localhost:3000');
-  logger.info('   Frontend: http://localhost:9090');
-  logger.info('   Health:   http://localhost:3000/health');
-  logger.info('   WebSocket: ws://localhost:3000/ws');
-  logger.info('\n✨ System ready for operation\n');
-  
-  return 0;
+  throw new Error(`${label} did not become healthy: ${lastError?.message ?? 'timeout'}`);
 }
 
-runStartupVerification()
-  .then(code => process.exit(code))
-  .catch((err) => {
-    logger.error('Verification failed:', err);
-    process.exit(1);
+try {
+  await checkEndpoint('API', apiHealthUrl, async (response) => {
+    const health = await response.json();
+    if (health.status !== 'online') throw new Error('API status is not online');
+    if (health.services?.database !== true) throw new Error('PostgreSQL is unhealthy');
+    if (health.services?.redis !== true) throw new Error('Redis is unhealthy');
   });
+  await checkEndpoint('Web frontend', `${webUrl}/health`);
+  if (mcpHealthUrl) await checkEndpoint('MCP service', mcpHealthUrl);
+  console.log('All critical RyanAI services are healthy.');
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+}

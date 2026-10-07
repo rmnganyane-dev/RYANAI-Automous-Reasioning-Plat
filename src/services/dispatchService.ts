@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import twilio, { Twilio } from 'twilio';
+import twilio from 'twilio';
 
 export interface PipelineReportPayload {
   projectName: string;
@@ -25,27 +25,37 @@ export interface SecurityAlertPayload {
   pid: number;
   command: string;
   violations: string[];
-  actionTaken: 'SIGKILL' | 'BLOCKED' | 'FLAGGED';
+  actionTaken: 'SIGKILL' | 'BLOCKED' | 'FLAGGED' | 'SUCCESS' | 'FAILED';
   timestamp: string;
 }
 
 export class DispatchService {
-  private resend: Resend;
-  private twilioClient: Twilio;
+  // Read configuration at dispatch time so importing the service does not require
+  // optional provider credentials, and failed delivery is never reported as success.
+  private requiredEnv(name: string): string {
+    const value = process.env[name]?.trim();
+    if (!value) throw new Error(`Dispatch requires ${name}`);
+    return value;
+  }
 
-  private fromEmail = process.env.DISPATCH_FROM_EMAIL || 'RyanAI <ryan@ganyane.dev>';
-  private defaultEmail = process.env.DEFAULT_RECIPIENT_EMAIL || 'rmnganyane@gmail.com';
-  private defaultPhone = process.env.DEFAULT_RECIPIENT_PHONE || '+27718095084';
-  private whatsappFrom = process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886';
-
-  constructor() {
-    // Provide fallback strings so SDK instantiation won't throw when ENVs are missing
-    const resendApiKey = process.env.RESEND_API_KEY || 're_placeholder_key';
-    this.resend = new Resend(resendApiKey);
-
-    const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID || 'AC_placeholder_sid';
-    const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN || 'placeholder_auth_token';
-    this.twilioClient = twilio(twilioAccountSid, twilioAuthToken);
+  private async sendWhatsApp(
+    body: string,
+    targetPhone?: string,
+  ): Promise<string> {
+    const accountSid = this.requiredEnv('TWILIO_ACCOUNT_SID');
+    const authToken = this.requiredEnv('TWILIO_AUTH_TOKEN');
+    const from = this.requiredEnv('TWILIO_WHATSAPP_NUMBER');
+    const to =
+      targetPhone?.trim() || this.requiredEnv('DEFAULT_RECIPIENT_PHONE');
+    const address = (phone: string) =>
+      phone.startsWith('whatsapp:') ? phone : `whatsapp:${phone}`;
+    const result = await twilio(accountSid, authToken).messages.create({
+      from: address(from),
+      to: address(to),
+      body,
+    });
+    if (!result.sid) throw new Error('Twilio returned no message SID');
+    return result.sid;
   }
 
   /* ==========================================================================
@@ -57,7 +67,7 @@ export class DispatchService {
    */
   async sendWhatsAppPipelineUpdate(
     payload: PipelineReportPayload,
-    targetPhone = this.defaultPhone
+    targetPhone?: string,
   ): Promise<string> {
     const statusEmoji = payload.status === 'SUCCESS' ? '✅' : '🚨';
     const durationSec = (payload.executionTimeMs / 1000).toFixed(2);
@@ -69,25 +79,13 @@ export class DispatchService {
       `*Duration:* ${durationSec}s`,
       payload.transcendStatus.violationsCount > 0
         ? `\n⚠️ *Transcend Violations:* ${payload.transcendStatus.violationsCount}`
-        : '🛡️ *Transcend Guard:* Passed',
+        : payload.transcendStatus.evaluated
+          ? '🛡️ *Transcend Guard:* Passed'
+          : '🛡️ *Transcend Guard:* Not evaluated',
       `\n📊 *Telemetry & Audit Logs:*\n${payload.logUrl}`,
     ].join('\n');
 
-    const formattedRecipient = targetPhone.startsWith('whatsapp:')
-      ? targetPhone
-      : `whatsapp:${targetPhone}`;
-
-    const formattedSender = this.whatsappFrom.startsWith('whatsapp:')
-      ? this.whatsappFrom
-      : `whatsapp:${this.whatsappFrom}`;
-
-    const result = await this.twilioClient.messages.create({
-      from: formattedSender,
-      to: formattedRecipient,
-      body: message,
-    });
-
-    return result.sid;
+    return this.sendWhatsApp(message, targetPhone);
   }
 
   /**
@@ -95,7 +93,7 @@ export class DispatchService {
    */
   async sendWhatsAppSecurityAlert(
     payload: SecurityAlertPayload,
-    targetPhone = this.defaultPhone
+    targetPhone?: string,
   ): Promise<string> {
     const message = [
       `🚨 *TRANSCEND KERNEL INTERVENTION*`,
@@ -107,17 +105,7 @@ export class DispatchService {
       ...payload.violations.map((v) => `• ${v}`),
     ].join('\n');
 
-    const result = await this.twilioClient.messages.create({
-      from: this.whatsappFrom.startsWith('whatsapp:')
-        ? this.whatsappFrom
-        : `whatsapp:${this.whatsappFrom}`,
-      to: targetPhone.startsWith('whatsapp:')
-        ? targetPhone
-        : `whatsapp:${targetPhone}`,
-      body: message,
-    });
-
-    return result.sid;
+    return this.sendWhatsApp(message, targetPhone);
   }
 
   /* ==========================================================================
@@ -129,13 +117,17 @@ export class DispatchService {
    */
   async sendPipelineEmailReport(
     payload: PipelineReportPayload,
-    targetEmail = this.defaultEmail
+    targetEmail?: string,
   ): Promise<string> {
+    const resend = new Resend(this.requiredEnv('RESEND_API_KEY'));
+    const from = this.requiredEnv('DISPATCH_FROM_EMAIL');
+    const to =
+      targetEmail?.trim() || this.requiredEnv('DEFAULT_RECIPIENT_EMAIL');
     const html = this.renderEmailTemplate(payload);
 
-    const response = await this.resend.emails.send({
-      from: this.fromEmail,
-      to: targetEmail,
+    const response = await resend.emails.send({
+      from,
+      to,
       subject: `[RyanAI] Pipeline ${payload.status}: ${payload.projectName} (${payload.branch})`,
       html,
     });
@@ -144,13 +136,43 @@ export class DispatchService {
       throw new Error(`Resend Email Error: ${response.error.message}`);
     }
 
-    return response.data?.id || 'OK';
+    if (!response.data?.id) throw new Error('Resend returned no email ID');
+    return response.data.id;
   }
 
   /**
    * High-density Cyber/Matrix dark-mode HTML email template generator
    */
-  private renderEmailTemplate(p: PipelineReportPayload): string {
+  private renderEmailTemplate(payload: PipelineReportPayload): string {
+    const escapeHtml = (value: string): string =>
+      value.replace(
+        /[&<>"']/g,
+        (char) =>
+          ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+          })[char]!,
+      );
+    const logUrl = new URL(payload.logUrl);
+    if (logUrl.protocol !== 'https:' && logUrl.protocol !== 'http:') {
+      throw new Error('Pipeline log URL must use HTTP or HTTPS');
+    }
+    const p = {
+      ...payload,
+      projectName: escapeHtml(payload.projectName),
+      branch: escapeHtml(payload.branch),
+      commitHash: escapeHtml(payload.commitHash.slice(0, 8)),
+      author: escapeHtml(payload.author),
+      status: escapeHtml(payload.status),
+      logUrl: escapeHtml(logUrl.href),
+      transcendStatus: {
+        ...payload.transcendStatus,
+        violations: payload.transcendStatus.violations.map(escapeHtml),
+      },
+    };
     const statusColor = p.status === 'SUCCESS' ? '#00ff9d' : '#ff0055';
     const statusBg = p.status === 'SUCCESS' ? '#002b1a' : '#330011';
 
@@ -185,7 +207,7 @@ export class DispatchService {
     </div>
     <div class="content">
       <p style="color: #cbd5e1; margin-top: 0;">Automated pipeline execution finished for <strong>${p.projectName}</strong>.</p>
-      
+
       <div class="grid">
         <div class="card">
           <div class="card-label">Target Branch</div>
@@ -193,7 +215,7 @@ export class DispatchService {
         </div>
         <div class="card">
           <div class="card-label">Commit Hash</div>
-          <div class="card-value">${p.commitHash.slice(0, 8)}</div>
+          <div class="card-value">${p.commitHash}</div>
         </div>
         <div class="card">
           <div class="card-label">Execution Duration</div>
@@ -211,8 +233,8 @@ export class DispatchService {
       <div class="card" style="margin-bottom: 16px;">
         <div class="card-label">Code Diff Summary</div>
         <div class="card-value" style="color: #38bdf8;">
-          ${p.codeDiffSummary.filesChanged} files changed | 
-          <span style="color: #4ade80;">+${p.codeDiffSummary.insertions}</span> | 
+          ${p.codeDiffSummary.filesChanged} files changed |
+          <span style="color: #4ade80;">+${p.codeDiffSummary.insertions}</span> |
           <span style="color: #f87171;">-${p.codeDiffSummary.deletions}</span>
         </div>
       </div>
@@ -233,7 +255,7 @@ export class DispatchService {
           : `
       <div class="card" style="border-color: #059669; background-color: #022c22;">
         <div class="card-label" style="color: #34d399;">Transcend Guard</div>
-        <div class="card-value" style="color: #6ee7b7;">✓ Zero policy violations detected</div>
+        <div class="card-value" style="color: #6ee7b7;">${p.transcendStatus.evaluated ? '✓ Zero policy violations detected' : 'Not evaluated'}</div>
       </div>
       `
       }

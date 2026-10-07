@@ -10,7 +10,7 @@ async function runMigrations() {
   logger.info('📡 Running database migrations...');
 
   return new Promise((resolve, reject) => {
-    const proc = spawn('prisma', ['db', 'push', '--accept-data-loss'], {
+    const proc = spawn('prisma', ['db', 'push'], {
       stdio: 'inherit',
       shell: true,
     });

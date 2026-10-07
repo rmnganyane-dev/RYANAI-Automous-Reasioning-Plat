@@ -1,5 +1,3 @@
-// File path: ./tailwind.config.js
-
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -10,10 +8,10 @@ export default {
     extend: {
       colors: {
         sovereign: {
-          dark: '#020617', // Slate 950
-          primary: '#3b82f6', // Blue 500
-          accent: '#10b981', // Emerald 500
-          panel: '#1e293b', // Slate 800
+          dark: '#020617',    // bg-sovereign-dark, text-sovereign-dark
+          primary: '#3b82f6', // bg-sovereign-primary, border-sovereign-primary
+          accent: '#10b981',  // bg-sovereign-accent, text-sovereign-accent
+          panel: '#1e293b',   // bg-sovereign-panel
         }
       },
       fontFamily: {

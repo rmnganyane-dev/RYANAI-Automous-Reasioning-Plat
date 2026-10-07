@@ -1,54 +1,8 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["DOM", "DOM.Iterable", "ES2022"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "jsx": "react-jsx",
-    "resolveJsonModule": true,
-    "allowJs": true,
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "allowSyntheticDefaultImports": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"],
-      "@/components/*": ["./src/components/*"],
-      "@/pages/*": ["./src/pages/*"],
-      "@/services/*": ["./src/services/*"],
-      "@/lib/*": ["./src/lib/*"],
-      "@/store/*": ["./src/store/*"],
-      "@/hooks/*": ["./src/hooks/*"],
-      "@/types/*": ["./src/types/*"],
-      "@/config/*": ["./src/config/*"],
-      "@/utils/*": ["./src/utils/*"],
-      "@/server/*": ["./src/server/*"],
-      "@/mcp/*": ["./src/mcp/*"],
-      "@/api/*": ["./src/api/*"]
-    },
-    "types": ["node", "vite/client"],
-    "composite": true,
-    "incremental": true
-  },
-  "include": ["src/**/*", "scripts/**/*"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "build",
-    "target",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/*.spec.ts",
-    "**/*.spec.tsx"
-  ],
+  "files": [],
   "references": [
+    { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.server.json" },
-    { "path": "./tsconfig.app.json" }
+    { "path": "./tsconfig.mcp.json" }
   ]
 }

@@ -1,28 +1,23 @@
-FROM node:22-alpine
+FROM node:22-alpine AS builder
 
-# Set environment to production
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+FROM node:22-alpine AS runner
+
+WORKDIR /app
 ENV NODE_ENV=production
-WORKDIR /usr/src/app
 
-# Copy dependency files first for better layer caching
-COPY package*.json npm-shrinkwrap.json* ./
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
-# Install production dependencies
-RUN npm ci --only=production --silent
-
-# Copy application code
-COPY . .
-
-# Set correct permissions for the non-root user
-RUN chown -R node:node /usr/src/app
-
-# Run as non-root user for security
+COPY --from=builder --chown=node:node /app/dist ./dist
 USER node
 
-EXPOSE 3000
-
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" || exit 1
-
-CMD ["npm", "start"]
+CMD ["node", "dist/main.js"]

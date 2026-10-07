@@ -1,11 +1,10 @@
 // src/engine/agentWorkers.ts
-import { primaryBrain, secondaryBrain, logicBrain } from '../config/brains';
+import { secondaryBrain, logicBrain } from '../config/brains';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 export interface AgentTaskResult {
   agentName: string;
   output: string;
-  confidence: number;
 }
 
 export class RyanAIAgentWorkers {
@@ -26,8 +25,7 @@ export class RyanAIAgentWorkers {
 
     return {
       agentName: "SecuritySentinel",
-      output: response.content.toString(),
-      confidence: 0.96
+      output: response.content.toString()
     };
   }
 
@@ -48,8 +46,7 @@ export class RyanAIAgentWorkers {
 
     return {
       agentName: "PerformanceProfiler",
-      output: response.content.toString(),
-      confidence: 0.94
+      output: response.content.toString()
     };
   }
 }

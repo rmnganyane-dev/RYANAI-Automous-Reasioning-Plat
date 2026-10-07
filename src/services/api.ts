@@ -1,6 +1,7 @@
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
 // File path: ./src/services/api.ts
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:9090";
+import { API_BASE_URL } from '../lib/apiBaseUrl';
 
 export interface ReasonResponse {
   success: boolean;
@@ -27,18 +28,23 @@ export async function fetchSystemHealth(): Promise<SystemHealth> {
   return response.json();
 }
 
-export async function executeAgentReasoning(prompt: string): Promise<ReasonResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/reason`, {
-    method: "POST",
+export async function executeAgentReasoning(
+  prompt: string,
+): Promise<ReasonResponse> {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/reason`, {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({ prompt }),
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error((errorData as any).error || `Reasoning execution failed with status: ${response.status}`);
+    throw new Error(
+      (errorData as { error?: string } | null)?.error ||
+        `Reasoning execution failed with status: ${response.status}`,
+    );
   }
 
   return response.json();

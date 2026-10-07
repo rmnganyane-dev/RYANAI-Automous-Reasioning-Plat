@@ -85,8 +85,8 @@ export function useRyanEngine() {
       const errorMsgObj: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Error executing reasoning pipeline: ${errorMessage}. Ensure Fastify server is running on port 9090.`,
-        reasoningSteps: ["Gateway connection error", "Falling back to local fallback buffer"],
+        content: `Error executing reasoning pipeline: ${errorMessage}. Check the API service and provider configuration.`,
+        reasoningSteps: ["API or model provider request failed"],
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, errorMsgObj]);

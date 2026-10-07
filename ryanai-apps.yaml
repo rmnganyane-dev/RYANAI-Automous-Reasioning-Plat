@@ -1,0 +1,10 @@
+# Namespace for the RyanAI stack.
+# Create secrets out-of-band (never commit real values):
+#   kubectl -n ryanai-system create secret generic ryanai-secrets \
+#     --from-literal=DB_PASSWORD="$(openssl rand -hex 24)" \
+#     --from-literal=REDIS_PASSWORD="$(openssl rand -hex 24)" \
+#     --from-literal=JWT_SECRET="$(openssl rand -hex 32)"
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ryanai-system

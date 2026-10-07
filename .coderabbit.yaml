@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+early_access: true
+
+inheritance: true
+
+reviews:
+  high_level_summary_in_walkthrough: true
+  auto_apply_labels: true
+  poem: true
+  finishing_touches:
+    simplify:
+      enabled: true
+    custom:
+      - enabled: true
+        name: clean up
+        instructions: Test
+
+knowledge_base:
+  opt_out: true
+  automatic_linking_mode: enabled

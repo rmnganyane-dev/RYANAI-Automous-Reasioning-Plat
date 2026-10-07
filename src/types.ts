@@ -1,8 +1,8 @@
 export interface TelemetryData {
-  cpuUsage: number;
+  cpuUsage: number | null;
   memoryUsage: number;
-  networkLatency: number;
-  activeThreads: number;
+  networkLatency: number | null;
+  activeThreads: number | null;
 }
 
 export interface LogEntry {

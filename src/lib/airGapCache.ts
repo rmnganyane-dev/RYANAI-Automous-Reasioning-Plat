@@ -1,5 +1,3 @@
-// File path: src/lib/airGapCache.ts
-
 const DB_NAME = 'ryan_ai_airgap_cache';
 const STORE_NAME = 'vectors';
 const DB_VERSION = 1;
@@ -33,13 +31,15 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 async function getKey(): Promise<CryptoKey> {
+  // Preserve the existing on-disk format. This application-wide key provides
+  // obfuscation, not protection against someone with access to this application.
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     enc.encode('RYANAI-AIRGAP-STATIC-SALT-KEY-2026'),
     { name: 'PBKDF2' },
     false,
-    ['deriveKey']
+    ['deriveKey'],
   );
   return crypto.subtle.deriveKey(
     {
@@ -51,56 +51,64 @@ async function getKey(): Promise<CryptoKey> {
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['encrypt', 'decrypt']
+    ['encrypt', 'decrypt'],
   );
+}
+
+async function withStore<T>(
+  mode: IDBTransactionMode,
+  operation: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
+  const database = await openDB();
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, mode);
+      const request = operation(transaction.objectStore(STORE_NAME));
+      // Resolve only after commit, so a successful request followed by an abort
+      // cannot be reported as a successful write.
+      transaction.oncomplete = () => resolve(request.result);
+      transaction.onabort = () =>
+        reject(transaction.error ?? new Error('Cache transaction aborted'));
+      transaction.onerror = () => reject(transaction.error ?? request.error);
+    });
+  } finally {
+    database.close();
+  }
 }
 
 export async function saveVector(entry: VectorEntry): Promise<void> {
-  const database = await openDB();
   const key = await getKey();
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const payload = new TextEncoder().encode(JSON.stringify(entry.vector));
-  
-  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, payload);
-
-  return new Promise<void>((resolve, reject) => {
-    const record: StoredVectorRecord = { 
-      id: entry.id, 
-      iv, 
-      ciphertext, 
-      metadata: entry.metadata || {} 
-    };
-    const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(record);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  }).finally(() => {
-    database.close();
-  });
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    payload,
+  );
+  const record: StoredVectorRecord = {
+    id: entry.id,
+    iv,
+    ciphertext,
+    metadata: entry.metadata,
+  };
+  await withStore('readwrite', (store) => store.put(record));
 }
 
 export async function loadVector(id: string): Promise<VectorEntry | null> {
-  const database = await openDB();
-  const key = await getKey();
-
-  const record = await new Promise<StoredVectorRecord | undefined>((resolve, reject) => {
-    const request = database.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(id);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-
-  if (!record) {
-    database.close();
-    return null;
-  }
-
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: record.iv },
-    key,
-    record.ciphertext
+  const record = await withStore<StoredVectorRecord | undefined>(
+    'readonly',
+    (store) => store.get(id),
   );
+  if (!record) return null;
 
-  database.close();
-  
+  const key = await getKey();
+  const iv = new Uint8Array(record.iv.length);
+  iv.set(record.iv);
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    record.ciphertext,
+  );
   return {
     id: record.id,
     vector: JSON.parse(new TextDecoder().decode(decrypted)),
@@ -109,29 +117,16 @@ export async function loadVector(id: string): Promise<VectorEntry | null> {
 }
 
 export async function deleteVector(id: string): Promise<void> {
-  const database = await openDB();
-  return new Promise<void>((resolve, reject) => {
-    const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(id);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  }).finally(() => {
-    database.close();
-  });
+  await withStore('readwrite', (store) => store.delete(id));
 }
 
 export async function clearVectorCache(): Promise<void> {
-  const database = await openDB();
-  return new Promise<void>((resolve, reject) => {
-    const request = database.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).clear();
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  }).finally(() => {
-    database.close();
-  });
+  await withStore('readwrite', (store) => store.clear());
 }
 
 export async function clearCache(): Promise<void> {
-  return clearVectorCache();
+  await clearVectorCache();
+  await airGapCache.clear();
 }
 
 interface CacheEntry<T = unknown> {
@@ -150,7 +145,7 @@ export class AirGapCache {
   async get<T = unknown>(key: string): Promise<T | null> {
     const entry = this.store.get(key);
     if (!entry) return null;
-    if (Date.now() > entry.expiry) {
+    if (Date.now() >= entry.expiry) {
       this.store.delete(key);
       return null;
     }

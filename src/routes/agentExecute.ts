@@ -7,7 +7,7 @@ const emergencyVoiceAlert = new EmergencyVoiceAlertService();
 
 export async function agentExecuteRoutes(fastify: FastifyInstance) {
   fastify.post('/api/v1/agent/execute', async (request: FastifyRequest, reply: FastifyReply) => {
-    const inputPayload = request.body as Record<string, any>;
+    const inputPayload = request.body as { pid?: number; command?: string };
     const targetPid = inputPayload.pid || request.raw.socket.remotePort || Math.floor(Math.random() * 8000 + 1000);
     const attemptedCommand = inputPayload.command || 'unknown_execution';
 

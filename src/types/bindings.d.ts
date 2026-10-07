@@ -10,7 +10,7 @@ declare module 'bindings' {
    * Loads a compiled native C++ addon module.
    * @param nameOrOptions - Module name string or configuration options object.
    */
-  function bindings(nameOrOptions: string | BindingsOptions): any;
+  function bindings(nameOrOptions: string | BindingsOptions): unknown;
 
   namespace bindings {}
 

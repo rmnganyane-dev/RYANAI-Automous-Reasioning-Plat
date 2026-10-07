@@ -5,34 +5,37 @@ $env:Path += ";$env:USERPROFILE\.cargo\bin"
 
 try {
     Write-Host "=== 1. Preparing build dependencies ===" -ForegroundColor Cyan
-    pnpm install --frozen-lockfile
-    if ($LASTEXITCODE -ne 0) { throw "pnpm install failed with exit code $LASTEXITCODE" }
+    npm.cmd ci --legacy-peer-deps
+    if ($LASTEXITCODE -ne 0) { throw "npm ci failed with exit code $LASTEXITCODE" }
 
     cargo fetch --manifest-path src-tauri/Cargo.toml
     if ($LASTEXITCODE -ne 0) { throw "cargo fetch failed with exit code $LASTEXITCODE" }
 
-    Write-Host "=== 2. Validating & building frontend ===" -ForegroundColor Cyan
+    Write-Host "=== 2. Validating & building frontend & backend ===" -ForegroundColor Cyan
     
-    # Strict TypeScript check
-    pnpm run typecheck
+    # Validate the web and API projects separately before bundling the desktop app.
+    npm.cmd run typecheck
     if ($LASTEXITCODE -ne 0) { throw "TypeScript validation failed with exit code $LASTEXITCODE" }
 
-    # Non-blocking ESLint check
-    Write-Host "Running ESLint advisory check..." -ForegroundColor Yellow
-    $ErrorActionPreference = "Continue"
-    pnpm run lint -- --fix
-    $ErrorActionPreference = "Stop"
+    npm.cmd run build:server
+    if ($LASTEXITCODE -ne 0) { throw "API build failed with exit code $LASTEXITCODE" }
 
-    # Production web build
-    pnpm run build
-    if ($LASTEXITCODE -ne 0) { throw "Frontend build failed with exit code $LASTEXITCODE" }
+    npm.cmd run build
+    if ($LASTEXITCODE -ne 0) { throw "Web build failed with exit code $LASTEXITCODE" }
+
+    npm.cmd test
+    if ($LASTEXITCODE -ne 0) { throw "Tests failed with exit code $LASTEXITCODE" }
 
     Write-Host "=== 3. Building Tauri installers ===" -ForegroundColor Cyan
-    pnpm run tauri build
+    npm.cmd run build:desktop
     if ($LASTEXITCODE -ne 0) { throw "Tauri installer build failed with exit code $LASTEXITCODE" }
 
     Write-Host "=== Build complete ===" -ForegroundColor Green
     Write-Host "Installers generated at: $root\src-tauri\target\release\bundle\" -ForegroundColor Yellow
+}
+catch {
+    Write-Error "Build pipeline failed: $_"
+    exit 1
 }
 finally {
     Pop-Location

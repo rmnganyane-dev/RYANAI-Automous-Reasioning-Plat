@@ -1,26 +1,42 @@
 import { FastifyPluginAsync } from 'fastify';
-import { reasoningAgent } from '../../agent/engine';
+import { getReasoningAgent } from '../../agent/engine.js';
 
 export const reasonPlugin: FastifyPluginAsync = async (fastify) => {
-  fastify.post('/api/reason', async (request, reply) => {
-    const { prompt } = request.body as { prompt: string };
+  fastify.post<{ Body: { prompt?: string; model?: string } }>('/api/reason', async (request, reply) => {
+    const prompt = request.body?.prompt?.trim();
+    if (!prompt) {
+      return reply.code(400).send({ success: false, error: 'A non-empty prompt is required' });
+    }
 
     try {
-      const result = await reasoningAgent.invoke({
+      const result = await getReasoningAgent(request.body?.model).invoke({
         messages: [{ role: 'user', content: prompt }],
       });
 
       const lastMessage = result.messages[result.messages.length - 1];
+      const output = typeof lastMessage?.content === 'string'
+        ? lastMessage.content
+        : JSON.stringify(lastMessage?.content ?? '');
+      const reasoningTrace = result.messages.map((message: { content: unknown }) =>
+        typeof message.content === 'string'
+          ? message.content
+          : JSON.stringify(message.content) ?? ''
+      );
 
       return {
         success: true,
+        objective: prompt,
+        output: output ?? '',
+        reasoningTrace,
         engine: 'RyanAI LangGraph ReAct',
-        response: lastMessage.content,
-        trace: result.messages,
+        response: output ?? '',
+        trace: reasoningTrace,
+        timestamp: new Date().toISOString(),
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       reply.status(500);
-      return { success: false, error: err.message };
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      return { success: false, error: errorMessage };
     }
   });
 };

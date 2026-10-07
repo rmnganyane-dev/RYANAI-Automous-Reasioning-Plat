@@ -17,11 +17,11 @@ export async function githubRoutes(fastify: FastifyInstance) {
         branch: payload.branch,
         filesPushed: payload.files.length,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       fastify.log.error(error, 'GitHub ship operation failed');
       return reply.status(500).send({
         error: 'GITHUB_SHIP_FAILED',
-        message: error.message,
+        message: (error instanceof Error ? error.message : String(error)),
       });
     }
   });
@@ -31,8 +31,8 @@ export async function githubRoutes(fastify: FastifyInstance) {
     try {
       const pr = await shipper.createPullRequest(req.body);
       return reply.send({ success: true, pr });
-    } catch (error: any) {
-      return reply.status(500).send({ error: error.message });
+    } catch (error: unknown) {
+      return reply.status(500).send({ error: (error instanceof Error ? error.message : String(error)) });
     }
   });
 
@@ -41,8 +41,8 @@ export async function githubRoutes(fastify: FastifyInstance) {
     try {
       const release = await shipper.createRelease(req.body);
       return reply.send({ success: true, release });
-    } catch (error: any) {
-      return reply.status(500).send({ error: error.message });
+    } catch (error: unknown) {
+      return reply.status(500).send({ error: (error instanceof Error ? error.message : String(error)) });
     }
   });
 }

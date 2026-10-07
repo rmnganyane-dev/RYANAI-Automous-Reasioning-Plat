@@ -1,8 +1,49 @@
 # 🚀 RyanAI: Autonomous Reasoning Platform
 
-**Status**: ✅ Production Ready | **Version**: 1.0.0 | **Build**: Complete
+## User authentication
 
-> **Enterprise-grade, multi-model agentic reasoning engine** engineered for dynamic intent classification, LangGraph ReAct loop orchestration, Model Context Protocol (MCP) integrations, and high-performance provider routing.
+The public landing page links to **Sign in** and **Create account**. Dashboard,
+cockpit, and workspace require a Supabase email/password session. Sign-up may
+require email confirmation depending on your Supabase project settings; users
+return to sign in after confirming. Sign-out clears the browser session and
+revokes its refresh tokens through Supabase. Existing access tokens follow
+Supabase's expiry policy; use a suitably short JWT lifetime for your deployment.
+
+Configure the same Supabase project on both sides:
+
+- Browser build: `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- API runtime: `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`.
+- In Supabase Auth, enable email/password sign-up, configure your Site URL and
+  allowed redirect URLs, and configure production email delivery.
+- Apply the repository's `supabase/migrations` to that project so conversations,
+  messages, profiles, and memory use the existing per-user row-level policies.
+
+Never put a Supabase secret/service-role key into a `VITE_` setting. Missing
+configuration blocks protected screens and APIs; it does not enable demo access.
+Local notes and conversation caches are namespaced by account; old unowned demo
+storage is retained in the browser but is not automatically assigned to a user.
+Vite settings are embedded at build time, so rebuild the frontend after setting
+them. Docker Compose forwards API settings and browser build arguments separately.
+
+API clients send `Authorization: Bearer <Supabase access token>`. The API verifies
+users with Supabase Auth on each HTTP request. Normal accounts can use reasoning;
+approvals, communications, metrics, and shared WebSocket channels require
+`app_metadata.role = "admin"`, assigned through a trusted Supabase admin process.
+Self-editable `user_metadata` does not grant privileges. `/api/auth/verify` returns
+the verified identity. The former shared-password `/api/auth/login` and cookie
+logout endpoint return HTTP 410; use Supabase Auth instead.
+
+Health endpoints remain public. Slack callbacks retain signature verification;
+Twilio callbacks require `TWILIO_AUTH_TOKEN` and the exact public
+`TWILIO_WHATSAPP_WEBHOOK_URL` configured in Twilio. Browser sessions are not a
+substitute for webhook signatures. WebSocket upgrades require an admin bearer
+header (no tokens in query strings) and reconnect after five minutes; the current
+browser UI uses authenticated HTTP/SSE for reasoning.
+
+
+**Status**: Active development | **Version**: 1.0.0
+
+> **Agentic reasoning platform** with a React/Vite frontend, Fastify API, LangGraph reasoning, optional MCP integrations, and Docker-based PostgreSQL/Redis services.
 >
 > **Attribution**: Named in honor of Mukhethwa Ryan Ganyane. Developed by RMN Ganyane (Pty) Ltd.
 
@@ -10,18 +51,20 @@
 
 ## 🎯 Key Features
 
-- ✅ **LangGraph ReAct Orchestration** - State-machine architecture with deterministic intent parsing, tool routing, and autonomous task execution
-- ✅ **Multi-Model Gateway Routing** - Configurable fallback supporting Nvidia Nemotron, Qwen, Claude, GPT-4 with local inference guarantees
-- ✅ **Model Context Protocol (MCP) Native** - Integrates external tools and cloud providers via HTTP/SSE transports
-- ✅ **Type-Safe Pipeline** - Strict TypeScript compilation with automated build verification
-- ✅ **Real-time Streaming** - WebSocket bridge for live reasoning updates and multi-turn conversations
-- ✅ **Production Docker** - Multi-stage builds, PostgreSQL + Redis infrastructure, health checks
-- ✅ **Automated CI/CD** - Built-in `npm run ship` pipeline with validation and Git automation
+- **LangGraph ReAct orchestration** - API-side agent orchestration; live reasoning requires a configured provider.
+- **Provider-backed reasoning** - Configure an OpenAI-compatible model endpoint and server-side credentials; unavailable local inference is not claimed.
+- **Model Context Protocol (MCP)** - Standalone stdio and authenticated Streamable HTTP service.
+- **TypeScript validation** - Typecheck, lint, build, and tests are available; run them before deployment.
+- **WebSocket endpoint** - The API includes a WebSocket bridge.
+- **Docker Compose stack** - Multi-stage builds for the API and web frontend with PostgreSQL and Redis dependencies.
+- **Automated CI/CD** - GitHub Actions validation and optional, explicitly configured deployments
 - ✅ **Desktop & Web** - Tauri v2 desktop shell + Vite React frontend + Nginx production server
 
 ---
 
 ## 📊 Architecture
+
+The frontend route manifest lives in [`app/routes.json`](./app/routes.json); the active React app consumes it while implementation remains under `src/`. Canonical RyanAI routes and active skills are described in [`src/config/core.ts`](./src/config/core.ts), and the model allowlist is backed by [`models/catalog.json`](./models/catalog.json). Web builds do not require the legacy `RYANAI` gitlink. Supabase is optional: set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to enable it (`VITE_SUPABASE_ANON_KEY` remains supported for existing setups); otherwise the workspace uses local storage. Only browser-safe public keys belong in these Vite variables. The former `ryanai-core.yaml` was removed because it included hard-coded development credentials. The C++ project under `native/local-inference` uses an optional CMake build. The legacy Node addon is also opt-in (see [Optional native Node addon](#optional-native-node-addon)); neither build runs during npm install or enables GPU inference by itself.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -31,12 +74,12 @@
 │   Frontend     │      Backend     │    Infrastructure       │
 │   (React 18)   │    (Fastify)     │    (Docker Compose)     │
 │                │                  │                          │
-│ • TypeScript   │ • Express +      │ • PostgreSQL 16         │
-│ • Vite         │   Fastify        │ • Redis 7               │
-│ • Tailwind CSS │ • LangGraph      │ • pgvector              │
-│ • Framer Motion│ • WebSocket      │ • Nginx                 │
-│ • Tauri v2     │ • MCP Server     │ • Multi-stage Docker    │
-│                │ • Auth/JWT       │                          │
+│ • TypeScript   │ • Fastify        │ • PostgreSQL 16         │
+│ • Vite         │ • LangGraph      │ • Redis 7               │
+│ • Tailwind CSS │ • WebSocket      │ • pgvector              │
+│ • Framer Motion│ • MCP service    │ • Nginx                 │
+│ • Tauri v2     │ • Auth/JWT       │ • Multi-stage Docker    │
+│                │                  │                          │
 └────────────────┼──────────────────┼──────────────────────────┘
                  │ Shared Types & Config (src/shared/)
                  │ Environment (.env)
@@ -44,17 +87,80 @@
 
 ---
 
-## 🚀 Quick Start (2 Minutes)
+## 🚀 Quick Start
 
 ### Prerequisites
 - Docker Desktop installed
-- Node.js 20+
-- PowerShell (Windows) or bash (Mac/Linux)
+- Node.js 22.12+ and npm 10+
+- PowerShell or Command Prompt (Windows), or bash (Mac/Linux)
+- Rust toolchain only when building the Tauri desktop application
+- Python 3.10+ only for Python tooling and workflow tests
+- CMake and a C++17 compiler only for `native/local-inference`
 
-### Step 1: Start Everything
-```bash
-npm run docker:up          # Builds and starts all containers
+### Windows command entry
+
+Paste only the command, without a trailing `# description`. Command Prompt does not
+interpret `#` as a comment: npm passes it and the following words to TypeScript,
+ESLint, Vite, or concurrently. Use a new terminal for each foreground service.
+
+If `npm run install:all` is missing, your checkout has an older `package.json`.
+Inspect `git status` and `git branch --show-current`, preserve local changes, and
+synchronize the intended branch before following these instructions.
+
+### Step 1: Configure and start the stack
+
+**Windows Command Prompt:**
+
+```cmd
+if not exist .env copy .env.example .env
+notepad .env
 ```
+
+**PowerShell:**
+
+```powershell
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+notepad .env
+```
+
+**Bash (Linux/macOS):**
+
+```bash
+[ -f .env ] || cp .env.example .env
+```
+
+Edit `.env` before starting Docker. Replace `DB_PASSWORD`, `REDIS_PASSWORD`,
+`JWT_SECRET`, and `MCP_AUTH_TOKEN` with independent random values. This command
+works in all three shells and prints four values you can use, one per setting:
+
+```text
+node -e "for(let i=0;i<4;i++) console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+For local Node processes, also put the corresponding database/cache passwords
+into `DATABASE_URL` and `REDIS_URL`. Save `.env`, then run:
+
+```text
+docker compose config --quiet
+npm run docker:up
+```
+
+Continue only after the configuration check succeeds. Compose checks all four
+required variables even when starting only PostgreSQL and Redis.
+
+If Vite reports a missing `RYANAI/core.json` or `src/lib/supabase` module,
+synchronize the current branch with `origin/main` after preserving local changes.
+The merged fix uses the tracked `app/routes.json` and explicitly loads
+`CommandCenter.tsx`. Restart the development processes after updating the files.
+
+`Dockerfile`, `Dockerfile.api`, `Dockerfile.server`, and `Dockerfile.monorepo` all
+build and start the same compiled API launcher. The web image renders its Nginx
+template at startup; `PORT` defaults to 80 and `API_HOST`/`API_PORT` default to
+`api`/3000. Compose fixes these container ports independently of local development
+ports. Browser Supabase settings are supplied as public `VITE_SUPABASE_*` build
+arguments; local `.env` files are excluded from the web build inputs.
+
+Set `OPENAI_API_KEY` in `.env` to enable live model reasoning. Without a provider key, the UI and API still start, but reasoning requests return an explicit configuration error.
 
 ### Step 2: Access the Platform
 - **Frontend**: http://localhost:9090
@@ -63,14 +169,88 @@ npm run docker:up          # Builds and starts all containers
 
 ### Step 3: Verify It Works
 ```bash
-npm run docker:health      # Check API endpoint
-npm run test:integration   # Run verification tests
+npm run docker:health
+npm run startup:verify
+npm run test:integration
 ```
 
 ### Stop Everything
 ```bash
-npm run docker:down        # Stop all containers
+npm run docker:down
 ```
+
+The API and tunnel load the root `.env` before reading configuration. Existing
+shell and Docker Compose environment variables take precedence; `.env` is optional
+when those supply configuration. Local `REDIS_URL` must contain the Redis password
+(and ACL username if required); setting `REDIS_PASSWORD` alone only configures
+Compose. Use the actual password, URL-encoded when necessary, rather than a literal
+`${REDIS_PASSWORD}` reference in `REDIS_URL`. The startup banner reports configuration
+presence, not successful authentication. For local API + Vite development, set
+`PORT=3001` in an existing `.env` copied from an older example; Compose supplies
+port 3000 to its API container independently. `API_BASE_URL` remains the Compose
+integration-check target (3000); set it to `http://localhost:3001` only when running
+integration checks against the local API.
+
+For local development, use `npm run dev:api` (API on port 3001 by default) and `npm run dev:web` (Vite on port 1420). Override ports portably in PowerShell with `$env:PORT='3002'; npm.cmd run dev:api` and `$env:VITE_PORT='5174'; npm.cmd run dev:web`; on bash, use `PORT=3002 npm run dev:api` and `VITE_PORT=5174 npm run dev:web`.
+
+For local Vite development, do not set `NODE_ENV=production` in `.env`; Vite controls development/production mode itself. Docker Compose runs the API in production without requiring this setting in `.env`. `npm run dev:tunnel` requires ngrok account authentication; set `NGROK_AUTHTOKEN` in the root `.env` or shell. The tunnel uses the same `PORT` value as the API (3001 by default for local development).
+
+### Codespaces and local development
+
+If `startup:verify` is missing or `dev` cannot find `scripts/dev-all.mjs`, inspect
+`git status` and synchronize your intended branch after preserving local changes.
+`npm run` lists available scripts; `npm run3` is not an npm command.
+
+The dev container includes Node 22 and Docker Compose. After updating its
+configuration, run **Codespaces: Rebuild Container** from the command palette.
+An existing container will not gain Docker until it is rebuilt. Confirm readiness:
+
+```bash
+node --version
+docker info
+docker compose version
+```
+
+Node must be 22.12 or newer. If `docker` is missing or its daemon is unavailable,
+resolve that before running any `docker:*` commands. Outside Codespaces, install
+and start Docker with Compose, or provide running PostgreSQL and Redis services
+and set their connection URLs in `.env`.
+
+For the API, Vite UI, and MCP development processes:
+
+```bash
+npm run install:all
+```
+
+Create `.env` from `.env.example` only if it does not already exist. Replace the
+four secret placeholders, and also replace the matching password portions of
+`DATABASE_URL` and `REDIS_URL`. Set `PORT=3001` and remove any old
+`NODE_ENV=production` line. Start only the database and cache containers, then
+keep this terminal running:
+
+```bash
+docker compose up -d --wait postgres redis
+npm run dev
+```
+
+Open http://localhost:1420 (or forward port 1420 in Codespaces). In a second terminal:
+
+```bash
+npm run startup:verify -- --local
+npm run test:integration -- --local
+npm run mcp:health
+```
+
+`--local` uses `PORT` (default 3001) and `VITE_PORT` (default 1420), overriding
+the Compose HTTP URLs in `.env`. Without it, checks use `API_BASE_URL` and
+`WEB_BASE_URL` (defaults 3000 and 9090). Both checks load `.env`; exported shell
+values take precedence. Redis must authenticate successfully before the API
+starts. A connection failure now exits with setup guidance instead of waiting
+for a Fastify plugin timeout. Integration checks fail if dependencies are down.
+
+Use Ctrl+C to stop development processes, then `npm run docker:down` to stop
+the database and cache containers. The Tauri desktop process is optional and
+should be started in its own terminal only when working on the desktop app.
 
 ---
 
@@ -119,12 +299,14 @@ scripts/                      # Build & development scripts
 ├── orchestrate.mjs         # Service orchestrator
 └── ... (12 more)
 
-docker-compose.yml          # Container orchestration
-Dockerfile                  # Frontend build (nginx)
-Dockerfile.api              # Backend build
+docker-compose.yml          # Web, API, PostgreSQL, and Redis services
+Dockerfile                  # API runtime
+Dockerfile.api              # API gateway runtime
+Dockerfile.server           # Reasoning API runtime
+Dockerfile.web              # Frontend build (Nginx)
 .dockerignore               # Docker exclusions
 .env.example                # Environment template
-package.json               # 60+ npm scripts
+package.json               # Build, development, and Docker scripts
 tsconfig.json              # TypeScript config
 vite.config.ts             # Vite config
 ```
@@ -135,27 +317,42 @@ vite.config.ts             # Vite config
 
 ### All Services at Once
 ```bash
-npm run dev                 # API (3001) + Web (5173) + MCP (8765)
+npm run dev
 ```
 
 ### Individual Services
 ```bash
-npm run dev:api             # Backend API only (port 3001)
-npm run dev:web             # Frontend UI only (port 5173)
-npm run dev:mcp             # MCP system server
-npm run dev:desktop         # Tauri desktop app
+npm run dev:api
+npm run dev:web
+npm run dev:mcp
+npm run dev:desktop
 ```
+
+### Install Dependencies for Local Development
+```bash
+npm run install:all
+```
+
+The root and app-specific `package-lock.json` files pin Node dependencies. Desktop dependencies are managed by Cargo; `requirements.txt` is currently empty because the Python tooling has no declared third-party packages.
 
 ### With Webhook Tunnel
 ```bash
-npm run dev:tunnel          # API + ngrok tunnel (for webhooks)
+npm run dev:tunnel
 ```
+
+### Optional dispatch notifications
+
+Pipeline notifications require explicit configuration: `TWILIO_ACCOUNT_SID`,
+`TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER`, and `DEFAULT_RECIPIENT_PHONE` for
+WhatsApp; `RESEND_API_KEY`, `DISPATCH_FROM_EMAIL`, and `DEFAULT_RECIPIENT_EMAIL`
+for email. Keep credentials in the server environment; do not use `VITE_` prefixes.
+Missing credentials are reported when a notification is requested.
 
 ### Type Checking & Validation
 ```bash
-npm run typecheck           # TypeScript type check
-npm run lint                # ESLint (0 warnings max)
-npm run validate            # Full check (typecheck + lint + build)
+npm run typecheck
+npm run lint
+npm run validate
 ```
 
 ---
@@ -171,22 +368,45 @@ npm run validate            # Full check (typecheck + lint + build)
 | `npm run docker:logs` | Stream logs from all containers |
 | `npm run docker:ps` | Show running containers |
 | `npm run docker:health` | Check API health endpoint |
+| `npm run startup:verify` | Check API, PostgreSQL, Redis, and frontend health |
 
 ### Services
-- **ryanai-api** (Port 3000): Fastify backend with WebSocket, REST, MCP
-- **ryanai-web** (Port 9090): Nginx serving React frontend
-- **ryanai-db** (Port 5432): PostgreSQL with pgvector for embeddings
-- **ryanai-redis** (Port 6379): Redis for caching and rate limiting
+- **api** (Port 3000): Fastify backend with WebSocket, REST, MCP, and LangGraph reasoning
+- **web** (Port 9090): Nginx serving the React frontend and proxying API calls
+- **postgres** (Port 5432): PostgreSQL with pgvector for embeddings
+- **redis** (Port 6379): Redis for caching and rate limiting
+
+The desktop shell and Render workflow worker remain separate applications. The standalone MCP service starts with Compose at `http://localhost:8765/mcp`; its health endpoint is `http://localhost:8765/health`. The Compose service binds only to loopback and requires `MCP_AUTH_TOKEN` in `.env`.
 
 ### Verify Everything Works
 ```bash
 docker compose ps                              # Show status
-curl http://localhost:3000/health | jq        # API health
+curl http://localhost:3000/health              # API health
 curl http://localhost:9090 | head -20         # Frontend
 
 # Or use the npm command
 npm run docker:health
+npm run mcp:health
 ```
+
+### MCP Server
+
+The standalone server supports stdio for editor/agent clients and Streamable HTTP for a live service:
+
+```bash
+npm run install:all
+npm run mcp:check
+npm run mcp:start
+npm run mcp:http
+npm run docker:up
+npm run mcp:health
+```
+
+`npm run mcp:start` occupies its terminal and reads MCP protocol messages from stdin;
+it does not accept shell commands. Stop it with Ctrl+C or open another terminal
+before running `npm run mcp:http` or other commands.
+
+For local HTTP use outside Compose, `MCP_HOST` defaults to `127.0.0.1`. Binding to a non-loopback interface requires an `MCP_AUTH_TOKEN` with at least 32 characters and a matching `MCP_ALLOWED_HOSTS` entry. Configure provider credentials with `NVIDIA_API_KEY` or `QWEN_API_KEY`; reasoning calls fail clearly if a key is not configured. MCP does not claim a local-model fallback unless one is actually running.
 
 ---
 
@@ -194,22 +414,29 @@ npm run docker:health
 
 ### Production Build
 ```bash
-npm run build               # TypeScript compilation + Vite build
+npm run build
+npm run build:server
 ```
 
 ### Type-Safe Pipeline
 ```bash
-npm run validate            # typecheck + lint + build
+npm run validate
 ```
 
-### Deploy to Production
+### Build Production Containers
 ```bash
-npm run ship                # validate + build + git commit + git push
+npm run ship
 ```
+
+For Vercel, set `VITE_API_BASE_URL` to the HTTPS origin of a separately hosted RyanAI API. Vercel hosts the static web frontend; it does not host this repository's API, PostgreSQL, or Redis services.
+
+GitHub Actions publishes production images after validation on the configured default branch. To enable the GitHub Actions Vercel deployment, configure repository secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`, plus repository variables `VERCEL_DEPLOY_ENABLED=true` and `VITE_API_BASE_URL` (the deployed API origin). The repository's [`vercel.json`](./vercel.json) sets `npm ci --legacy-peer-deps` as the install command and `npm run build:web` as the build command. Do not set `npm run build:web` as Vercel's install command. Older commits do not contain these configuration changes; deploy a commit that includes them.
+
+The scheduled and manually triggered smoke tests require `PROD_GATEWAY_URL` (the full API health URL, e.g. the API origin plus `/health`) and `PROD_FRONTEND_URL` secrets. Preview checks additionally require `PREVIEW_GATEWAY_URL` and `PREVIEW_FRONTEND_URL`.
 
 ### Windows Installers
 ```powershell
-npm run release             # Build Windows MSI + NSIS installers
+npm run release
 .\build-installer.ps1       # Alternative: PowerShell script
 ```
 
@@ -225,6 +452,8 @@ npm run release             # Build Windows MSI + NSIS installers
 | `npm run test:integration` | Integration test suite |
 | `npm run test:platform` | Platform-specific tests |
 
+`npm run test` runs the local Vitest suite. `npm run test:e2e` and `npm run test:integration` require the API and web stack to be running; integration tests also need reachable PostgreSQL and Redis configured with `DATABASE_URL` and `REDIS_URL`. These are commands to execute in your environment, not a claim that production deployment has been verified.
+
 ### Sandbox Test Console
 Open http://localhost:9090/sandbox.html to test:
 - API connectivity
@@ -239,18 +468,13 @@ Open http://localhost:9090/sandbox.html to test:
 
 ### Setup & Migrations
 ```bash
-npm run db:setup            # Full setup (generate + migrate)
-npm run db:generate         # Generate Prisma client
-npm run db:push             # Push schema to database
-npm run db:migrate          # Run migrations
+npm run db:setup
+npm run db:generate
+npm run db:push
+npm run db:migrate
 ```
 
-### Schema Includes
-- Users & authentication
-- Conversations & messages
-- Memory vault entries
-- Vector embeddings (pgvector)
-- Agent state checkpoints
+The `prisma/schema.prisma` schema currently targets SQLite for Prisma-generated client use. The Compose API separately connects to PostgreSQL via `pg.Pool`; PostgreSQL initialization is managed separately. Do not assume Prisma migrations create or migrate the Compose API's PostgreSQL tables.
 
 ---
 
@@ -270,12 +494,14 @@ HOST=0.0.0.0
 LOG_LEVEL=info
 
 # Database
-DATABASE_URL=postgresql://postgres:[REDACTED]@localhost:5432/ryanai
+DB_PASSWORD=replace-with-a-unique-password
+DATABASE_URL=postgresql://ryanai:${DB_PASSWORD}@localhost:5432/ryanai_db
 DB_MAX_CONNECTIONS=20
 DB_TIMEOUT_MS=2000
 
 # Redis
-REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=replace-with-a-different-password
+REDIS_URL=redis://:${REDIS_PASSWORD}@localhost:6379
 REDIS_TIMEOUT=5000
 
 # Authentication
@@ -287,10 +513,10 @@ API_BASE_URL=http://localhost:3000
 API_TIMEOUT=30000
 
 # LLM Providers
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4-turbo
-VITE_ANTHROPIC_API_KEY=sk-ant-...
-VITE_GOOGLE_API_KEY=...
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o
+ANTHROPIC_API_KEY=
+GOOGLE_API_KEY=
 
 # Optional Services
 NGROK_AUTHTOKEN=...                    # For webhook testing
@@ -331,11 +557,10 @@ TAURI_ENABLED=false
 - ✅ GitHub OAuth integration
 
 ### Security & Authentication
-- ✅ JWT-based authentication
-- ✅ Email sign-in
-- ✅ GitHub OAuth
-- ✅ Demo mode for testing
-- ✅ Session persistence
+- ✅ Supabase email/password sign-in and registration
+- ✅ Verified bearer sessions and administrator permissions
+- ✅ Session restoration and real sign-out
+- Authentication provider OAuth buttons and demo bypasses are not enabled.
 - ✅ Rate limiting (100 requests/minute)
 - ✅ CORS properly configured
 
@@ -355,12 +580,12 @@ npm run docker:up
 ```
 
 ### Port Already in Use
-**Problem**: EADDRINUSE on port 3000 or 5173
+**Problem**: EADDRINUSE on port 3000, 3001, 1420, or 9090
 
 **Solution**: Use different port
 ```bash
 PORT=3002 npm run dev:api              # Custom API port
-VITE_PORT=5174 npm run dev:web         # Custom web port
+npm run dev:web -- --port 1421
 ```
 
 ### Docker Won't Start
@@ -369,8 +594,8 @@ VITE_PORT=5174 npm run dev:web         # Custom web port
 **Solution**: Clean Docker state
 ```bash
 docker system prune -af                # Remove unused images/volumes
-npm run docker:down -v                 # Remove volumes
-npm run docker:up                      # Fresh build
+npm run docker:down -v
+npm run docker:up
 ```
 
 ### WebSocket Connection Failed
@@ -390,9 +615,9 @@ LOG_LEVEL=debug npm run dev:api
 
 **Solution**: Rebuild TypeScript cache
 ```bash
-npm run typecheck                      # Full type check
+npm run typecheck
 rm -rf dist node_modules/.cache       # Clear cache
-npm run validate                       # Full validation
+npm run validate
 ```
 
 ### Database Connection Issues
@@ -401,8 +626,8 @@ npm run validate                       # Full validation
 **Solution**: Verify services are running
 ```bash
 docker compose ps                      # Show container status
-npm run docker:logs                    # View logs
-npm run docker:health                  # Check health
+npm run docker:logs
+npm run docker:health
 ```
 
 ---
@@ -411,79 +636,79 @@ npm run docker:health                  # Check health
 
 ### Development Scripts (11)
 ```bash
-npm run dev                 # All services
-npm run dev:all            # Alias
-npm run dev:api            # Backend only
-npm run dev:web            # Frontend only
-npm run dev:mcp            # MCP server
-npm run dev:desktop        # Tauri desktop
-npm run dev:tunnel         # API + ngrok
-npm run start              # Production start
-npm run preview            # Vite preview
-npm run orchestrate        # Dependency-ordered startup
-npm run tunnel             # Standalone ngrok
+npm run dev
+npm run dev:all
+npm run dev:api
+npm run dev:web
+npm run dev:mcp
+npm run dev:desktop
+npm run dev:tunnel
+npm run start
+npm run preview
+npm run orchestrate
+npm run tunnel
 ```
 
 ### Docker & Infrastructure (9)
 ```bash
-npm run docker:up          # Build + start
-npm run docker:build       # Build only
-npm run docker:down        # Stop all
-npm run docker:logs        # Stream logs
-npm run docker:ps          # Show containers
-npm run docker:health      # Check health
-npm run infra:up           # Legacy alias
-npm run infra:down         # Legacy alias
-npm run infra:logs         # Legacy alias
+npm run docker:up
+npm run docker:build
+npm run docker:down
+npm run docker:logs
+npm run docker:ps
+npm run docker:health
+npm run infra:up
+npm run infra:down
+npm run infra:logs
 ```
 
 ### Build & Validation (8)
 ```bash
-npm run build              # Production build
-npm run typecheck          # Type checking
-npm run lint               # ESLint
-npm run validate           # Full validation
-npm run build:client       # Frontend build
-npm run build:server       # Backend build
-npm run build:api          # API build
-npm run build:desktop      # Tauri build
+npm run build
+npm run typecheck
+npm run lint
+npm run validate
+npm run build:client
+npm run build:server
+npm run build:api
+npm run build:desktop
 ```
 
 ### Testing (4)
 ```bash
-npm run test               # All tests
-npm run test:e2e           # E2E tests
-npm run test:integration   # Integration tests
-npm run test:platform      # Platform tests
+npm run test
+npm run test:e2e
+npm run test:integration
+npm run test:platform
 ```
 
 ### Database (4)
 ```bash
-npm run db:setup           # Full setup
-npm run db:generate        # Generate client
-npm run db:push            # Push schema
-npm run db:migrate         # Run migrations
+npm run db:setup
+npm run db:generate
+npm run db:push
+npm run db:migrate
 ```
 
 ### Advanced (25+)
 ```bash
-npm run mcp:check          # MCP validation
-npm run mcp:start          # Start MCP
-npm run mcp:system         # System MCP
-npm run cmake:configure    # CMake config
-npm run cmake:build        # CMake build
-npm run rust:fetch         # Cargo fetch
-npm run rust:check         # Cargo check
-npm run rust:build         # Cargo build
-npm run core:run           # Python main
-npm run core:check         # Python validation
-npm run tauri              # Tauri CLI
-npm run release            # Windows installer
-npm run ship               # Deploy pipeline
-npm run telemetry:collect  # Telemetry
+npm run mcp:check
+npm run mcp:start
+npm run mcp:system
+npm run cmake:configure
+npm run cmake:build
+npm run rust:fetch
+npm run rust:check
+npm run rust:build
+npm run core:run
+npm run core:check
+npm run tauri
+npm run release
+npm run ship
+npm run telemetry:collect
 ```
 
-**Full reference**: See `SCRIPTS_REFERENCE.md`
+**Full reference**: See [SCRIPTS_REFERENCE.md](./SCRIPTS_REFERENCE.md)
 
 ---
 
@@ -501,7 +726,7 @@ npm run telemetry:collect  # Telemetry
 - ⚠️ Enable HTTPS/TLS
 - ⚠️ Restrict CORS to your domain
 - ⚠️ Use environment secrets manager
-- ⚠️ Enable API authentication middleware
+- ✅ API authentication middleware enabled (configure Supabase before use)
 - ⚠️ Set up rate limiting rules
 - ⚠️ Regular security audits
 
@@ -554,9 +779,29 @@ system             System events
 ### Docker (Recommended)
 ```bash
 npm run docker:up
-# Deploy with docker-compose push to registry
 # Or: docker buildx build --push
 ```
+
+### Optional native Node addon
+
+Root `npm install` / `npm ci` skips automatic node-gyp compilation via
+`gypfile: false`. Vercel builds only the web frontend; dependency lifecycle
+scripts remain enabled (do not use `--ignore-scripts` as a workaround).
+
+To explicitly build the legacy Node addon on a host with Python, a C++ build
+toolchain, and the CUDA toolkit installed:
+
+```bash
+npm ci --legacy-peer-deps
+npm run native:addon:build
+```
+
+The addon build uses the declared `node-gyp` and `node-addon-api` development
+dependencies, so install dev dependencies on the build host. Its existing Linux
+configuration expects CUDA at `/usr/local/cuda`; Windows uses `CUDA_PATH` or the
+existing CUDA v12.0 default. The current target links the CUDA runtime but does
+not compile the CUDA kernels; this command alone does not enable GPU inference.
+This is separate from the optional CMake project (`npm run native:build`).
 
 ### AWS/GCP/Azure
 1. Build Docker image
@@ -640,7 +885,7 @@ For issues, questions, or feedback:
 
 **RyanAI Autonomous Reasoning Platform v1.0.0**
 
-✅ Production Ready | ✅ All Systems Operational | ✅ Fully Documented
+Status and supported behavior are documented above; run the validation commands before deployment.
 
 Built with:
 - React 18 + TypeScript
@@ -651,3 +896,9 @@ Built with:
 - LangGraph + MCP
 
 **Ready to deploy. Start now!** 🚀
+
+### Workspace patch safety
+
+The `self_patch_workspace` tool requires an approved isolated verifier and exclusive
+workspace ownership. See [workspace patching and recovery](docs/workspace-patching.md)
+and [verifier provisioning](docs/patch-verifier.md) before enabling it.

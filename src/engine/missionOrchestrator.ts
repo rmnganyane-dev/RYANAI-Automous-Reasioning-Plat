@@ -1,7 +1,5 @@
 // src/engine/missionOrchestrator.ts
 import { RyanAIDispatcher } from './dispatcher';
-import { RyanAIAutoDebugger } from './autoDebugger';
-import { RyanAISandbox } from './sandbox';
 import { RyanAIAgentWorkers } from './agentWorkers';
 
 export interface MissionContext {
@@ -57,9 +55,9 @@ export class RyanAIMissionOrchestrator {
       context.logs.push(`[Mission] Mission [${missionId}] executed successfully.`);
       
       return context;
-    } catch (error: any) {
+    } catch (error: unknown) {
       context.status = 'FAILED';
-      context.logs.push(`[Error] Mission failed: ${error.message}`);
+      context.logs.push(`[Error] Mission failed: ${(error instanceof Error ? error.message : String(error))}`);
       return context;
     }
   }

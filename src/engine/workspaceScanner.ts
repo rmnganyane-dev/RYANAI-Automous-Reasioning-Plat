@@ -34,8 +34,8 @@ export class RyanWorkspaceScanner {
             fileCount++;
           }
         }
-      } catch (err: any) {
-        console.warn(`[Workspace Scanner] Could not read directory ${dir}: ${err.message}`);
+      } catch (err: unknown) {
+        console.warn(`[Workspace Scanner] Could not read directory ${dir}: ${(err instanceof Error ? err.message : String(err))}`);
       }
     }
 

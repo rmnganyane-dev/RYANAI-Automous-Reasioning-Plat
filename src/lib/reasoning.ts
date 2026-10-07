@@ -1,29 +1,41 @@
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
 // src/lib/reasoning.ts
 // Autonomous reasoning engine integration
 
 import type { ModelId, ReasoningCallbacks } from './types.js';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+import { API_BASE_URL } from './apiBaseUrl';
+import { API_ROUTES } from '@/config/core';
 
 export async function streamReasoning(
   prompt: string,
   model: ModelId,
-  callbacks: ReasoningCallbacks
+  callbacks: ReasoningCallbacks,
 ): Promise<void> {
   try {
-    const response = await fetch(`${API_BASE}/api/reasoning/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const response = await authenticatedFetch(
+      `${API_BASE_URL}${API_ROUTES.streamPath}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          model,
+        }),
       },
-      body: JSON.stringify({
-        prompt,
-        model,
-      }),
-    });
+    );
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.statusText}`);
+      const errorBody = await response.text();
+      let message = response.statusText;
+      try {
+        const errorPayload = JSON.parse(errorBody) as { error?: string };
+        message = errorPayload.error || message;
+      } catch {
+        if (errorBody) message = errorBody.slice(0, 300);
+      }
+      throw new Error(`API error (${response.status}): ${message}`);
     }
 
     if (!response.body) {
@@ -33,6 +45,7 @@ export async function streamReasoning(
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let completed = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -45,30 +58,42 @@ export async function streamReasoning(
 
       for (const line of lines) {
         if (line.startsWith('data: ')) {
+          let data: Record<string, unknown>;
           try {
-            const data = JSON.parse(line.slice(6));
-
-            if (data.status === 'processing' && data.message) {
-              callbacks.onStep?.({
-                type: 'reasoning',
-                name: 'process',
-                result: data.message,
-              });
-            } else if (data.status === 'complete' && data.result) {
-              callbacks.onToken?.(data.result);
-              callbacks.onDone?.();
-            } else if (data.error) {
-              callbacks.onError?.(data.error);
-            }
+            data = JSON.parse(line.slice(6)) as Record<string, unknown>;
           } catch {
             if (line.trim()) {
               callbacks.onToken?.(line.trim());
             }
+            continue;
+          }
+
+          if (typeof data.error === 'string') {
+            throw new Error(data.error);
+          }
+          if (
+            data.status === 'processing' &&
+            typeof data.message === 'string'
+          ) {
+            callbacks.onStep?.({
+              type: 'reasoning',
+              name: 'process',
+              result: data.message,
+            });
+          } else if (
+            data.status === 'complete' &&
+            typeof data.result === 'string'
+          ) {
+            callbacks.onToken?.(data.result);
+            completed = true;
           }
         }
       }
     }
 
+    if (!completed) {
+      throw new Error('Reasoning stream ended before completion');
+    }
     callbacks.onDone?.();
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -76,19 +101,30 @@ export async function streamReasoning(
   }
 }
 
-export async function quickReason(prompt: string, model: ModelId): Promise<string> {
-  try {
-    const response = await fetch(`${API_BASE}/api/reason`, {
+export async function quickReason(
+  prompt: string,
+  model: ModelId,
+): Promise<string> {
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}${API_ROUTES.reasonPath}`,
+    {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, model }),
-    });
-
-    const data = await response.json();
-    return data.response || 'No response';
-  } catch (err) {
-    return `Error: ${err instanceof Error ? err.message : 'Unknown error'}`;
+    },
+  );
+  const data = (await response.json()) as {
+    success?: boolean;
+    output?: string;
+    response?: string;
+    error?: string;
+  };
+  if (!response.ok || !data.success) {
+    throw new Error(
+      data.error || `Reasoning request failed (HTTP ${response.status}).`,
+    );
   }
+  const output = data.output || data.response;
+  if (!output) throw new Error('Reasoning API returned an empty response.');
+  return output;
 }
