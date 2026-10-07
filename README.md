@@ -896,3 +896,9 @@ Built with:
 - LangGraph + MCP
 
 **Ready to deploy. Start now!** 🚀
+
+### Workspace patch safety
+
+The `self_patch_workspace` tool requires an approved isolated verifier and exclusive
+workspace ownership. See [workspace patching and recovery](docs/workspace-patching.md)
+and [verifier provisioning](docs/patch-verifier.md) before enabling it.
