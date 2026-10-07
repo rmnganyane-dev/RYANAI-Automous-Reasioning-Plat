@@ -1,6 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@reference "tailwindcss";
+
+.your-custom-class {
+  @apply text-4xl;
+}
 
 /* Root Theme Variables */
 :root {
