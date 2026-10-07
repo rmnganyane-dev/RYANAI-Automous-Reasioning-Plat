@@ -17,23 +17,17 @@
         with:
           node-version: 22
 
-      # Required if your project uses pnpm workspaces
+      # Required for pnpm workspaces
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9 
 
-      - name: Run Trivy scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: sarif
-          output: trivy-results.sarif
-          severity: CRITICAL,HIGH
-          exit-code: '0'
+      # Runs your custom script to bypass raw node_modules
+      - name: Run Trivy Scan Script
+        run: ./scripts/run-trivy.sh
 
-      # Critical missing step: Uploads the generated file to GitHub
+      # Uploads the generated file to GitHub
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3
         with:
