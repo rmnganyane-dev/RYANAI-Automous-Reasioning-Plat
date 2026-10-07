@@ -188,159 +188,284 @@ async function snapshot(root: string): Promise<Snapshot> {
   return { revision: digest.digest("hex"), files };
 }
 
+interface PatchOwnership {
+  lock?: string;
+  stagingRoot?: string;
+  promotionStarted: boolean;
+}
+
+/**
+ * Acquire and persist exclusive ownership, recording it before directory sync so failures can clean up.
+ */
+async function acquirePatchLock(root: string, ownership: PatchOwnership) {
+  const state = await stateDirectory(root);
+  const lock = path.join(state, "lock");
+  try {
+    await fs.mkdir(lock, { mode: 0o700 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+      throw new Error("Workspace patch is busy or requires recovery.", {
+        cause: error,
+      });
+    }
+    throw error;
+  }
+  ownership.lock = lock;
+  await syncDirectory(state);
+  return lock;
+}
+
+/**
+ * Copy the permitted snapshot and candidate into staging with verifier-readable permissions.
+ */
+async function stageSnapshot(
+  stage: string,
+  baseline: Snapshot,
+  request: PatchRequest,
+) {
+  await fs.mkdir(stage, { mode: 0o755 });
+  await fs.chmod(stage, 0o755);
+  for (const [relative, file] of baseline.files) {
+    const target = path.join(stage, relative);
+    await fs.mkdir(path.dirname(target), { recursive: true, mode: 0o755 });
+    let directory = path.dirname(target);
+    while (directory !== stage) {
+      await fs.chmod(directory, 0o755);
+      directory = path.dirname(directory);
+    }
+    await fs.writeFile(target, file.content);
+    await fs.chmod(target, file.mode & 0o111 ? 0o755 : 0o644);
+  }
+  const stagedTarget = path.join(stage, request.filePath);
+  await fs.mkdir(path.dirname(stagedTarget), { recursive: true, mode: 0o755 });
+  await fs.writeFile(stagedTarget, request.patchContent);
+  await fs.chmod(
+    stagedTarget,
+    (baseline.files.get(request.filePath)?.mode ?? 0) & 0o111 ? 0o755 : 0o644,
+  );
+}
+
+/**
+ * Confirm the tracked snapshot and target still match the state that was verified.
+ */
+async function revisionMatches(
+  root: string,
+  baseline: Snapshot,
+  journal: Journal,
+) {
+  const latest = await snapshot(root);
+  const current = await readTarget(root, journal.filePath);
+  return (
+    baseline.revision === latest.revision &&
+    (current === null ? null : hash(current)) === journal.originalHash
+  );
+}
+
+/**
+ * Journal promotion intent, atomically replace the target, and retain ownership if commit durability is uncertain.
+ */
+async function promotePatch(
+  root: string,
+  lock: string,
+  journal: Journal,
+  baseline: Snapshot,
+  request: PatchRequest,
+  ownership: PatchOwnership,
+) {
+  const parent = path.dirname(path.join(root, request.filePath));
+  // Persist intent before creating a same-filesystem promotion file. Never restore a stale snapshot.
+  journal.phase = "promoting";
+  await saveJournal(lock, journal);
+  ownership.promotionStarted = true;
+  const temporary = path.join(root, journal.temporaryPath);
+  const mode = baseline.files.get(request.filePath)?.mode ?? 0o644;
+  await durableWrite(temporary, request.patchContent, mode);
+  await fs.rename(temporary, path.join(root, request.filePath));
+  await syncDirectory(parent);
+  journal.phase = "committed";
+  await saveJournal(lock, journal);
+  ownership.promotionStarted = false;
+}
+
+/**
+ * Validate a tracked-file patch in isolation, then promote it only if the workspace revision is unchanged.
+ */
+async function executePatch(
+  workspace: string,
+  request: PatchRequest,
+  ownership: PatchOwnership,
+) {
+  if (process.platform !== "linux")
+    throw new Error("Workspace patching requires Linux.");
+  const root = await fs.realpath(workspace);
+  if (
+    typeof request.patchContent !== "string" ||
+    Buffer.byteLength(request.patchContent) > 8 * 1024 * 1024
+  ) {
+    throw new Error("Patch content must be a string no larger than 8 MiB.");
+  }
+  const lock = await acquirePatchLock(root, ownership);
+  const original = await readTarget(root, request.filePath);
+  const baseline = await snapshot(root);
+  if (original === null || !baseline.files.has(request.filePath)) {
+    throw new Error("Patch targets must be existing files tracked by Git.");
+  }
+  const id = randomUUID();
+  const journal: Journal = {
+    version: 1,
+    id,
+    phase: "preparing",
+    filePath: request.filePath,
+    originalHash: hash(original),
+    candidateHash: hash(request.patchContent),
+    temporaryPath: path.posix.join(
+      path.posix.dirname(request.filePath),
+      `.ryan-patch-${id}.tmp`,
+    ),
+  };
+  await saveJournal(lock, journal);
+  const stagingRoot = stageDirectory(root, id);
+  await fs.mkdir(stagingRoot, { mode: 0o700 });
+  ownership.stagingRoot = stagingRoot;
+  const stage = path.join(stagingRoot, "source");
+  await stageSnapshot(stage, baseline, request);
+  const verification = await runVerificationPipeline(stage, request.testScript);
+  if (!verification.success) {
+    return {
+      status: "rejected",
+      error: `Patch validation failed: ${verification.error}`,
+    };
+  }
+  journal.phase = "validated";
+  await saveJournal(lock, journal);
+  if (!(await revisionMatches(root, baseline, journal))) {
+    return {
+      status: "conflict",
+      error:
+        "Workspace changed during validation; retry against the new revision.",
+    };
+  }
+  await promotePatch(root, lock, journal, baseline, request, ownership);
+  return {
+    status: "success",
+    message: `Successfully updated and verified ${request.filePath}`,
+  };
+}
+
+/**
+ * Retire owned transaction state only when promotion is not uncertain; otherwise preserve it for recovery.
+ */
+async function cleanupPatch(ownership: PatchOwnership) {
+  const { lock, stagingRoot, promotionStarted } = ownership;
+  // A crash or uncertain promotion leaves ownership/journal intact for explicit recovery.
+  if (!lock || promotionStarted) return;
+  if (stagingRoot) await fs.rm(stagingRoot, { recursive: true, force: true });
+  const retired = path.join(path.dirname(lock), `finished-${randomUUID()}`);
+  await fs.rename(lock, retired);
+  await syncDirectory(path.dirname(lock));
+  await fs.rm(retired, { recursive: true, force: true });
+}
+
 /** All cooperating writers must hold this lock; crashes deliberately leave it for recovery. */
 export async function applyWorkspacePatch(
   workspace: string,
   request: PatchRequest,
 ) {
-  let lock: string | undefined;
-  let journal: Journal | undefined;
-  let stagingRoot: string | undefined;
-  let promotionStarted = false;
-  const result = await (async () => {
-    try {
-      if (process.platform !== "linux")
-        throw new Error("Workspace patching requires Linux.");
-      const root = await fs.realpath(workspace);
-      if (
-        typeof request.patchContent !== "string" ||
-        Buffer.byteLength(request.patchContent) > 8 * 1024 * 1024
-      ) {
-        throw new Error("Patch content must be a string no larger than 8 MiB.");
-      }
-      const state = await stateDirectory(root);
-      const candidateLock = path.join(state, "lock");
-      try {
-        await fs.mkdir(candidateLock, { mode: 0o700 });
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "EEXIST") {
-          throw new Error("Workspace patch is busy or requires recovery.", {
-            cause: error,
-          });
-        }
-        throw error;
-      }
-      lock = candidateLock;
-      await syncDirectory(state);
-      const original = await readTarget(root, request.filePath);
-      const baseline = await snapshot(root);
-      if (original === null || !baseline.files.has(request.filePath)) {
-        throw new Error("Patch targets must be existing files tracked by Git.");
-      }
-      const id = randomUUID();
-      journal = {
-        version: 1,
-        id,
-        phase: "preparing",
-        filePath: request.filePath,
-        originalHash: original === null ? null : hash(original),
-        candidateHash: hash(request.patchContent),
-        temporaryPath: path.posix.join(
-          path.posix.dirname(request.filePath),
-          `.ryan-patch-${id}.tmp`,
-        ),
-      };
-      await saveJournal(lock, journal);
-      const candidateStageRoot = stageDirectory(root, id);
-      await fs.mkdir(candidateStageRoot, { mode: 0o700 });
-      stagingRoot = candidateStageRoot;
-      const stage = path.join(stagingRoot, "source");
-      await fs.mkdir(stage, { mode: 0o755 });
-      await fs.chmod(stage, 0o755);
-      for (const [relative, file] of baseline.files) {
-        const target = path.join(stage, relative);
-        await fs.mkdir(path.dirname(target), { recursive: true, mode: 0o755 });
-        let directory = path.dirname(target);
-        while (directory !== stage) {
-          await fs.chmod(directory, 0o755);
-          directory = path.dirname(directory);
-        }
-        await fs.writeFile(target, file.content);
-        await fs.chmod(target, file.mode & 0o111 ? 0o755 : 0o644);
-      }
-      const stagedTarget = path.join(stage, request.filePath);
-      await fs.mkdir(path.dirname(stagedTarget), {
-        recursive: true,
-        mode: 0o755,
-      });
-      await fs.writeFile(stagedTarget, request.patchContent);
-      await fs.chmod(
-        stagedTarget,
-        (baseline.files.get(request.filePath)?.mode ?? 0) & 0o111
-          ? 0o755
-          : 0o644,
-      );
-      const verification = await runVerificationPipeline(
-        stage,
-        request.testScript,
-      );
-      if (!verification.success) {
-        return {
-          status: "rejected",
-          error: `Patch validation failed: ${verification.error}`,
-        };
-      }
-      journal.phase = "validated";
-      await saveJournal(lock, journal);
-      const latest = await snapshot(root);
-      const current = await readTarget(root, request.filePath);
-      if (
-        baseline.revision !== latest.revision ||
-        (current === null ? null : hash(current)) !== journal.originalHash
-      ) {
-        return {
-          status: "conflict",
-          error:
-            "Workspace changed during validation; retry against the new revision.",
-        };
-      }
-      const parent = path.dirname(path.join(root, request.filePath));
-      // Persist intent before creating a same-filesystem promotion file. Never restore a stale snapshot.
-      journal.phase = "promoting";
-      await saveJournal(lock, journal);
-      promotionStarted = true;
-      const temporary = path.join(root, journal.temporaryPath);
-      const mode = baseline.files.get(request.filePath)?.mode ?? 0o644;
-      await durableWrite(temporary, request.patchContent, mode);
-      await fs.rename(temporary, path.join(root, request.filePath));
-      await syncDirectory(parent);
-      journal.phase = "committed";
-      await saveJournal(lock, journal);
-      promotionStarted = false;
-      return {
-        status: "success",
-        message: `Successfully updated and verified ${request.filePath}`,
-      };
-    } catch (error) {
-      return {
-        status: "failed",
-        error: `${message(error)}${promotionStarted ? " Recovery is required before another patch." : ""}`,
-      };
-    }
-  })();
-  {
-    // A crash or uncertain promotion leaves ownership/journal intact for explicit recovery.
-    if (lock && !promotionStarted) {
-      try {
-        if (stagingRoot)
-          await fs.rm(stagingRoot, { recursive: true, force: true });
-        const retired = path.join(
-          path.dirname(lock),
-          `finished-${randomUUID()}`,
-        );
-        await fs.rename(lock, retired);
-        await syncDirectory(path.dirname(lock));
-        await fs.rm(retired, { recursive: true, force: true });
-      } catch {
-        return {
-          status: "failed",
-          error:
-            "Patch cleanup failed; inspect recovery state before retrying. A verified patch may already be committed.",
-        };
-      }
-    }
+  const ownership: PatchOwnership = { promotionStarted: false };
+  let result;
+  try {
+    result = await executePatch(workspace, request, ownership);
+  } catch (error) {
+    result = {
+      status: "failed",
+      error: `${message(error)}${ownership.promotionStarted ? " Recovery is required before another patch." : ""}`,
+    };
+  }
+  try {
+    await cleanupPatch(ownership);
+  } catch {
+    return {
+      status: "failed",
+      error:
+        "Patch cleanup failed; inspect recovery state before retrying. A verified patch may already be committed.",
+    };
   }
   return result;
+}
+
+/**
+ * Check for a real recovery lock directory, rejecting links and unexpected filesystem objects.
+ */
+async function recoveryLockExists(lock: string) {
+  let stat;
+  try {
+    stat = await fs.lstat(lock);
+  } catch (error) {
+    if (isMissing(error)) return false;
+    throw error;
+  }
+  if (!stat.isDirectory() || stat.isSymbolicLink())
+    throw new Error("Invalid recovery lock.");
+  return true;
+}
+
+/**
+ * Load persisted recovery state, allowing an absent journal from a crash before its first write.
+ */
+async function readRecoveryJournal(lock: string) {
+  try {
+    return JSON.parse(
+      await fs.readFile(path.join(lock, "journal.json"), "utf8"),
+    ) as Journal;
+  } catch (error) {
+    if (!isMissing(error)) throw error;
+    return undefined;
+  }
+}
+
+/**
+ * Reject unsupported phases and paths that do not belong to the recorded patch transaction.
+ */
+function validateRecoveryJournal(journal: Journal) {
+  if (
+    journal.version !== 1 ||
+    !allowed(journal.filePath) ||
+    !/^[a-f0-9-]{36}$/.test(journal.id) ||
+    journal.temporaryPath !==
+      path.posix.join(
+        path.posix.dirname(journal.filePath),
+        `.ryan-patch-${journal.id}.tmp`,
+      ) ||
+    !["preparing", "validated", "promoting", "committed"].includes(
+      journal.phase,
+    )
+  ) {
+    throw new Error("Invalid recovery journal; manual investigation required.");
+  }
+}
+
+/**
+ * Reconcile durable intent against target hashes without overwriting conflicting workspace changes.
+ */
+async function recoverPromotion(root: string, journal: Journal) {
+  if (journal.phase !== "promoting" && journal.phase !== "committed")
+    return "aborted";
+  const content = await readTarget(root, journal.filePath);
+  const currentHash = content === null ? null : hash(content);
+  let status = "aborted";
+  if (currentHash === journal.candidateHash) status = "committed";
+  else if (
+    currentHash !== journal.originalHash ||
+    journal.phase === "committed"
+  ) {
+    throw new Error(
+      "Recovery conflict: preserve workspace and journal for manual investigation.",
+    );
+  }
+  // Recheck parents through readTarget before removing only this transaction's temporary file.
+  await fs.rm(path.join(root, journal.temporaryPath), { force: true });
+  await syncDirectory(path.dirname(path.join(root, journal.filePath)));
+  return status;
 }
 
 /** Operator-only: stop ALL writers first. Never expose this through the agent/MCP tools. */
@@ -353,64 +478,18 @@ export async function recoverWorkspacePatch(
   const root = await fs.realpath(workspace);
   const state = await stateDirectory(root);
   const lock = path.join(state, "lock");
-  let lockStat;
-  try {
-    lockStat = await fs.lstat(lock);
-  } catch (error) {
-    if (isMissing(error)) return { status: "nothing_to_recover" };
-    throw error;
-  }
-  if (!lockStat.isDirectory() || lockStat.isSymbolicLink())
-    throw new Error("Invalid recovery lock.");
-  let journal: Journal | undefined;
-  try {
-    journal = JSON.parse(
-      await fs.readFile(path.join(lock, "journal.json"), "utf8"),
-    ) as Journal;
-  } catch (error) {
-    if (!isMissing(error)) throw error;
-  }
+  if (!(await recoveryLockExists(lock)))
+    return { status: "nothing_to_recover" };
+  const journal = await readRecoveryJournal(lock);
   let status = "aborted";
   if (journal) {
-    if (
-      journal.version !== 1 ||
-      !allowed(journal.filePath) ||
-      !/^[a-f0-9-]{36}$/.test(journal.id) ||
-      journal.temporaryPath !==
-        path.posix.join(
-          path.posix.dirname(journal.filePath),
-          `.ryan-patch-${journal.id}.tmp`,
-        ) ||
-      !["preparing", "validated", "promoting", "committed"].includes(
-        journal.phase,
-      )
-    ) {
-      throw new Error(
-        "Invalid recovery journal; manual investigation required.",
-      );
-    }
-    if (journal.phase === "promoting" || journal.phase === "committed") {
-      const content = await readTarget(root, journal.filePath);
-      const currentHash = content === null ? null : hash(content);
-      if (currentHash === journal.candidateHash) status = "committed";
-      else if (
-        currentHash !== journal.originalHash ||
-        journal.phase === "committed"
-      ) {
-        throw new Error(
-          "Recovery conflict: preserve workspace and journal for manual investigation.",
-        );
-      }
-      // Recheck parents through readTarget before removing only this transaction's temporary file.
-      await fs.rm(path.join(root, journal.temporaryPath), { force: true });
-      await syncDirectory(path.dirname(path.join(root, journal.filePath)));
-    }
-  }
-  if (journal)
+    validateRecoveryJournal(journal);
+    status = await recoverPromotion(root, journal);
     await fs.rm(stageDirectory(root, journal.id), {
       recursive: true,
       force: true,
     });
+  }
   const retired = path.join(state, `finished-${randomUUID()}`);
   await fs.rename(lock, retired);
   await syncDirectory(state);

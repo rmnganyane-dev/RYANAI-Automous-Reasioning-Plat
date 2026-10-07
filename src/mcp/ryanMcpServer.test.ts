@@ -41,4 +41,29 @@ describe("MCP patch result reporting", () => {
       expect(result.isError).toBe(status !== "success");
     },
   );
+  it("keeps patch validation errors inside the MCP error response", async () => {
+    new RyanMCPServer();
+    const result = await handlers[1]({
+      params: {
+        name: "self_patch_workspace",
+        arguments: { filePath: "src/app.ts" },
+      },
+    });
+    expect(result.isError).toBe(true);
+    expect(SelfPatchSkill.applyAndVerifyPatch).not.toHaveBeenCalled();
+  });
+
+  it("keeps asynchronous patch failures inside the MCP error response", async () => {
+    vi.mocked(SelfPatchSkill.applyAndVerifyPatch).mockRejectedValueOnce(
+      new Error("controller failure"),
+    );
+    new RyanMCPServer();
+    const result = await handlers[1]({
+      params: {
+        name: "self_patch_workspace",
+        arguments: { filePath: "src/app.ts", patchContent: "candidate" },
+      },
+    });
+    expect(result.isError).toBe(true);
+  });
 });

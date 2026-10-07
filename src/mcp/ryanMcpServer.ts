@@ -171,25 +171,7 @@ export class RyanMCPServer {
         }
 
         if (name === "self_patch_workspace") {
-          const { filePath, patchContent, testScript } = args ?? {};
-          if (
-            typeof filePath !== "string" ||
-            typeof patchContent !== "string" ||
-            (testScript !== undefined && typeof testScript !== "string")
-          ) {
-            throw new Error(
-              "filePath and patchContent must be strings; testScript must be a string when supplied",
-            );
-          }
-          const result = await SelfPatchSkill.applyAndVerifyPatch({
-            filePath,
-            patchContent,
-            testScript,
-          });
-          return {
-            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-            isError: result.status !== "success",
-          };
+          return await this.applyPatchTool(args);
         }
 
         throw new Error(`Unknown MCP tool requested: ${name}`);
@@ -205,6 +187,31 @@ export class RyanMCPServer {
         };
       }
     });
+  }
+
+  /** Validate patch arguments and map patch outcomes to MCP results; the caller formats thrown errors. */
+  private async applyPatchTool(args: Record<string, unknown> | undefined) {
+    const { filePath, patchContent, testScript } = args ?? {};
+    if (
+      typeof filePath !== "string" ||
+      typeof patchContent !== "string" ||
+      (testScript !== undefined && typeof testScript !== "string")
+    ) {
+      throw new Error(
+        "filePath and patchContent must be strings; testScript must be a string when supplied",
+      );
+    }
+    const result = await SelfPatchSkill.applyAndVerifyPatch({
+      filePath,
+      patchContent,
+      testScript,
+    });
+    return {
+      content: [
+        { type: "text" as const, text: JSON.stringify(result, null, 2) },
+      ],
+      isError: result.status !== "success",
+    };
   }
 
   public async start() {
