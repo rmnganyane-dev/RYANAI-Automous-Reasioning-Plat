@@ -16,6 +16,8 @@ import {
   startupSummary,
 } from './startupDiagnostics.js';
 
+import { API_ROUTES } from '../config/core.js';
+
 import { getReasoningAgent } from '../agent/engine.js';
 import { registerWebSocketRoutes } from '../api/websocket.js';
 import { authPlugin } from './routes/auth.js';
@@ -210,7 +212,7 @@ const healthCheck = async (_request: FastifyRequest, reply: FastifyReply) => {
 };
 
 fastify.get('/health', healthCheck);
-fastify.get('/api/health', healthCheck);
+fastify.get(API_ROUTES.healthPath, healthCheck);
 
 // Sentry integration test route
 fastify.get('/debug-sentry', async () => {
@@ -254,7 +256,7 @@ async function runReasoning(prompt: string, model?: string) {
 }
 
 fastify.post<{ Body: { prompt?: string; model?: string } }>(
-  '/api/reason',
+  API_ROUTES.reasonPath,
   async (request, reply) => {
     const prompt = request.body?.prompt?.trim();
     if (!prompt) {
@@ -280,7 +282,7 @@ fastify.post<{ Body: { prompt?: string; model?: string } }>(
 
 // Reasoning stream endpoint
 fastify.post<{ Body: { prompt?: string; sessionId?: string; model?: string } }>(
-  '/api/reasoning/stream',
+  API_ROUTES.streamPath,
   async (request, reply) => {
     const prompt = request.body?.prompt?.trim();
     const { sessionId } = request.body || {};
@@ -293,6 +295,10 @@ fastify.post<{ Body: { prompt?: string; sessionId?: string; model?: string } }>(
     reply.hijack();
     const { raw } = reply;
 
+    // Hijacking bypasses Fastify's header flush, including the CORS hook.
+    for (const [name, value] of Object.entries(reply.getHeaders())) {
+      if (value !== undefined) raw.setHeader(name, value);
+    }
     raw.setHeader('Content-Type', 'text/event-stream');
     raw.setHeader('Cache-Control', 'no-cache, no-transform');
     raw.setHeader('Connection', 'keep-alive');
@@ -397,10 +403,10 @@ async function start() {
       `   - Auth Verify: GET http://${config.host}:${config.port}/api/auth/verify`,
     );
     console.log(
-      `   - Reason: POST http://${config.host}:${config.port}/api/reason`,
+      `   - Reason: POST http://${config.host}:${config.port}${API_ROUTES.reasonPath}`,
     );
     console.log(
-      `   - Stream: POST http://${config.host}:${config.port}/api/reasoning/stream`,
+      `   - Stream: POST http://${config.host}:${config.port}${API_ROUTES.streamPath}`,
     );
     console.log(`   - MCP: POST http://${config.host}:${config.port}/api/mcp`);
     console.log(
