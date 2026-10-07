@@ -7,6 +7,7 @@ import { authenticatedFetch } from '@/lib/authenticatedFetch';
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Analytics } from '@vercel/analytics/react';
 import App from './App';
 import './index.css';
 import { API_BASE_URL } from './lib/apiBaseUrl';
@@ -219,6 +220,7 @@ const initializeApp = async () => {
       <React.StrictMode>
         <ErrorBoundary>
           <App />
+          <Analytics />
         </ErrorBoundary>
       </React.StrictMode>,
     );
