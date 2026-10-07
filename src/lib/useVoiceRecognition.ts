@@ -20,7 +20,7 @@ export interface UseVoiceRecognitionOptions {
   onCommand?: (command: string, args: string) => void;
 }
 
-export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
+export function useVoiceRecognition(_options: UseVoiceRecognitionOptions = {}) {
   const [isListening, setIsListening] = useState(false);
   const [interimText, setInterimText] = useState('');
   const [isSupported, setIsSupported] = useState(false);

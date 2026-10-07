@@ -4,12 +4,12 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 
-let nativeCudaModule: any = null;
+let nativeCudaModule: { runCudaInference: (prompt: string) => string } | null = null;
 
 try {
   // Load the compiled Node-API addon
   nativeCudaModule = require(path.resolve(process.cwd(), "build/Release/ryan_cuda_native.node"));
-} catch (error) {
+} catch {
   console.warn("[RyanAI CUDA Warning] Native CUDA module not compiled yet. Falling back to software simulation mode.");
 }
 
@@ -18,8 +18,8 @@ export class CudaInferenceEngine {
     if (nativeCudaModule && typeof nativeCudaModule.runCudaInference === "function") {
       try {
         return nativeCudaModule.runCudaInference(prompt);
-      } catch (error: any) {
-        console.error("[CUDA Execution Error]:", error.message);
+      } catch (error: unknown) {
+        console.error("[CUDA Execution Error]:", (error instanceof Error ? error.message : String(error)));
       }
     }
 

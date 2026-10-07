@@ -17,7 +17,7 @@ export const reasonPlugin: FastifyPluginAsync = async (fastify) => {
       const output = typeof lastMessage?.content === 'string'
         ? lastMessage.content
         : JSON.stringify(lastMessage?.content ?? '');
-      const reasoningTrace = result.messages.map((message) =>
+      const reasoningTrace = result.messages.map((message: { content: unknown }) =>
         typeof message.content === 'string'
           ? message.content
           : JSON.stringify(message.content) ?? ''

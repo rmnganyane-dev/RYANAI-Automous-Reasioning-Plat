@@ -1,5 +1,46 @@
 # 🚀 RyanAI: Autonomous Reasoning Platform
 
+## User authentication
+
+The public landing page links to **Sign in** and **Create account**. Dashboard,
+cockpit, and workspace require a Supabase email/password session. Sign-up may
+require email confirmation depending on your Supabase project settings; users
+return to sign in after confirming. Sign-out clears the browser session and
+revokes its refresh tokens through Supabase. Existing access tokens follow
+Supabase's expiry policy; use a suitably short JWT lifetime for your deployment.
+
+Configure the same Supabase project on both sides:
+
+- Browser build: `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- API runtime: `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`.
+- In Supabase Auth, enable email/password sign-up, configure your Site URL and
+  allowed redirect URLs, and configure production email delivery.
+- Apply the repository's `supabase/migrations` to that project so conversations,
+  messages, profiles, and memory use the existing per-user row-level policies.
+
+Never put a Supabase secret/service-role key into a `VITE_` setting. Missing
+configuration blocks protected screens and APIs; it does not enable demo access.
+Local notes and conversation caches are namespaced by account; old unowned demo
+storage is retained in the browser but is not automatically assigned to a user.
+Vite settings are embedded at build time, so rebuild the frontend after setting
+them. Docker Compose forwards API settings and browser build arguments separately.
+
+API clients send `Authorization: Bearer <Supabase access token>`. The API verifies
+users with Supabase Auth on each HTTP request. Normal accounts can use reasoning;
+approvals, communications, metrics, and shared WebSocket channels require
+`app_metadata.role = "admin"`, assigned through a trusted Supabase admin process.
+Self-editable `user_metadata` does not grant privileges. `/api/auth/verify` returns
+the verified identity. The former shared-password `/api/auth/login` and cookie
+logout endpoint return HTTP 410; use Supabase Auth instead.
+
+Health endpoints remain public. Slack callbacks retain signature verification;
+Twilio callbacks require `TWILIO_AUTH_TOKEN` and the exact public
+`TWILIO_WHATSAPP_WEBHOOK_URL` configured in Twilio. Browser sessions are not a
+substitute for webhook signatures. WebSocket upgrades require an admin bearer
+header (no tokens in query strings) and reconnect after five minutes; the current
+browser UI uses authenticated HTTP/SSE for reasoning.
+
+
 **Status**: Active development | **Version**: 1.0.0
 
 > **Agentic reasoning platform** with a React/Vite frontend, Fastify API, LangGraph reasoning, optional MCP integrations, and Docker-based PostgreSQL/Redis services.
@@ -66,15 +107,58 @@ If `npm run install:all` is missing, your checkout has an older `package.json`.
 Inspect `git status` and `git branch --show-current`, preserve local changes, and
 synchronize the intended branch before following these instructions.
 
-### Step 1: Start Everything
+### Step 1: Configure and start the stack
+
+**Windows Command Prompt:**
+
+```cmd
+if not exist .env copy .env.example .env
+notepad .env
+```
+
+**PowerShell:**
+
+```powershell
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+notepad .env
+```
+
+**Bash (Linux/macOS):**
+
 ```bash
-cp .env.example .env
-# Replace DB_PASSWORD, REDIS_PASSWORD, JWT_SECRET, and MCP_AUTH_TOKEN placeholders in .env.
+[ -f .env ] || cp .env.example .env
+```
+
+Edit `.env` before starting Docker. Replace `DB_PASSWORD`, `REDIS_PASSWORD`,
+`JWT_SECRET`, and `MCP_AUTH_TOKEN` with independent random values. This command
+works in all three shells and prints four values you can use, one per setting:
+
+```text
+node -e "for(let i=0;i<4;i++) console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+For local Node processes, also put the corresponding database/cache passwords
+into `DATABASE_URL` and `REDIS_URL`. Save `.env`, then run:
+
+```text
+docker compose config --quiet
 npm run docker:up
 ```
 
-On Windows, copy the file with `Copy-Item .env.example .env` (PowerShell) or
-`copy .env.example .env` (Command Prompt), if you do not already have a `.env`.
+Continue only after the configuration check succeeds. Compose checks all four
+required variables even when starting only PostgreSQL and Redis.
+
+If Vite reports a missing `RYANAI/core.json` or `src/lib/supabase` module,
+synchronize the current branch with `origin/main` after preserving local changes.
+The merged fix uses the tracked `app/routes.json` and explicitly loads
+`CommandCenter.tsx`. Restart the development processes after updating the files.
+
+`Dockerfile`, `Dockerfile.api`, `Dockerfile.server`, and `Dockerfile.monorepo` all
+build and start the same compiled API launcher. The web image renders its Nginx
+template at startup; `PORT` defaults to 80 and `API_HOST`/`API_PORT` default to
+`api`/3000. Compose fixes these container ports independently of local development
+ports. Browser Supabase settings are supplied as public `VITE_SUPABASE_*` build
+arguments; local `.env` files are excluded from the web build inputs.
 
 Set `OPENAI_API_KEY` in `.env` to enable live model reasoning. Without a provider key, the UI and API still start, but reasoning requests return an explicit configuration error.
 
@@ -109,7 +193,64 @@ integration checks against the local API.
 
 For local development, use `npm run dev:api` (API on port 3001 by default) and `npm run dev:web` (Vite on port 1420). Override ports portably in PowerShell with `$env:PORT='3002'; npm.cmd run dev:api` and `$env:VITE_PORT='5174'; npm.cmd run dev:web`; on bash, use `PORT=3002 npm run dev:api` and `VITE_PORT=5174 npm run dev:web`.
 
-For local Vite development, do not set `NODE_ENV=production` in `.env`; Vite controls development/production mode itself. Docker Compose defaults the API to production without requiring this setting in `.env`. `npm run dev:tunnel` requires ngrok account authentication; set `NGROK_AUTHTOKEN` in the root `.env` or shell. The tunnel uses the same `PORT` value as the API (3001 by default for local development).
+For local Vite development, do not set `NODE_ENV=production` in `.env`; Vite controls development/production mode itself. Docker Compose runs the API in production without requiring this setting in `.env`. `npm run dev:tunnel` requires ngrok account authentication; set `NGROK_AUTHTOKEN` in the root `.env` or shell. The tunnel uses the same `PORT` value as the API (3001 by default for local development).
+
+### Codespaces and local development
+
+If `startup:verify` is missing or `dev` cannot find `scripts/dev-all.mjs`, inspect
+`git status` and synchronize your intended branch after preserving local changes.
+`npm run` lists available scripts; `npm run3` is not an npm command.
+
+The dev container includes Node 22 and Docker Compose. After updating its
+configuration, run **Codespaces: Rebuild Container** from the command palette.
+An existing container will not gain Docker until it is rebuilt. Confirm readiness:
+
+```bash
+node --version
+docker info
+docker compose version
+```
+
+Node must be 22.12 or newer. If `docker` is missing or its daemon is unavailable,
+resolve that before running any `docker:*` commands. Outside Codespaces, install
+and start Docker with Compose, or provide running PostgreSQL and Redis services
+and set their connection URLs in `.env`.
+
+For the API, Vite UI, and MCP development processes:
+
+```bash
+npm run install:all
+```
+
+Create `.env` from `.env.example` only if it does not already exist. Replace the
+four secret placeholders, and also replace the matching password portions of
+`DATABASE_URL` and `REDIS_URL`. Set `PORT=3001` and remove any old
+`NODE_ENV=production` line. Start only the database and cache containers, then
+keep this terminal running:
+
+```bash
+docker compose up -d --wait postgres redis
+npm run dev
+```
+
+Open http://localhost:1420 (or forward port 1420 in Codespaces). In a second terminal:
+
+```bash
+npm run startup:verify -- --local
+npm run test:integration -- --local
+npm run mcp:health
+```
+
+`--local` uses `PORT` (default 3001) and `VITE_PORT` (default 1420), overriding
+the Compose HTTP URLs in `.env`. Without it, checks use `API_BASE_URL` and
+`WEB_BASE_URL` (defaults 3000 and 9090). Both checks load `.env`; exported shell
+values take precedence. Redis must authenticate successfully before the API
+starts. A connection failure now exits with setup guidance instead of waiting
+for a Fastify plugin timeout. Integration checks fail if dependencies are down.
+
+Use Ctrl+C to stop development processes, then `npm run docker:down` to stop
+the database and cache containers. The Tauri desktop process is optional and
+should be started in its own terminal only when working on the desktop app.
 
 ---
 
@@ -416,11 +557,10 @@ TAURI_ENABLED=false
 - ✅ GitHub OAuth integration
 
 ### Security & Authentication
-- ✅ JWT-based authentication
-- ✅ Email sign-in
-- ✅ GitHub OAuth
-- ✅ Demo mode for testing
-- ✅ Session persistence
+- ✅ Supabase email/password sign-in and registration
+- ✅ Verified bearer sessions and administrator permissions
+- ✅ Session restoration and real sign-out
+- Authentication provider OAuth buttons and demo bypasses are not enabled.
 - ✅ Rate limiting (100 requests/minute)
 - ✅ CORS properly configured
 
@@ -586,7 +726,7 @@ npm run telemetry:collect
 - ⚠️ Enable HTTPS/TLS
 - ⚠️ Restrict CORS to your domain
 - ⚠️ Use environment secrets manager
-- ⚠️ Enable API authentication middleware
+- ✅ API authentication middleware enabled (configure Supabase before use)
 - ⚠️ Set up rate limiting rules
 - ⚠️ Regular security audits
 
@@ -756,3 +896,9 @@ Built with:
 - LangGraph + MCP
 
 **Ready to deploy. Start now!** 🚀
+
+### Workspace patch safety
+
+The `self_patch_workspace` tool requires an approved isolated verifier and exclusive
+workspace ownership. See [workspace patching and recovery](docs/workspace-patching.md)
+and [verifier provisioning](docs/patch-verifier.md) before enabling it.

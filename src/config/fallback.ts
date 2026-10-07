@@ -19,14 +19,14 @@ export class BrainFallbackHandler {
     try {
       const response = await targetBrain.invoke(messages);
       return response;
-    } catch (error: any) {
-      console.warn(`[Fallback Warning] ${brainType} brain failed: ${error.message}. Routing to fallback brain...`);
+    } catch (error: unknown) {
+      console.warn(`[Fallback Warning] ${brainType} brain failed: ${(error instanceof Error ? error.message : String(error))}. Routing to fallback brain...`);
       
       try {
         const fallbackResponse = await fallbackBrain.invoke(messages);
         return fallbackResponse;
-      } catch (fallbackError: any) {
-        console.error(`[Critical Error] Fallback brain also failed: ${fallbackError.message}`);
+      } catch (fallbackError: unknown) {
+        console.error(`[Critical Error] Fallback brain also failed: ${(fallbackError instanceof Error ? fallbackError.message : String(fallbackError))}`);
         throw fallbackError;
       }
     }

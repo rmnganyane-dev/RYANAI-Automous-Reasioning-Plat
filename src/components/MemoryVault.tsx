@@ -2,32 +2,44 @@ import Modal from './Modal';
 import { Brain } from 'lucide-react';
 import { useState } from 'react';
 import type { MemoryEntry } from '@/lib/types';
-import { loadMemory, saveMemory, addMemoryEntry, deleteMemoryEntry } from '@/lib/storage';
+import { loadMemory, addMemoryEntry, deleteMemoryEntry } from '@/lib/storage';
 
 interface MemoryVaultProps {
   open: boolean;
+  userId: string;
   onClose: () => void;
 }
 
-export default function MemoryVault({ open, onClose }: MemoryVaultProps) {
-  const [entries, setEntries] = useState<MemoryEntry[]>(() => loadMemory());
+export default function MemoryVault({
+  open,
+  onClose,
+  userId,
+}: MemoryVaultProps) {
+  const [entries, setEntries] = useState<MemoryEntry[]>(() =>
+    loadMemory(userId),
+  );
   const [input, setInput] = useState('');
 
   const handleAdd = () => {
     if (input.trim()) {
-      const entry = addMemoryEntry(input);
+      const entry = addMemoryEntry(input, userId);
       setEntries([entry, ...entries]);
       setInput('');
     }
   };
 
   const handleDelete = (id: string) => {
-    deleteMemoryEntry(id);
+    deleteMemoryEntry(id, userId);
     setEntries(entries.filter((e) => e.id !== id));
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Memory Vault" icon={<Brain size={20} />}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Memory Vault"
+      icon={<Brain size={20} />}
+    >
       <div className="space-y-3">
         <div className="flex gap-2">
           <input
@@ -47,7 +59,10 @@ export default function MemoryVault({ open, onClose }: MemoryVaultProps) {
 
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {entries.map((entry) => (
-            <div key={entry.id} className="text-xs p-2 bg-ink-800/30 rounded border border-cyan-500/10">
+            <div
+              key={entry.id}
+              className="text-xs p-2 bg-ink-800/30 rounded border border-cyan-500/10"
+            >
               <div className="flex justify-between gap-2">
                 <div className="flex-1">{entry.content}</div>
                 <button
