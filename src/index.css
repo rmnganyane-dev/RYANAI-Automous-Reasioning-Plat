@@ -63,12 +63,13 @@ body {
   }
 }
 
+/* Register glass so Tailwind 4 can resolve it in @apply and variants. */
+@utility glass {
+  @apply bg-slate-900/40 backdrop-blur-md;
+}
+
 /* Custom HUD Component Classes */
 @layer components {
-  .glass {
-    @apply bg-slate-900/40 backdrop-blur-md;
-  }
-
   .glass-dark {
     @apply bg-slate-950/70 backdrop-blur-lg;
   }
