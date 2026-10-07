@@ -111,9 +111,6 @@ const serviceStatus = {
 // ============================================================================
 
 async function registerPlugins() {
-  await fastify.register(fastifyWebsocket);
-  await registerWebSocketRoutes(fastify);
-
   // Check readiness before Avvio's plugin timeout obscures connection failures.
   const redis = await connectRedis(config.redis.url);
   await fastify.register(fastifyRedis, {
@@ -127,6 +124,11 @@ async function registerPlugins() {
     timeWindow: '1 minute',
     redis: fastify.redis,
   });
+
+  // Register routes only after rate-limit's onRoute hook is installed.
+  await fastify.register(fastifyWebsocket);
+  await registerWebSocketRoutes(fastify);
+  registerCoreRoutes();
 
   // 3. Register Application & Webhook Routes
   await fastify.register(authPlugin);
@@ -197,54 +199,98 @@ async function verifyRedis() {
 // API ROUTES
 // ============================================================================
 
-const healthCheck = async (_request: FastifyRequest, reply: FastifyReply) => {
-  const healthy =
-    serviceStatus.database && serviceStatus.redis && serviceStatus.api;
-  reply.code(healthy ? 200 : 503);
-  return {
-    status: healthy ? 'online' : 'degraded',
-    service: 'ryanai-api-gateway',
-    timestamp: new Date().toISOString(),
-    services: serviceStatus,
-    engine: 'LangGraph ReAct',
-    architect: 'RyanAI',
-    cudaActive: false,
-    activeGraph: 'reasoning-agent',
+function registerCoreRoutes() {
+  const healthCheck = async (_request: FastifyRequest, reply: FastifyReply) => {
+    const healthy =
+      serviceStatus.database && serviceStatus.redis && serviceStatus.api;
+    reply.code(healthy ? 200 : 503);
+    return {
+      status: healthy ? 'online' : 'degraded',
+      service: 'ryanai-api-gateway',
+      timestamp: new Date().toISOString(),
+      services: serviceStatus,
+      engine: 'LangGraph ReAct',
+      architect: 'RyanAI',
+      cudaActive: false,
+      activeGraph: 'reasoning-agent',
+    };
   };
-};
 
+<<<<<<< HEAD
 fastify.get('/health', healthCheck);
 fastify.get(API_ROUTES.healthPath, healthCheck);
+=======
+  fastify.get('/health', healthCheck);
+  fastify.get('/api/health', healthCheck);
+>>>>>>> 46f6e7a (fix(auth): enforce rate limits before provider verification)
 
-// Sentry integration test route
-fastify.get('/debug-sentry', async () => {
-  throw new Error('RyanAI Sentry Integration Test Exception!');
-});
-
-// Root
-fastify.get('/', async () => {
-  return {
-    status: 'online',
-    service: 'RyanAI API Gateway',
-    version: '1.0.0',
-    timestamp: new Date().toISOString(),
-  };
-});
-
-function contentToText(content: unknown): string {
-  if (typeof content === 'string') return content;
-  return JSON.stringify(content) ?? String(content);
-}
-
-async function runReasoning(prompt: string, model?: string) {
-  const result = await getReasoningAgent(model).invoke({
-    messages: [{ role: 'user', content: prompt }],
+  // Sentry integration test route
+  fastify.get('/debug-sentry', async () => {
+    throw new Error('RyanAI Sentry Integration Test Exception!');
   });
-  const reasoningTrace = result.messages.map((message: { content: unknown }) =>
-    contentToText(message.content),
-  );
-  const output = reasoningTrace.at(-1) ?? '';
 
+  // Root
+  fastify.get('/', async () => {
+    return {
+      status: 'online',
+      service: 'RyanAI API Gateway',
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+    };
+  });
+
+  function contentToText(content: unknown): string {
+    if (typeof content === 'string') return content;
+    return JSON.stringify(content) ?? String(content);
+  }
+
+  async function runReasoning(prompt: string, model?: string) {
+    const result = await getReasoningAgent(model).invoke({
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const reasoningTrace = result.messages.map(
+      (message: { content: unknown }) => contentToText(message.content),
+    );
+    const output = reasoningTrace.at(-1) ?? '';
+
+    return {
+      success: true,
+      objective: prompt,
+      output,
+      reasoningTrace,
+      engine: 'RyanAI LangGraph ReAct',
+      response: output,
+      trace: reasoningTrace,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  fastify.post<{ Body: { prompt?: string; model?: string } }>(
+    '/api/reason',
+    async (request, reply) => {
+      const prompt = request.body?.prompt?.trim();
+      if (!prompt) {
+        return reply
+          .code(400)
+          .send({ success: false, error: 'A non-empty prompt is required' });
+      }
+
+      try {
+        return await runReasoning(prompt, request.body?.model);
+      } catch (err) {
+        fastify.log.error({ err }, 'Reasoning request failed');
+        return reply.code(502).send({
+          success: false,
+          error:
+            err instanceof Error
+              ? err.message
+              : 'Reasoning provider request failed',
+        });
+      }
+    },
+  );
+
+<<<<<<< HEAD
   return {
     success: true,
     objective: prompt,
@@ -286,6 +332,12 @@ fastify.post<{ Body: { prompt?: string; model?: string } }>(
 fastify.post<{ Body: { prompt?: string; sessionId?: string; model?: string } }>(
   API_ROUTES.streamPath,
   async (request, reply) => {
+=======
+  // Reasoning stream endpoint
+  fastify.post<{
+    Body: { prompt?: string; sessionId?: string; model?: string };
+  }>('/api/reasoning/stream', async (request, reply) => {
+>>>>>>> 46f6e7a (fix(auth): enforce rate limits before provider verification)
     const prompt = request.body?.prompt?.trim();
     const { sessionId } = request.body || {};
     if (!prompt) {
@@ -338,41 +390,41 @@ fastify.post<{ Body: { prompt?: string; sessionId?: string; model?: string } }>(
         raw.end();
       }
     }
-  },
-);
-
-// MCP routes
-fastify.post<{
-  Body: { action?: string; tool?: string; payload?: Record<string, unknown> };
-}>('/api/mcp', async (request, reply) => {
-  const { action, tool, payload } = request.body || {};
-
-  if (!action && !tool) {
-    return reply
-      .code(400)
-      .send({ success: false, error: 'Missing action or tool parameter' });
-  }
-
-  return reply.send({
-    success: true,
-    data: {
-      receivedAction: action,
-      receivedTool: tool,
-      processedPayload: payload ?? {},
-    },
   });
-});
 
-// System info
-fastify.get('/api/system', async () => {
-  return {
-    platform: process.platform,
-    nodeVersion: process.version,
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    env: config.nodeEnv,
-  };
-});
+  // MCP routes
+  fastify.post<{
+    Body: { action?: string; tool?: string; payload?: Record<string, unknown> };
+  }>('/api/mcp', async (request, reply) => {
+    const { action, tool, payload } = request.body || {};
+
+    if (!action && !tool) {
+      return reply
+        .code(400)
+        .send({ success: false, error: 'Missing action or tool parameter' });
+    }
+
+    return reply.send({
+      success: true,
+      data: {
+        receivedAction: action,
+        receivedTool: tool,
+        processedPayload: payload ?? {},
+      },
+    });
+  });
+
+  // System info
+  fastify.get('/api/system', async () => {
+    return {
+      platform: process.platform,
+      nodeVersion: process.version,
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      env: config.nodeEnv,
+    };
+  });
+}
 
 // ============================================================================
 // SERVER STARTUP

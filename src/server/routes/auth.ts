@@ -52,14 +52,12 @@ export async function requireUser(
     if (error || !data.user || data.user.is_anonymous) {
       const status =
         error && (!error.status || error.status >= 500) ? 503 : 401;
-      return reply
-        .code(status)
-        .send({
-          error:
-            status === 503
-              ? 'Authentication is temporarily unavailable.'
-              : 'Invalid or expired session. Please sign in again.',
-        });
+      return reply.code(status).send({
+        error:
+          status === 503
+            ? 'Authentication is temporarily unavailable.'
+            : 'Invalid or expired session. Please sign in again.',
+      });
     }
     request.authUser = {
       id: data.user.id,
@@ -88,7 +86,8 @@ export async function requireAdmin(
 /** Install before any routes, including websocket upgrades. Deny by default. */
 export function installAuthentication(fastify: FastifyInstance) {
   fastify.decorateRequest('authUser', null);
-  fastify.addHook('onRequest', async (request, reply) => {
+  // Run after onRequest rate limits, before route handlers or websocket upgrades.
+  fastify.addHook('preValidation', async (request, reply) => {
     const path = request.url.split('?')[0];
     if (request.method === 'OPTIONS') return;
     if (
