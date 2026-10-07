@@ -46,6 +46,7 @@
     "src/server/launcher.ts",
     "src/server/index.ts",
     "src/server/connectRedis.ts",
+    "src/server/startupDiagnostics.ts",
     "src/server/routes/**/*.ts",
     "src/server/comms/index.js",
     "src/agent/engine.ts",
