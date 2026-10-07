@@ -118,7 +118,7 @@
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^6.12.0",
     "@renderinc/sdk": "^1.2.0",
-    "@sentry/node": "^10.75.0",
+    "@sentry/node": "^11.4.0",
     "@sentry/profiling-node": "^10.75.0",
     "@supabase/server": "^1.6.1",
     "@supabase/ssr": "^0.12.7",
@@ -155,7 +155,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@eslint/js": "^9.9.1",
+    "@eslint/js": "^10.0.1",
     "@ngrok/ngrok": "^1.7.0",
     "@tauri-apps/cli": "^2.11.4",
     "@types/bcrypt": "^6.0.0",
