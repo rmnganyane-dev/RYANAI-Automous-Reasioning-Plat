@@ -1,6 +1,9 @@
 version: 2
 updates:
+<<<<<<< HEAD
   # Monitor npm packages in the root directory
+=======
+>>>>>>> 172f136 (fix: add dependabot config and sync build dependencies)
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -10,7 +13,10 @@ updates:
       - "dependencies"
       - "javascript"
 
+<<<<<<< HEAD
   # Monitor GitHub Actions workflow dependencies
+=======
+>>>>>>> 172f136 (fix: add dependabot config and sync build dependencies)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
