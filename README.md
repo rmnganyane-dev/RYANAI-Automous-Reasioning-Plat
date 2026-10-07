@@ -409,6 +409,9 @@ npm run ship
 
 For Vercel, set `VITE_API_BASE_URL` to the HTTPS origin of a separately hosted RyanAI API. Vercel hosts the static web frontend; it does not host this repository's API, PostgreSQL, or Redis services.
 
+If reasoning reports `404 NOT_FOUND` with a Vercel request ID, check the request URL in the browser Network panel. It must target the Fastify API's `/api/reasoning/stream`, not the Vercel frontend. Set `VITE_API_BASE_URL` in the Vercel project's environment settings for the affected deployment environment, then rebuild/redeploy (Vite embeds this value at build time). Use only the API's HTTPS origin, without `/api` or a route suffix. Verify that origin's `/api/health` returns the RyanAI gateway JSON; a degraded response indicates backend dependencies need attention. Vercel builds now reject a missing or invalid API origin, including the deployment's own Vercel hostname. `VITE_API_URL` remains a legacy fallback. Running or changing `src/server/launcher.ts` alone does not create API routes on Vercel.
+
+
 GitHub Actions publishes production images after validation on the configured default branch. To enable the GitHub Actions Vercel deployment, configure repository secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`, plus repository variables `VERCEL_DEPLOY_ENABLED=true` and `VITE_API_BASE_URL` (the deployed API origin). The repository's [`vercel.json`](./vercel.json) sets `npm ci --legacy-peer-deps` as the install command and `npm run build:web` as the build command. Do not set `npm run build:web` as Vercel's install command. Older commits do not contain these configuration changes; deploy a commit that includes them.
 
 The scheduled and manually triggered smoke tests require `PROD_GATEWAY_URL` (the full API health URL, e.g. the API origin plus `/health`) and `PROD_FRONTEND_URL` secrets. Preview checks additionally require `PREVIEW_GATEWAY_URL` and `PREVIEW_FRONTEND_URL`.
