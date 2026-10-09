@@ -1,28 +1,18 @@
-<<<<<<< HEAD
 import { authenticatedFetch } from '@/lib/authenticatedFetch';
-/**
- * RyanAI Command Center - Main Frontend Entry Point
- * Integrates React frontend with Fastify backend
- * Version: 4.5.0-matrix
- */
-
-=======
->>>>>>> eefb063 (Update main.tsx)
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-<<<<<<< HEAD
 import { API_BASE_URL } from './lib/apiBaseUrl';
+import { getPlatformHealth } from './lib/platformHealth';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // ============================================================================
 // ENVIRONMENT CONFIGURATION
 // ============================================================================
-=======
->>>>>>> eefb063 (Update main.tsx)
 
 const APP_VERSION = '4.5.0-matrix';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+const APP_ENV = import.meta.env.MODE;
 
 class RyanAIClient {
   private baseURL: string;
@@ -31,8 +21,9 @@ class RyanAIClient {
   constructor(baseURL: string, version: string) {
     this.baseURL = baseURL;
     this.version = version;
-<<<<<<< HEAD
-    console.log(`🚀 RyanAI Client initialized | API: ${baseURL} | Version: ${version}`);
+    console.log(
+      `🚀 RyanAI Client initialized | API: ${baseURL} | Version: ${version}`,
+    );
   }
 
   /**
@@ -40,31 +31,18 @@ class RyanAIClient {
    */
   async request<T = unknown>(
     endpoint: string,
-    options: RequestInit & { method?: string } = {}
+    options: RequestInit & { method?: string } = {},
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     const method = options.method || 'GET';
-
-    try {
-      const response = await authenticatedFetch(url, {
-        ...options,
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-App-Version': this.version,
-          ...options.headers,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
-      }
-
-      return (await response.json()) as T;
-    } catch (error) {
-      console.error(`API Request Failed: ${method} ${endpoint}`, error);
-      throw error;
-    }
+    const headers = new Headers(options.headers);
+    if (!headers.has('Content-Type'))
+      headers.set('Content-Type', 'application/json');
+    if (!headers.has('X-App-Version'))
+      headers.set('X-App-Version', this.version);
+    const response = await authenticatedFetch(url, { ...options, method, headers });
+    if (!response.ok) throw new Error(`API Error: ${response.status}`);
+    return response.json() as Promise<T>;
   }
 
   /**
@@ -88,7 +66,9 @@ class RyanAIClient {
    * Get Governance Errors
    */
   async getGovernanceErrors(filter?: string) {
-    return this.request(`/api/governance/errors${filter ? `?filter=${filter}` : ''}`);
+    return this.request(
+      `/api/governance/errors${filter ? `?filter=${filter}` : ''}`,
+    );
   }
 
   /**
@@ -102,7 +82,9 @@ class RyanAIClient {
    * Get Recycled Items
    */
   async getRecycledItems(category?: string) {
-    return this.request(`/api/recycling/items${category ? `?category=${category}` : ''}`);
+    return this.request(
+      `/api/recycling/items${category ? `?category=${category}` : ''}`,
+    );
   }
 
   /**
@@ -130,32 +112,14 @@ class RyanAIClient {
    * Health Check
    */
   async healthCheck() {
-    return this.request('/health');
+    return getPlatformHealth();
   }
-=======
-  }
-
-  async healthCheck(): Promise<boolean> {
-    try {
-      const res = await fetch(`${this.baseURL}/health`);
-      return res.ok;
-    } catch {
-      return false;
-    }
-  }
->>>>>>> eefb063 (Update main.tsx)
 }
 
 const apiClient = new RyanAIClient(API_BASE_URL, APP_VERSION);
 
 declare global {
   interface Window {
-    ryanai: {
-      client: RyanAIClient;
-      version: string;
-      apiUrl: string;
-    };
-<<<<<<< HEAD
     __DEV__?: {
       apiClient: RyanAIClient;
       logs: Console;
@@ -163,8 +127,11 @@ declare global {
       simulateError: (errorId: string) => Promise<unknown>;
       checkHealth: () => Promise<boolean>;
     };
-=======
->>>>>>> eefb063 (Update main.tsx)
+    ryanai: {
+      client: RyanAIClient;
+      version: string;
+      apiUrl: string;
+    };
   }
 }
 
@@ -174,7 +141,6 @@ window.ryanai = {
   apiUrl: API_BASE_URL,
 };
 
-<<<<<<< HEAD
 // ============================================================================
 // ERROR TRACKING (OPTIONAL SENTRY)
 // ============================================================================
@@ -188,7 +154,7 @@ const initializeSentry = () => {
 };
 
 // ============================================================================
-// HEALTH CHECK BEFORE INITIALIZATION
+// OPTIONAL BACKEND HEALTH CHECK
 // ============================================================================
 
 const performHealthCheck = async (): Promise<boolean> => {
@@ -197,7 +163,7 @@ const performHealthCheck = async (): Promise<boolean> => {
     console.log('✅ Backend health check passed');
     return true;
   } catch (error) {
-    console.warn('⚠️ Backend health check failed (will retry):', error);
+    console.warn('⚠️ Backend health check failed:', error);
     return false;
   }
 };
@@ -210,13 +176,6 @@ const initializeApp = async () => {
   try {
     initializeSentry();
 
-    const backendHealthy = await performHealthCheck();
-    if (backendHealthy) {
-      console.log('🟢 Backend connection established');
-    } else {
-      console.log('🟡 Backend unavailable - frontend operating in offline mode');
-    }
-
     const rootElement = document.getElementById('root');
     if (!rootElement) {
       throw new Error('Root element not found in DOM');
@@ -225,18 +184,29 @@ const initializeApp = async () => {
     const root = ReactDOM.createRoot(rootElement);
     root.render(
       <React.StrictMode>
-        <App />
-      </React.StrictMode>
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
+      </React.StrictMode>,
     );
 
     console.log(
       '%c✅ RyanAI Command Center v4.5.0-matrix Ready',
-      'font-size: 14px; color: #00ff66; font-weight: bold; text-shadow: 0 0 10px #00ff66;'
+      'font-size: 14px; color: #00ff66; font-weight: bold; text-shadow: 0 0 10px #00ff66;',
     );
     console.log(
       `%c📍 API: ${API_BASE_URL}`,
-      'color: #00f3ff; font-family: monospace; font-size: 12px;'
+      'color: #00f3ff; font-family: monospace; font-size: 12px;',
     );
+
+    const backendHealthy = await performHealthCheck();
+    if (backendHealthy) {
+      console.log('🟢 Backend connection established');
+    } else {
+      console.log(
+        '🟡 Backend unavailable - frontend operating in offline mode',
+      );
+    }
 
     window.dispatchEvent(
       new CustomEvent('ryanai-ready', {
@@ -246,21 +216,18 @@ const initializeApp = async () => {
           backendHealthy,
           timestamp: new Date().toISOString(),
         },
-      })
+      }),
     );
   } catch (error) {
     console.error('❌ Failed to initialize RyanAI Command Center:', error);
 
-    const errorBoundary = document.getElementById('error-boundary');
-    const loadingScreen = document.getElementById('loading-screen');
-
-    if (errorBoundary && loadingScreen) {
-      loadingScreen.style.display = 'none';
-      errorBoundary.style.display = 'block';
-      const errorDetails = document.getElementById('error-details');
-      if (errorDetails) {
-        errorDetails.textContent = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      }
+    const rootElement = document.getElementById('root');
+    if (rootElement) {
+      const message = document.createElement('p');
+      message.setAttribute('role', 'alert');
+      message.textContent =
+        'RyanAI could not start. Reload the page to try again.';
+      rootElement.replaceChildren(message);
     }
 
     window.dispatchEvent(
@@ -269,7 +236,7 @@ const initializeApp = async () => {
           error: error instanceof Error ? error.message : 'Unknown error',
           timestamp: new Date().toISOString(),
         },
-      })
+      }),
     );
 
     throw error;
@@ -281,19 +248,15 @@ const initializeApp = async () => {
 // ============================================================================
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeApp);
+  document.addEventListener(
+    'DOMContentLoaded',
+    () => {
+      void initializeApp().catch(console.error);
+    },
+    { once: true },
+  );
 } else {
   initializeApp().catch(console.error);
-}
-
-// ============================================================================
-// HOT MODULE REPLACEMENT (HMR) FOR DEVELOPMENT
-// ============================================================================
-
-if (import.meta.hot) {
-  import.meta.hot.accept('./App', () => {
-    console.log('🔄 Hot module replacement triggered');
-  });
 }
 
 // ============================================================================
@@ -317,14 +280,12 @@ if (APP_ENV === 'development') {
 
   console.log(
     '%c💻 Development Mode - Debug utilities available at window.__DEV__',
-    'color: #00f3ff; font-size: 12px; font-family: monospace;'
-=======
-const rootElement = document.getElementById('root');
-if (rootElement) {
-  ReactDOM.createRoot(rootElement).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>
->>>>>>> eefb063 (Update main.tsx)
+    'color: #00f3ff; font-size: 12px; font-family: monospace;',
   );
 }
+
+// ============================================================================
+// EXPORT FOR TYPE SAFETY
+// ============================================================================
+
+export { apiClient, APP_VERSION, API_BASE_URL, APP_ENV };

@@ -4,6 +4,7 @@ import '../loadEnv.js';
 // Tracing must precede application imports.
 import '../instrument.js';
 import '../telemetry.js';
+import './engine/cudaLoader.js';
 
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
@@ -117,6 +118,7 @@ const serviceStatus = {
 async function registerPlugins() {
   // Check readiness before Avvio's plugin timeout obscures connection failures.
   const redis = await connectRedis(config.redis.url);
+  // 1. Register Fastify Redis Connection
   await fastify.register(fastifyRedis, {
     client: redis,
     closeClient: true,
@@ -226,13 +228,9 @@ function registerCoreRoutes() {
     };
   };
 
-<<<<<<< HEAD
-fastify.get('/health', healthCheck);
-fastify.get(API_ROUTES.healthPath, healthCheck);
-=======
-  fastify.get('/health', healthCheck);
-  fastify.get('/api/health', healthCheck);
->>>>>>> 46f6e7a (fix(auth): enforce rate limits before provider verification)
+  for (const path of new Set(['/health', '/api/health', API_ROUTES.healthPath])) {
+    fastify.get(path, healthCheck);
+  }
 
   // Sentry integration test route
   fastify.get('/debug-sentry', async () => {
@@ -281,47 +279,10 @@ fastify.get(API_ROUTES.healthPath, healthCheck);
     };
   }
 
-  fastify.post<{ Body: { prompt?: string; model?: string } }>(
-    '/api/reason',
-    async (request, reply) => {
-      const prompt = request.body?.prompt?.trim();
-      if (!prompt) {
-        return reply
-          .code(400)
-          .send({ success: false, error: 'A non-empty prompt is required' });
-      }
-
-      try {
-        return await runReasoning(prompt, request.body?.model);
-      } catch (err) {
-        fastify.log.error({ err }, 'Reasoning request failed');
-        return reply.code(502).send({
-          success: false,
-          error:
-            err instanceof Error
-              ? err.message
-              : 'Reasoning provider request failed',
-        });
-      }
-    },
-  );
-
-<<<<<<< HEAD
-  return {
-    success: true,
-    objective: prompt,
-    output,
-    reasoningTrace,
-    engine: 'RyanAI LangGraph ReAct',
-    response: output,
-    trace: reasoningTrace,
-    timestamp: new Date().toISOString(),
-  };
-}
-
-fastify.post<{ Body: { prompt?: string; model?: string } }>(
-  API_ROUTES.reasonPath,
-  async (request, reply) => {
+  const reasonHandler = async (
+    request: FastifyRequest<{ Body: { prompt?: string; model?: string } }>,
+    reply: FastifyReply,
+  ) => {
     const prompt = request.body?.prompt?.trim();
     if (!prompt) {
       return reply
@@ -341,19 +302,18 @@ fastify.post<{ Body: { prompt?: string; model?: string } }>(
             : 'Reasoning provider request failed',
       });
     }
-  },
-);
+  };
+  for (const path of new Set(['/api/reason', API_ROUTES.reasonPath])) {
+    fastify.post(path, reasonHandler);
+  }
 
-// Reasoning stream endpoint
-fastify.post<{ Body: { prompt?: string; sessionId?: string; model?: string } }>(
-  API_ROUTES.streamPath,
-  async (request, reply) => {
-=======
   // Reasoning stream endpoint
-  fastify.post<{
-    Body: { prompt?: string; sessionId?: string; model?: string };
-  }>('/api/reasoning/stream', async (request, reply) => {
->>>>>>> 46f6e7a (fix(auth): enforce rate limits before provider verification)
+  const streamHandler = async (
+    request: FastifyRequest<{
+      Body: { prompt?: string; sessionId?: string; model?: string };
+    }>,
+    reply: FastifyReply,
+  ) => {
     const prompt = request.body?.prompt?.trim();
     const { sessionId } = request.body || {};
     if (!prompt) {
@@ -406,7 +366,10 @@ fastify.post<{ Body: { prompt?: string; sessionId?: string; model?: string } }>(
         raw.end();
       }
     }
-  });
+  };
+  for (const path of new Set(['/api/reasoning/stream', API_ROUTES.streamPath])) {
+    fastify.post(path, streamHandler);
+  }
 
   // MCP routes
   fastify.post<{

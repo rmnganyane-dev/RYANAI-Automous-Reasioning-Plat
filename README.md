@@ -97,6 +97,34 @@ The frontend route manifest lives in [`app/routes.json`](./app/routes.json); the
 - Python 3.10+ only for Python tooling and workflow tests
 - CMake and a C++17 compiler only for `native/local-inference`
 
+### Optional CS-Script VS Code extension
+
+CS-Script is optional editor tooling; the platform does not require .NET. If the
+extension reports missing tools, install the [.NET SDK](https://dotnet.microsoft.com/en-us/download)
+on the machine where the extension runs. For a remote VS Code window, that means
+the remote host or development container.
+
+From the repository root, run:
+
+```bash
+npm run setup:cs-script
+```
+
+This checks for an SDK, installs missing global `cs-script.cli` and `cs-syntaxer`
+tools, and updates tools already installed. It requires network access to NuGet
+and permission to write to your user's .NET tools directory. It is opt-in and
+does not run during `npm install` or container creation.
+
+Ensure `$HOME/.dotnet/tools` (Linux/macOS) or `%USERPROFILE%\.dotnet\tools`
+(Windows) is on PATH. Restart VS Code, then run **CS-Script: Detect and integrate
+CS-Script** from the Command Palette.
+
+The `MD034/no-bare-urls` warning in the extension's generated `integration-error.md`
+is a separate Markdown formatting issue. Use a Markdown link such as
+`[Download the .NET SDK](https://dotnet.microsoft.com/en-us/download)` to fix it.
+The file lives in your VS Code user configuration, outside this repository.
+
+
 ### Windows command entry
 
 Paste only the command, without a trailing `# description`. Command Prompt does not
@@ -130,11 +158,11 @@ notepad .env
 ```
 
 Edit `.env` before starting Docker. Replace `DB_PASSWORD`, `REDIS_PASSWORD`,
-`JWT_SECRET`, and `MCP_AUTH_TOKEN` with independent random values. This command
-works in all three shells and prints four values you can use, one per setting:
+and `MCP_AUTH_TOKEN` with independent random values. This command
+works in all three shells and prints three values you can use, one per setting:
 
 ```text
-node -e "for(let i=0;i<4;i++) console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+node -e "for(let i=0;i<3;i++) console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
 For local Node processes, also put the corresponding database/cache passwords
@@ -145,7 +173,7 @@ docker compose config --quiet
 npm run docker:up
 ```
 
-Continue only after the configuration check succeeds. Compose checks all four
+Continue only after the configuration check succeeds. Compose checks all three
 required variables even when starting only PostgreSQL and Redis.
 
 If Vite reports a missing `RYANAI/core.json` or `src/lib/supabase` module,
@@ -223,7 +251,7 @@ npm run install:all
 ```
 
 Create `.env` from `.env.example` only if it does not already exist. Replace the
-four secret placeholders, and also replace the matching password portions of
+three secret placeholders, and also replace the matching password portions of
 `DATABASE_URL` and `REDIS_URL`. Set `PORT=3001` and remove any old
 `NODE_ENV=production` line. Start only the database and cache containers, then
 keep this terminal running:
@@ -477,6 +505,23 @@ npm run release
 
 `npm run test` runs the local Vitest suite. `npm run test:e2e` and `npm run test:integration` require the API and web stack to be running; integration tests also need reachable PostgreSQL and Redis configured with `DATABASE_URL` and `REDIS_URL`. These are commands to execute in your environment, not a claim that production deployment has been verified.
 
+Both smoke scripts load `.env` (existing shell values take precedence). For a local
+API/Vite session, use `npm run test:e2e -- --local` or
+`npm run test:integration -- --local`; these use `PORT` (default 3001) and
+`VITE_PORT` (default 1420) instead of the Compose URLs. Otherwise configure
+`API_BASE_URL`, `WEB_BASE_URL`, and optionally `API_HEALTH_URL`.
+
+Anonymous reasoning requests and WebSocket upgrades must return HTTP 401.
+To also check authenticated behavior, supply short-lived Supabase access tokens
+in your local environment: `TEST_USER_ACCESS_TOKEN` for the end-to-end empty-prompt
+check (HTTP 400), and `TEST_ADMIN_ACCESS_TOKEN` for successful WebSocket upgrades
+in both scripts. The latter account must have trusted `app_metadata.role=admin`.
+Tokens are sent only in authorization headers; do not commit them. Use trusted
+API targets when supplying tokens. Missing tokens produce explicit `SKIP` lines
+and a separate skipped count; supplied invalid/expired tokens or a non-admin
+WebSocket token fail the checks. A pass with skipped checks does not validate
+sign-in, authenticated reasoning, or administrator access.
+
 ### Sandbox Test Console
 Open http://localhost:9090/sandbox.html to test:
 - API connectivity
@@ -528,7 +573,6 @@ REDIS_URL=redis://:${REDIS_PASSWORD}@localhost:6379
 REDIS_TIMEOUT=5000
 
 # Authentication
-JWT_SECRET=your-secret-key-here-change-in-production
 JWT_EXPIRES_IN=24h
 
 # API Configuration
