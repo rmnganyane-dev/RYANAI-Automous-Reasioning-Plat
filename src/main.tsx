@@ -284,11 +284,3 @@ if (APP_ENV === 'development') {
 // ============================================================================
 
 export { apiClient, APP_VERSION, API_BASE_URL, APP_ENV };
-const rootElement = document.getElementById('root');
-if (rootElement) {
-  ReactDOM.createRoot(rootElement).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>
-  );
-}
