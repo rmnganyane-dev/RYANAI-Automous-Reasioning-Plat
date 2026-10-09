@@ -55,6 +55,10 @@ async function getKey(): Promise<CryptoKey> {
   );
 }
 
+/**
+ * Run one IndexedDB request and resolve its result only after transaction commit.
+ * Closes the database after the operation; opening, request, and transaction errors reject.
+ */
 async function withStore<T>(
   mode: IDBTransactionMode,
   operation: (store: IDBObjectStore) => IDBRequest<T>,
@@ -76,6 +80,12 @@ async function withStore<T>(
   }
 }
 
+/**
+ * Insert or replace a persisted vector by ID, resolving after transaction commit.
+ * Only id, vector, and metadata are stored. The vector uses a shared application
+ * key for obfuscation; metadata remains unencrypted.
+ * Serialization, cryptography, and IndexedDB failures reject.
+ */
 export async function saveVector(entry: VectorEntry): Promise<void> {
   const key = await getKey();
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -94,6 +104,10 @@ export async function saveVector(entry: VectorEntry): Promise<void> {
   await withStore('readwrite', (store) => store.put(record));
 }
 
+/**
+ * Load and decrypt a persisted vector, returning null only when its ID is absent.
+ * IndexedDB, cryptography, and JSON parsing failures reject.
+ */
 export async function loadVector(id: string): Promise<VectorEntry | null> {
   const record = await withStore<StoredVectorRecord | undefined>(
     'readonly',
@@ -116,14 +130,23 @@ export async function loadVector(id: string): Promise<VectorEntry | null> {
   };
 }
 
+/**
+ * Delete a persisted vector, resolving after commit even if the ID is absent.
+ * IndexedDB failures reject.
+ */
 export async function deleteVector(id: string): Promise<void> {
   await withStore('readwrite', (store) => store.delete(id));
 }
 
+/** Clear all persisted vectors and resolve after commit; IndexedDB failures reject. */
 export async function clearVectorCache(): Promise<void> {
   await withStore('readwrite', (store) => store.clear());
 }
 
+/**
+ * Clear persisted vectors, then the shared in-memory cache.
+ * If IndexedDB clearing fails, reject without clearing the in-memory cache.
+ */
 export async function clearCache(): Promise<void> {
   await clearVectorCache();
   await airGapCache.clear();
@@ -142,6 +165,10 @@ export class AirGapCache {
     this.defaultTtl = options?.ttl ?? 3600000; // 1 hour default
   }
 
+  /**
+   * Return the cached value, or null when absent or at/past its expiry.
+   * Expired entries are removed on access.
+   */
   async get<T = unknown>(key: string): Promise<T | null> {
     const entry = this.store.get(key);
     if (!entry) return null;
@@ -152,6 +179,10 @@ export class AirGapCache {
     return entry.value as T;
   }
 
+  /**
+   * Replace a cached value with a TTL in milliseconds, using the instance default
+   * (one hour unless configured) when omitted. Zero or negative TTLs expire immediately.
+   */
   async set(key: string, value: unknown, ttl?: number): Promise<void> {
     const expiry = Date.now() + (ttl ?? this.defaultTtl);
     this.store.set(key, { value, expiry });

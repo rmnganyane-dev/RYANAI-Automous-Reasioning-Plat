@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
+/**
+ * Track the restored Supabase session and subsequent auth changes, excluding
+ * anonymous users. Restoration failures become error state. The returned signOut
+ * resolves to false on failure or missing configuration and true on success.
+ */
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(Boolean(supabase));

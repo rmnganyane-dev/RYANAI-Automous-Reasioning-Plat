@@ -36,7 +36,13 @@ async function dispatch(resource, params) {
   return { response, data };
 }
 
-/** Send a WhatsApp message and track the event in Segment */
+/**
+ * Send a WhatsApp message and track the event in Segment.
+ * Supply to/from without the whatsapp: prefix; userId identifies the Segment user.
+ * Returns Twilio's parsed response. Non-OK responses are tracked as failures and
+ * reject; configuration, transport, JSON parsing, and synchronous tracking errors
+ * also propagate. Tracking is queued without waiting for a flush.
+ */
 export async function sendWhatsAppAndTrack({ userId, to, from, contentSid }) {
   const { response, data } = await dispatch('Messages', {
     To: `whatsapp:${to}`,
@@ -61,7 +67,12 @@ export async function sendWhatsAppAndTrack({ userId, to, from, contentSid }) {
   return data;
 }
 
-/** Initiate a voice call and track the event in Segment */
+/**
+ * Initiate a voice call and track the event in Segment for userId.
+ * Returns Twilio's parsed response. Non-OK responses are tracked as failures and
+ * reject; configuration, transport, JSON parsing, and synchronous tracking errors
+ * also propagate. Tracking is queued without waiting for a flush.
+ */
 export async function makeVoiceCallAndTrack({ userId, to, from, twimlUrl }) {
   const { response, data } = await dispatch('Calls', { To: to, From: from, Url: twimlUrl });
 

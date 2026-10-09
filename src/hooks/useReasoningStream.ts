@@ -11,6 +11,13 @@ export interface StreamEventData {
   error?: string;
 }
 
+/**
+ * Expose authenticated reasoning streaming and its active-request state.
+ * The returned streamReasoning delivers processing messages and complete results;
+ * onComplete runs for each complete event, not merely at end of stream.
+ * Authentication, transport, parsing, server-event, and callback Error objects
+ * reject the request; streaming state is reset in finally.
+ */
 export function useRyanStream() {
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
 

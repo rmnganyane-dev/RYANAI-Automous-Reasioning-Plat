@@ -189,6 +189,11 @@ export class RyanMCPServer {
     });
   }
 
+  /**
+   * Validate patch arguments and return the patch result as MCP text content.
+   * Non-success statuses set isError. Invalid arguments and rejected patch calls
+   * propagate to the tool handler, which converts them into MCP error responses.
+   */
   private async applyPatchTool(args: Record<string, unknown> | undefined) {
     const { filePath, patchContent, testScript } = args ?? {};
     if (

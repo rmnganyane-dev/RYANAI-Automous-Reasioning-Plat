@@ -7,7 +7,11 @@ export interface PatchRequest {
 }
 
 export class SelfPatchSkill {
-  /** Stage and verify a candidate before atomically promoting its original bytes. */
+  /**
+   * Stage and verify replacement file content in the current working directory.
+   * The directory must be a Linux Git repository root. Returns the success,
+   * rejected, conflict, or failed result from {@link applyWorkspacePatch}.
+   */
   public static async applyAndVerifyPatch(request: PatchRequest) {
     return applyWorkspacePatch(process.cwd(), request);
   }

@@ -348,7 +348,16 @@ async function cleanupPatch(ownership: PatchOwnership) {
   await fs.rm(retired, { recursive: true, force: true });
 }
 
-/** All cooperating writers must hold this lock; crashes deliberately leave it for recovery. */
+/**
+ * Verify and replace an existing tracked file in a Linux Git workspace.
+ * All cooperating writers must hold this lock; crashes deliberately leave it for recovery.
+ * @param workspace - Git repository root whose working files are snapshotted.
+ * @param request - Workspace-relative filePath, full replacement patchContent
+ * (no more than 8 MiB), and optional JavaScript testScript for the verifier.
+ * @returns success after promotion, rejected for failed verification, conflict
+ * if the snapshot changed, or failed for caught validation, I/O, or cleanup errors.
+ * A failed result after promotion may still leave the replacement in place.
+ */
 export async function applyWorkspacePatch(
   workspace: string,
   request: PatchRequest,
@@ -438,7 +447,14 @@ async function recoverPromotion(root: string, journal: Journal) {
   return status;
 }
 
-/** Operator-only: stop ALL writers first. Never expose this through the agent/MCP tools. */
+/**
+ * Operator-only: stop ALL writers first. Never expose this through the agent/MCP tools.
+ * Retire an interrupted patch's lock and staging data without restoring file bytes.
+ * @param confirmQuiescent - Caller confirmation that all workspace writers have stopped.
+ * @returns A status of nothing_to_recover, aborted, or committed.
+ * @throws If confirmation is absent, recovery state is invalid, promotion conflicts
+ * with current file contents, or filesystem operations fail.
+ */
 export async function recoverWorkspacePatch(
   workspace: string,
   confirmQuiescent: boolean,

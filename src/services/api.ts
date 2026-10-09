@@ -28,6 +28,11 @@ export async function fetchSystemHealth(): Promise<SystemHealth> {
   return response.json();
 }
 
+/**
+ * Post a prompt using the current session and return the parsed reasoning response.
+ * Rejects on authentication, transport, or response JSON errors and on non-OK HTTP
+ * status, using the server error message when available.
+ */
 export async function executeAgentReasoning(
   prompt: string,
 ): Promise<ReasonResponse> {

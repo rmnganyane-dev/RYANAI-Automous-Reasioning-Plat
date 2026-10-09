@@ -49,6 +49,11 @@ export function generateTitle(text: string): string {
   return words.join(' ').substring(0, 50) + (text.length > 50 ? '...' : '');
 }
 
+/**
+ * Load conversations from the userId-specific localStorage key.
+ * Return an empty array for missing data, read failures, or invalid JSON;
+ * parsed values are not schema-validated.
+ */
 export function loadConversations(userId: string): Conversation[] {
   try {
     const data = localStorage.getItem(`${STORAGE_KEY}:${userId}`);
@@ -58,6 +63,10 @@ export function loadConversations(userId: string): Conversation[] {
   }
 }
 
+/**
+ * Replace conversations at the userId-specific localStorage key.
+ * Serialization and storage failures are caught; return does not confirm persistence.
+ */
 export function saveConversations(
   conversations: Conversation[],
   userId: string,
@@ -72,6 +81,11 @@ export function saveConversations(
   }
 }
 
+/**
+ * Load memory from the userId-specific localStorage key.
+ * Return an empty array for missing data, read failures, or invalid JSON;
+ * parsed values are not schema-validated.
+ */
 export function loadMemory(userId: string): MemoryEntry[] {
   try {
     const data = localStorage.getItem(`${MEMORY_KEY}:${userId}`);
@@ -81,6 +95,10 @@ export function loadMemory(userId: string): MemoryEntry[] {
   }
 }
 
+/**
+ * Replace memory at the userId-specific localStorage key.
+ * Serialization and storage failures are caught; return does not confirm persistence.
+ */
 export function saveMemory(entries: MemoryEntry[], userId: string): void {
   try {
     localStorage.setItem(`${MEMORY_KEY}:${userId}`, JSON.stringify(entries));
@@ -89,6 +107,10 @@ export function saveMemory(entries: MemoryEntry[], userId: string): void {
   }
 }
 
+/**
+ * Append a timestamped entry to the user's memory and attempt to save it.
+ * Returns the new entry even if storage fails; malformed stored structures can throw.
+ */
 export function addMemoryEntry(
   content: string,
   userId: string,
@@ -108,6 +130,10 @@ export function addMemoryEntry(
   return entry;
 }
 
+/**
+ * Remove matching IDs from the user's memory and attempt to save the remainder.
+ * Storage failures are caught; malformed stored structures can throw.
+ */
 export function deleteMemoryEntry(id: string, userId: string): void {
   const entries = loadMemory(userId);
   const filtered = entries.filter((e) => e.id !== id);

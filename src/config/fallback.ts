@@ -4,7 +4,10 @@ import { BaseMessage } from '@langchain/core/messages';
 
 export class BrainFallbackHandler {
   /**
-   * Executes a model call with automatic fallback resilience
+   * Invoke the selected brain, retrying once with the secondary brain on failure.
+   * Selecting the secondary brain also retries that same brain.
+   * @returns The first successful model response.
+   * @throws The secondary attempt's error if both attempts fail.
    */
   static async safeInvoke(
     brainType: 'primary' | 'secondary' | 'logic',

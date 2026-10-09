@@ -110,6 +110,10 @@ async function runService(serviceName: string): Promise<boolean> {
   });
 }
 
+/**
+ * Probe configured HTTP health endpoints and return true even when they fail.
+ * The database and Redis entries are not probed because their URLs are not HTTP.
+ */
 async function runHealthChecks(): Promise<boolean> {
   logger.info('Running health checks...');
 
