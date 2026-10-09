@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { authenticatedFetch } from '@/lib/authenticatedFetch';
 /**
  * RyanAI Command Center - Main Frontend Entry Point
@@ -5,26 +6,24 @@ import { authenticatedFetch } from '@/lib/authenticatedFetch';
  * Version: 4.5.0-matrix
  */
 
+=======
+>>>>>>> eefb063 (Update main.tsx)
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+<<<<<<< HEAD
 import { API_BASE_URL } from './lib/apiBaseUrl';
 
 // ============================================================================
 // ENVIRONMENT CONFIGURATION
 // ============================================================================
+=======
+>>>>>>> eefb063 (Update main.tsx)
 
 const APP_VERSION = '4.5.0-matrix';
-const APP_ENV = import.meta.env.MODE || 'development';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-// ============================================================================
-// GLOBAL API CLIENT
-// ============================================================================
-
-/**
- * Global API client for backend communication
- */
 class RyanAIClient {
   private baseURL: string;
   private version: string;
@@ -32,6 +31,7 @@ class RyanAIClient {
   constructor(baseURL: string, version: string) {
     this.baseURL = baseURL;
     this.version = version;
+<<<<<<< HEAD
     console.log(`🚀 RyanAI Client initialized | API: ${baseURL} | Version: ${version}`);
   }
 
@@ -132,23 +132,30 @@ class RyanAIClient {
   async healthCheck() {
     return this.request('/health');
   }
-}
+=======
+  }
 
-// ============================================================================
-// INITIALIZE GLOBAL CLIENT
-// ============================================================================
+  async healthCheck(): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseURL}/health`);
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+>>>>>>> eefb063 (Update main.tsx)
+}
 
 const apiClient = new RyanAIClient(API_BASE_URL, APP_VERSION);
 
-// Attach to window for global access with complete TypeScript declarations
 declare global {
   interface Window {
     ryanai: {
       client: RyanAIClient;
       version: string;
-      environment: string;
       apiUrl: string;
     };
+<<<<<<< HEAD
     __DEV__?: {
       apiClient: RyanAIClient;
       logs: Console;
@@ -156,16 +163,18 @@ declare global {
       simulateError: (errorId: string) => Promise<unknown>;
       checkHealth: () => Promise<boolean>;
     };
+=======
+>>>>>>> eefb063 (Update main.tsx)
   }
 }
 
 window.ryanai = {
   client: apiClient,
   version: APP_VERSION,
-  environment: APP_ENV,
   apiUrl: API_BASE_URL,
 };
 
+<<<<<<< HEAD
 // ============================================================================
 // ERROR TRACKING (OPTIONAL SENTRY)
 // ============================================================================
@@ -309,5 +318,13 @@ if (APP_ENV === 'development') {
   console.log(
     '%c💻 Development Mode - Debug utilities available at window.__DEV__',
     'color: #00f3ff; font-size: 12px; font-family: monospace;'
+=======
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+>>>>>>> eefb063 (Update main.tsx)
   );
 }
