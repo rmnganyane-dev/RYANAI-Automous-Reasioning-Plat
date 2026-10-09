@@ -343,6 +343,26 @@ vite.config.ts             # Vite config
 
 ## 🛠️ Development
 
+### Load only the UI
+
+```bash
+npm ci --legacy-peer-deps
+npm run dev:web
+```
+
+Open http://localhost:1420. The React UI mounts without waiting for the API,
+PostgreSQL, Redis, MCP, or model credentials. Health checks use `/api/health` and
+time out after five seconds; unavailable services are reported in the UI.
+Navigation and the local workspace remain available, while live reasoning needs
+the configured API. For a built UI, run `npm run build` then `npm run preview`.
+
+Keep `index.html` at the project root and `App.tsx` under `src/`. The supported
+API entrypoint is `src/server/launcher.ts` (`npm run dev:api`); the standalone
+`server.ts` and `src/server.ts` scripts are legacy alternatives and do not serve
+the React UI. Docker Compose serves the UI through `Dockerfile.web`/Nginx on
+http://localhost:9090. Preserve the repository's full `.dockerignore` when
+integrating standalone file copies.
+
 ### All Services at Once
 ```bash
 npm run dev
@@ -457,6 +477,9 @@ npm run ship
 ```
 
 For Vercel, set `VITE_API_BASE_URL` to the HTTPS origin of a separately hosted RyanAI API. Vercel hosts the static web frontend; it does not host this repository's API, PostgreSQL, or Redis services.
+
+If reasoning reports `404 NOT_FOUND` with a Vercel request ID, check the request URL in the browser Network panel. It must target the Fastify API's `/api/reasoning/stream`, not the Vercel frontend. Set `VITE_API_BASE_URL` in the Vercel project's environment settings for the affected deployment environment, then rebuild/redeploy (Vite embeds this value at build time). Use only the API's HTTPS origin, without `/api` or a route suffix. Verify that origin's `/api/health` returns the RyanAI gateway JSON; a degraded response indicates backend dependencies need attention. Vercel builds now reject a missing or invalid API origin, including the deployment's own Vercel hostname. `VITE_API_URL` remains a legacy fallback. Running or changing `src/server/launcher.ts` alone does not create API routes on Vercel.
+
 
 GitHub Actions publishes production images after validation on the configured default branch. To enable the GitHub Actions Vercel deployment, configure repository secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`, plus repository variables `VERCEL_DEPLOY_ENABLED=true` and `VITE_API_BASE_URL` (the deployed API origin). The repository's [`vercel.json`](./vercel.json) sets `npm ci --legacy-peer-deps` as the install command and `npm run build:web` as the build command. Do not set `npm run build:web` as Vercel's install command. Older commits do not contain these configuration changes; deploy a commit that includes them.
 
