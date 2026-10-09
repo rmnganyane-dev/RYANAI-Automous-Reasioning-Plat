@@ -72,6 +72,7 @@ export async function requireUser(
   }
 }
 
+/** Require a verified Supabase user and reject non-admin accounts with HTTP 403. */
 export async function requireAdmin(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -120,6 +121,7 @@ export function installAuthentication(fastify: FastifyInstance) {
   });
 }
 
+/** Register session verification and retire legacy login and logout routes with HTTP 410. */
 export const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     '/api/auth/verify',

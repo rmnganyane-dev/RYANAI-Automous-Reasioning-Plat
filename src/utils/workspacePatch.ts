@@ -25,18 +25,23 @@ interface Snapshot {
   files: Map<string, { content: Buffer; mode: number }>;
 }
 
+/** Return the SHA-256 hex digest used to compare workspace and candidate contents. */
 function hash(content: Buffer | string) {
   return createHash("sha256").update(content).digest("hex");
 }
+/** Derive a temporary staging path from the workspace root hash and transaction ID. */
 function stageDirectory(root: string, id: string) {
   return path.join("/tmp", `ryan-patch-stage-${hash(root)}-${id}`);
 }
+/** Convert a caught value to an error message for the patch result. */
 function message(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
+/** Identify filesystem errors caused by a missing file or directory. */
 function isMissing(error: unknown) {
   return (error as NodeJS.ErrnoException).code === "ENOENT";
 }
+/** Check that a relative patch path excludes traversal, state, dependency, and credential paths. */
 function allowed(relative: string) {
   const parts = relative.split("/");
   return (
@@ -88,11 +93,13 @@ async function inspect(root: string, relative: string) {
   }
   return null;
 }
+/** Read an inspected regular file, returning null only when the target is absent. */
 async function readTarget(root: string, relative: string) {
   return (await inspect(root, relative))
     ? fs.readFile(path.join(root, relative))
     : null;
 }
+/** Flush directory metadata to disk and always close the directory handle. */
 async function syncDirectory(directory: string) {
   const handle = await fs.open(directory, "r");
   try {
@@ -101,6 +108,7 @@ async function syncDirectory(directory: string) {
     await handle.close();
   }
 }
+/** Exclusively create a file, write and sync its contents, and apply the requested mode. */
 async function durableWrite(
   filename: string,
   content: string | Buffer,
@@ -115,12 +123,14 @@ async function durableWrite(
     await handle.close();
   }
 }
+/** Atomically replace the transaction journal and sync its directory for crash recovery. */
 async function saveJournal(lock: string, journal: Journal) {
   const temporary = path.join(lock, `journal-${randomUUID()}.tmp`);
   await durableWrite(temporary, JSON.stringify(journal));
   await fs.rename(temporary, path.join(lock, "journal.json"));
   await syncDirectory(lock);
 }
+/** Create or validate the private patch state directory owned by the current user. */
 async function stateDirectory(root: string) {
   const state = path.join(root, STATE);
   await fs.mkdir(state, { mode: 0o700 }).catch((error) => {
@@ -141,6 +151,7 @@ async function stateDirectory(root: string) {
   await syncDirectory(root);
   return state;
 }
+/** Run a bounded Git command with filesystem monitoring and global configuration disabled. */
 async function git(root: string, args: string[]) {
   const result = await execFileAsync(
     "/usr/bin/git",
@@ -194,6 +205,7 @@ interface PatchOwnership {
   promotionStarted: boolean;
 }
 
+/** Acquire exclusive patch ownership, rejecting an existing lock that is busy or unrecovered. */
 async function acquirePatchLock(root: string, ownership: PatchOwnership) {
   const state = await stateDirectory(root);
   const lock = path.join(state, "lock");
@@ -212,6 +224,7 @@ async function acquirePatchLock(root: string, ownership: PatchOwnership) {
   return lock;
 }
 
+/** Copy tracked snapshot bytes and the candidate into staging with verifier-readable modes. */
 async function stageSnapshot(
   stage: string,
   baseline: Snapshot,
@@ -239,6 +252,7 @@ async function stageSnapshot(
   );
 }
 
+/** Check that the workspace revision and original target bytes still match the validation baseline. */
 async function revisionMatches(
   root: string,
   baseline: Snapshot,
@@ -252,6 +266,10 @@ async function revisionMatches(
   );
 }
 
+/**
+ * Persist promotion intent, atomically replace the target, and mark the journal committed.
+ * Keep recovery ownership on failures after promotion has started.
+ */
 async function promotePatch(
   root: string,
   lock: string,
@@ -275,6 +293,10 @@ async function promotePatch(
   ownership.promotionStarted = false;
 }
 
+/**
+ * Lock and snapshot the workspace, validate a staged candidate, then check conflicts and promote.
+ * Return rejected or conflict results without promotion; propagate operational failures.
+ */
 async function executePatch(
   workspace: string,
   request: PatchRequest,
@@ -337,6 +359,7 @@ async function executePatch(
   };
 }
 
+/** Remove staging and retire a held lock when promotion is not in an uncertain state. */
 async function cleanupPatch(ownership: PatchOwnership) {
   const { lock, stagingRoot, promotionStarted } = ownership;
   // A crash or uncertain promotion leaves ownership/journal intact for explicit recovery.
@@ -375,6 +398,7 @@ export async function applyWorkspacePatch(
   return result;
 }
 
+/** Return whether a recovery lock exists, rejecting links or non-directory lock paths. */
 async function recoveryLockExists(lock: string) {
   let stat;
   try {
@@ -388,6 +412,7 @@ async function recoveryLockExists(lock: string) {
   return true;
 }
 
+/** Read the persisted journal, returning undefined if it is missing and propagating other errors. */
 async function readRecoveryJournal(lock: string) {
   try {
     return JSON.parse(
@@ -399,6 +424,7 @@ async function readRecoveryJournal(lock: string) {
   }
 }
 
+/** Reject journals with an unsupported version, phase, transaction ID, or patch path. */
 function validateRecoveryJournal(journal: Journal) {
   if (
     journal.version !== 1 ||
@@ -417,6 +443,10 @@ function validateRecoveryJournal(journal: Journal) {
   }
 }
 
+/**
+ * Classify interrupted promotion by comparing live bytes with the journal hashes.
+ * Remove its temporary file on a recognized state and throw on conflicts without restoring bytes.
+ */
 async function recoverPromotion(root: string, journal: Journal) {
   if (journal.phase !== "promoting" && journal.phase !== "committed")
     return "aborted";

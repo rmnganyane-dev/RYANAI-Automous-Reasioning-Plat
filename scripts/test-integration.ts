@@ -27,6 +27,7 @@ async function check(name: string, run: () => Promise<void>): Promise<void> {
   }
 }
 
+/** Record whether an HTTP endpoint responds successfully with the expected content type. */
 async function checkHttp(
   name: string,
   url: string,
@@ -48,6 +49,10 @@ async function checkHttp(
   });
 }
 
+/**
+ * Check database, Redis, HTTP, and WebSocket integrations using configured endpoints.
+ * Close database clients and report failures or skipped authenticated checks.
+ */
 async function main(): Promise<void> {
   if (!databaseUrl || !redisUrl) {
     throw new Error(
