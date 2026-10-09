@@ -1,4 +1,4 @@
-import type { ModelId, ModelMeta } from '@/lib/types';
+import type { ModelId } from '@/lib/types';
 
 export default function Model({ model }: { model?: ModelId }) {
   return (

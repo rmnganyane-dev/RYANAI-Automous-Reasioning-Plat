@@ -30,11 +30,11 @@ export async function agentOpsRoutes(fastify: FastifyInstance) {
         objective,
         result: lastMessage.content,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[RyanAI Gateway Execution Error]:", error);
       return reply.code(500).send({
         status: "failed",
-        error: error.message,
+        error: (error instanceof Error ? error.message : String(error)),
       });
     }
   });

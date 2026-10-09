@@ -15,8 +15,8 @@ export function AgentControlPanel() {
     try {
       const res = await TauriBridge.executeObjective(objective);
       setOutput(res.result);
-    } catch (err: any) {
-      setOutput(`Error: ${err.message}`);
+    } catch (err: unknown) {
+      setOutput(`Error: ${(err instanceof Error ? err.message : String(err))}`);
     } finally {
       setLoading(false);
     }

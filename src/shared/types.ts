@@ -48,7 +48,7 @@ export interface AuthContext {
   expiresAt: number;
 }
 
-export interface APIRequest<T = any> {
+export interface APIRequest<T = unknown> {
   id: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   path: string;
@@ -58,7 +58,7 @@ export interface APIRequest<T = any> {
   timestamp: number;
 }
 
-export interface APIResponse<T = any> {
+export interface APIResponse<T = unknown> {
   id: string;
   status: number;
   success: boolean;
@@ -66,13 +66,13 @@ export interface APIResponse<T = any> {
   error?: {
     code: string;
     message: string;
-    details?: Record<string, any>;
+    details?: Record<string, unknown>;
   };
   timestamp: number;
   duration: number;
 }
 
-export interface WebSocketMessage<T = any> {
+export interface WebSocketMessage<T = unknown> {
   id: string;
   type: 'request' | 'response' | 'event' | 'stream' | 'error';
   channel: string;
@@ -87,7 +87,7 @@ export interface WebSocketMessage<T = any> {
 export interface ReasoningRequest {
   prompt: string;
   sessionId: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   maxTokens?: number;
   temperature?: number;
 }
@@ -103,8 +103,8 @@ export interface ReasoningResponse {
 
 export interface ToolCall {
   toolName: string;
-  arguments: Record<string, any>;
-  result?: any;
+  arguments: Record<string, unknown>;
+  result?: unknown;
   error?: string;
 }
 
@@ -115,15 +115,15 @@ export interface AgentState {
     content: string;
     timestamp: number;
   }>;
-  context: Record<string, any>;
+  context: Record<string, unknown>;
   status: 'idle' | 'processing' | 'paused' | 'completed' | 'error';
   lastUpdate: number;
 }
 
-export interface StreamEvent<T = any> {
+export interface StreamEvent<T = unknown> {
   type: 'start' | 'chunk' | 'progress' | 'complete' | 'error';
   data?: T;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   timestamp: number;
 }
 
@@ -132,7 +132,7 @@ export class AppError extends Error {
     public code: string,
     public message: string,
     public status: number = 500,
-    public details?: Record<string, any>
+    public details?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'AppError';
@@ -140,7 +140,7 @@ export class AppError extends Error {
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string, details?: Record<string, any>) {
+  constructor(message: string, details?: Record<string, unknown>) {
     super('VALIDATION_ERROR', message, 400, details);
     this.name = 'ValidationError';
   }

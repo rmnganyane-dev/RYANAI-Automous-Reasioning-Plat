@@ -19,7 +19,7 @@ export async function authGatewayRoutes(fastify: FastifyInstance) {
   
   // 1. Register / Login with Enterprise @ryanai Domain
   fastify.post('/api/v1/auth/ryan-domain', async (req: FastifyRequest, reply: FastifyReply) => {
-    const { username, password, isRegistration } = req.body as any;
+    const { username, password, isRegistration } = req.body as { username: string; password: string; isRegistration?: boolean };
     const email = `${username.toLowerCase()}@ryanai.dev`;
     const ipAddress = req.ip;
     const userAgent = req.headers['user-agent'] || 'unknown';
@@ -70,14 +70,14 @@ export async function authGatewayRoutes(fastify: FastifyInstance) {
         const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
         return reply.send({ success: true, token, user: { id: user.id, email: user.email, role: user.role } });
       }
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err instanceof Error ? err.message : String(err)) });
     }
   });
 
   // 2. Google OAuth2 / Gmail Sign In
   fastify.post('/api/v1/auth/gmail', async (req: FastifyRequest, reply: FastifyReply) => {
-    const { idToken, googleTokens } = req.body as any;
+    const { idToken, googleTokens } = req.body as { idToken: string; googleTokens?: Record<string, string> };
     const ipAddress = req.ip;
     const userAgent = req.headers['user-agent'] || 'unknown';
 
@@ -113,14 +113,14 @@ export async function authGatewayRoutes(fastify: FastifyInstance) {
 
       const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
       return reply.send({ success: true, token, user });
-    } catch (err: any) {
-      return reply.status(401).send({ error: 'Gmail Authentication Failed', details: err.message });
+    } catch (err: unknown) {
+      return reply.status(401).send({ error: 'Gmail Authentication Failed', details: (err instanceof Error ? err.message : String(err)) });
     }
   });
 
   // 3. WhatsApp OTP Auth Engine (Saves OTP securely to Redis with 5 min TTL)
   fastify.post('/api/v1/auth/whatsapp/send-otp', async (req: FastifyRequest, reply: FastifyReply) => {
-    const { phoneNumber } = req.body as any;
+    const { phoneNumber } = req.body as { phoneNumber: string };
     if (!phoneNumber) return reply.status(400).send({ error: 'Phone number is required.' });
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -141,7 +141,7 @@ export async function authGatewayRoutes(fastify: FastifyInstance) {
 
   // 3b. WhatsApp OTP Verification & Login Engine (Validates against Redis)
   fastify.post('/api/v1/auth/whatsapp/verify-otp', async (req: FastifyRequest, reply: FastifyReply) => {
-    const { phoneNumber, enteredOtp } = req.body as any;
+    const { phoneNumber, enteredOtp } = req.body as { phoneNumber: string; enteredOtp: string };
     const ipAddress = req.ip;
     const userAgent = req.headers['user-agent'] || 'unknown';
 
@@ -183,14 +183,14 @@ export async function authGatewayRoutes(fastify: FastifyInstance) {
 
       const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
       return reply.send({ success: true, token, user: { id: user.id, email: user.email, role: user.role } });
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err instanceof Error ? err.message : String(err)) });
     }
   });
 
   // 4. Master Administrator Sign In
   fastify.post('/api/v1/auth/master-admin', async (req: FastifyRequest, reply: FastifyReply) => {
-    const { username, password } = req.body as any;
+    const { username, password } = req.body as { username: string; password: string };
     const adminUser = process.env.MASTER_ADMIN_USER || 'administrator';
     const adminPass = process.env.MASTER_ADMIN_PASS || 'RyanAI_Master_2026!#';
 

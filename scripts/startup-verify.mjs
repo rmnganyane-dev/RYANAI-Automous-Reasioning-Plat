@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
-const apiUrl = (process.env.API_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
-const webUrl = (process.env.WEB_BASE_URL || 'http://localhost:9090').replace(/\/+$/, '');
+import { apiHealthUrl, webUrl, mcpHealthUrl } from './health-config.mjs';
 const timeoutMs = Number(process.env.STARTUP_TIMEOUT_MS || 60_000);
 const retryDelayMs = Number(process.env.STARTUP_RETRY_DELAY_MS || 2_000);
 
@@ -26,15 +25,14 @@ async function checkEndpoint(label, url, validate = () => {}) {
 }
 
 try {
-  await checkEndpoint('API', `${apiUrl}/health`, async (response) => {
+  await checkEndpoint('API', apiHealthUrl, async (response) => {
     const health = await response.json();
     if (health.status !== 'online') throw new Error('API status is not online');
     if (health.services?.database !== true) throw new Error('PostgreSQL is unhealthy');
     if (health.services?.redis !== true) throw new Error('Redis is unhealthy');
   });
   await checkEndpoint('Web frontend', `${webUrl}/health`);
-  const mcpUrl = process.env.MCP_HEALTH_URL;
-  if (mcpUrl) await checkEndpoint('MCP service', mcpUrl);
+  if (mcpHealthUrl) await checkEndpoint('MCP service', mcpHealthUrl);
   console.log('All critical RyanAI services are healthy.');
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
