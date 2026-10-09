@@ -97,6 +97,34 @@ The frontend route manifest lives in [`app/routes.json`](./app/routes.json); the
 - Python 3.10+ only for Python tooling and workflow tests
 - CMake and a C++17 compiler only for `native/local-inference`
 
+### Optional CS-Script VS Code extension
+
+CS-Script is optional editor tooling; the platform does not require .NET. If the
+extension reports missing tools, install the [.NET SDK](https://dotnet.microsoft.com/en-us/download)
+on the machine where the extension runs. For a remote VS Code window, that means
+the remote host or development container.
+
+From the repository root, run:
+
+```bash
+npm run setup:cs-script
+```
+
+This checks for an SDK, installs missing global `cs-script.cli` and `cs-syntaxer`
+tools, and updates tools already installed. It requires network access to NuGet
+and permission to write to your user's .NET tools directory. It is opt-in and
+does not run during `npm install` or container creation.
+
+Ensure `$HOME/.dotnet/tools` (Linux/macOS) or `%USERPROFILE%\.dotnet\tools`
+(Windows) is on PATH. Restart VS Code, then run **CS-Script: Detect and integrate
+CS-Script** from the Command Palette.
+
+The `MD034/no-bare-urls` warning in the extension's generated `integration-error.md`
+is a separate Markdown formatting issue. Use a Markdown link such as
+`[Download the .NET SDK](https://dotnet.microsoft.com/en-us/download)` to fix it.
+The file lives in your VS Code user configuration, outside this repository.
+
+
 ### Windows command entry
 
 Paste only the command, without a trailing `# description`. Command Prompt does not
