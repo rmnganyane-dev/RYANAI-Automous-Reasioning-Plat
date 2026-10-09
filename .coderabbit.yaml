@@ -15,7 +15,6 @@ reviews:
         name: clean up
         instructions: Test
 
-reviews:
   profile: assertive
   path_instructions:
     - path: "src/**/*.ts"
