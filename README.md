@@ -97,6 +97,34 @@ The frontend route manifest lives in [`app/routes.json`](./app/routes.json); the
 - Python 3.10+ only for Python tooling and workflow tests
 - CMake and a C++17 compiler only for `native/local-inference`
 
+### Optional CS-Script VS Code extension
+
+CS-Script is optional editor tooling; the platform does not require .NET. If the
+extension reports missing tools, install the [.NET SDK](https://dotnet.microsoft.com/en-us/download)
+on the machine where the extension runs. For a remote VS Code window, that means
+the remote host or development container.
+
+From the repository root, run:
+
+```bash
+npm run setup:cs-script
+```
+
+This checks for an SDK, installs missing global `cs-script.cli` and `cs-syntaxer`
+tools, and updates tools already installed. It requires network access to NuGet
+and permission to write to your user's .NET tools directory. It is opt-in and
+does not run during `npm install` or container creation.
+
+Ensure `$HOME/.dotnet/tools` (Linux/macOS) or `%USERPROFILE%\.dotnet\tools`
+(Windows) is on PATH. Restart VS Code, then run **CS-Script: Detect and integrate
+CS-Script** from the Command Palette.
+
+The `MD034/no-bare-urls` warning in the extension's generated `integration-error.md`
+is a separate Markdown formatting issue. Use a Markdown link such as
+`[Download the .NET SDK](https://dotnet.microsoft.com/en-us/download)` to fix it.
+The file lives in your VS Code user configuration, outside this repository.
+
+
 ### Windows command entry
 
 Paste only the command, without a trailing `# description`. Command Prompt does not
@@ -159,6 +187,15 @@ template at startup; `PORT` defaults to 80 and `API_HOST`/`API_PORT` default to
 `api`/3000. Compose fixes these container ports independently of local development
 ports. Browser Supabase settings are supplied as public `VITE_SUPABASE_*` build
 arguments; local `.env` files are excluded from the web build inputs.
+### Step 1: Start Everything
+```bash
+cp .env.example .env
+# Replace DB_PASSWORD, REDIS_PASSWORD, JWT_SECRET, and MCP_AUTH_TOKEN placeholders in .env.
+npm run docker:up
+```
+
+On Windows, copy the file with `Copy-Item .env.example .env` (PowerShell) or
+`copy .env.example .env` (Command Prompt), if you do not already have a `.env`.
 
 Set `OPENAI_API_KEY` in `.env` to enable live model reasoning. Without a provider key, the UI and API still start, but reasoning requests return an explicit configuration error.
 
@@ -251,6 +288,23 @@ for a Fastify plugin timeout. Integration checks fail if dependencies are down.
 Use Ctrl+C to stop development processes, then `npm run docker:down` to stop
 the database and cache containers. The Tauri desktop process is optional and
 should be started in its own terminal only when working on the desktop app.
+```
+
+The API and tunnel load the root `.env` before reading configuration. Existing
+shell and Docker Compose environment variables take precedence; `.env` is optional
+when those supply configuration. Local `REDIS_URL` must contain the Redis password
+(and ACL username if required); setting `REDIS_PASSWORD` alone only configures
+Compose. Use the actual password, URL-encoded when necessary, rather than a literal
+`${REDIS_PASSWORD}` reference in `REDIS_URL`. The startup banner reports configuration
+presence, not successful authentication. For local API + Vite development, set
+`PORT=3001` in an existing `.env` copied from an older example; Compose supplies
+port 3000 to its API container independently. `API_BASE_URL` remains the Compose
+integration-check target (3000); set it to `http://localhost:3001` only when running
+integration checks against the local API.
+
+For local development, use `npm run dev:api` (API on port 3001 by default) and `npm run dev:web` (Vite on port 1420). Override ports portably in PowerShell with `$env:PORT='3002'; npm.cmd run dev:api` and `$env:VITE_PORT='5174'; npm.cmd run dev:web`; on bash, use `PORT=3002 npm run dev:api` and `VITE_PORT=5174 npm run dev:web`.
+
+For local Vite development, do not set `NODE_ENV=production` in `.env`; Vite controls development/production mode itself. Docker Compose defaults the API to production without requiring this setting in `.env`. `npm run dev:tunnel` requires ngrok account authentication; set `NGROK_AUTHTOKEN` in the root `.env` or shell. The tunnel uses the same `PORT` value as the API (3001 by default for local development).
 
 ---
 
@@ -314,6 +368,26 @@ vite.config.ts             # Vite config
 ---
 
 ## 🛠️ Development
+
+### Load only the UI
+
+```bash
+npm ci --legacy-peer-deps
+npm run dev:web
+```
+
+Open http://localhost:1420. The React UI mounts without waiting for the API,
+PostgreSQL, Redis, MCP, or model credentials. Health checks use `/api/health` and
+time out after five seconds; unavailable services are reported in the UI.
+Navigation and the local workspace remain available, while live reasoning needs
+the configured API. For a built UI, run `npm run build` then `npm run preview`.
+
+Keep `index.html` at the project root and `App.tsx` under `src/`. The supported
+API entrypoint is `src/server/launcher.ts` (`npm run dev:api`); the standalone
+`server.ts` and `src/server.ts` scripts are legacy alternatives and do not serve
+the React UI. Docker Compose serves the UI through `Dockerfile.web`/Nginx on
+http://localhost:9090. Preserve the repository's full `.dockerignore` when
+integrating standalone file copies.
 
 ### All Services at Once
 ```bash
@@ -429,6 +503,9 @@ npm run ship
 ```
 
 For Vercel, set `VITE_API_BASE_URL` to the HTTPS origin of a separately hosted RyanAI API. Vercel hosts the static web frontend; it does not host this repository's API, PostgreSQL, or Redis services.
+
+If reasoning reports `404 NOT_FOUND` with a Vercel request ID, check the request URL in the browser Network panel. It must target the Fastify API's `/api/reasoning/stream`, not the Vercel frontend. Set `VITE_API_BASE_URL` in the Vercel project's environment settings for the affected deployment environment, then rebuild/redeploy (Vite embeds this value at build time). Use only the API's HTTPS origin, without `/api` or a route suffix. Verify that origin's `/api/health` returns the RyanAI gateway JSON; a degraded response indicates backend dependencies need attention. Vercel builds now reject a missing or invalid API origin, including the deployment's own Vercel hostname. `VITE_API_URL` remains a legacy fallback. Running or changing `src/server/launcher.ts` alone does not create API routes on Vercel.
+
 
 GitHub Actions publishes production images after validation on the configured default branch. To enable the GitHub Actions Vercel deployment, configure repository secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`, plus repository variables `VERCEL_DEPLOY_ENABLED=true` and `VITE_API_BASE_URL` (the deployed API origin). The repository's [`vercel.json`](./vercel.json) sets `npm ci --legacy-peer-deps` as the install command and `npm run build:web` as the build command. Do not set `npm run build:web` as Vercel's install command. Older commits do not contain these configuration changes; deploy a commit that includes them.
 
