@@ -13,6 +13,7 @@ interface StoredVectorRecord {
   id: string;
   iv: Uint8Array;
   ciphertext: ArrayBuffer;
+  extraFields?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
 }
 
@@ -87,19 +88,21 @@ async function withStore<T>(
  * Serialization, cryptography, and IndexedDB failures reject.
  */
 export async function saveVector(entry: VectorEntry): Promise<void> {
+  const { id, vector, metadata, ...extraFields } = entry;
   const key = await getKey();
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const payload = new TextEncoder().encode(JSON.stringify(entry.vector));
+  const payload = new TextEncoder().encode(JSON.stringify(vector));
   const ciphertext = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     key,
     payload,
   );
   const record: StoredVectorRecord = {
-    id: entry.id,
+    id,
     iv,
     ciphertext,
-    metadata: entry.metadata,
+    metadata,
+    extraFields,
   };
   await withStore('readwrite', (store) => store.put(record));
 }
@@ -124,6 +127,7 @@ export async function loadVector(id: string): Promise<VectorEntry | null> {
     record.ciphertext,
   );
   return {
+    ...record.extraFields,
     id: record.id,
     vector: JSON.parse(new TextDecoder().decode(decrypted)),
     metadata: record.metadata,
