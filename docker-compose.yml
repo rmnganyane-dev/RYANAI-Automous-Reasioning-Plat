@@ -6,12 +6,16 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       POSTGRES_DB: ryanai_db
     ports:
-      - "127.0.0.1:5432:5432"
+      - '127.0.0.1:5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./prisma/migrations/init_vector_memory.sql:/docker-entrypoint-initdb.d/001-init-vector-memory.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ryanai -d ryanai_db"]
+      test:
+        - CMD-SHELL
+        - >-
+          PGPASSWORD="$$POSTGRES_PASSWORD" psql -h 127.0.0.1
+          -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -w -c 'SELECT 1' > /dev/null
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,11 +29,11 @@ services:
     command:
       - redis-server
       - --appendonly
-      - "yes"
+      - 'yes'
       - --requirepass
       - ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
     ports:
-      - "127.0.0.1:6379:6379"
+      - '127.0.0.1:6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
@@ -46,12 +50,13 @@ services:
       context: .
       dockerfile: Dockerfile.api
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3000
       DATABASE_URL: postgresql://ryanai:${DB_PASSWORD:?Set DB_PASSWORD in .env}@postgres:5432/ryanai_db
       REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
       OPENAI_ALLOWED_MODELS: ${OPENAI_ALLOWED_MODELS:-gpt-4o,gpt-4o-mini}
@@ -62,9 +67,17 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "127.0.0.1:3000:3000"
+      - '127.0.0.1:3000:3000'
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1:3000/health',
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -76,7 +89,7 @@ services:
       context: .
       dockerfile: mcp-server/Dockerfile
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: production
       RYANAI_MCP_TRANSPORT: http
       RYANAI_API_HEALTH_URL: http://api:3000/health
       MCP_HOST: 0.0.0.0
@@ -93,9 +106,15 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8765:8765"
+      - '127.0.0.1:8765:8765'
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8765/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8765/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -106,13 +125,29 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+    environment:
+      PORT: 80
+      API_HOST: api
+      API_PORT: 3000
     depends_on:
       api:
         condition: service_healthy
     ports:
-      - "127.0.0.1:9090:80"
+      - '127.0.0.1:9090:80'
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1/health',
+        ]
       interval: 15s
       timeout: 5s
       retries: 5

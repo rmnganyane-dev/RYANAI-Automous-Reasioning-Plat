@@ -1,6 +1,9 @@
 {
   "name": "RyanAI Reasoning Platform",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
   "postCreateCommand": "npm ci --legacy-peer-deps",
   "customizations": {
     "vscode": {

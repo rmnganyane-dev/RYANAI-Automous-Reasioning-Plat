@@ -39,6 +39,7 @@
     "types": ["vite/client", "node"]
   },
   "include": [
+    "src/config/core.ts",
     "src/pages/**/*.tsx",
     "src/components/**/*.tsx",
     "src/hooks/**/*.ts",

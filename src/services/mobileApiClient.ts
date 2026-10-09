@@ -20,21 +20,21 @@ export class MobileApiClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error((errorData as any).error || `Server responded with status ${response.status}`);
+        throw new Error((errorData as { error?: string } | null)?.error || `Server responded with status ${response.status}`);
       }
 
       return await response.json() as AgentEvolutionResponse;
-    } catch (error: any) {
-      console.error("[Mobile API Error]:", error.message);
+    } catch (error: unknown) {
+      console.error("[Mobile API Error]:", (error instanceof Error ? error.message : String(error)));
       throw error;
     }
   }
 
-  public static async checkHealth(): Promise<any> {
+  public static async checkHealth(): Promise<unknown> {
     try {
       const response = await fetch(`${BACKEND_URL}/health`);
       return await response.json();
-    } catch (error) {
+    } catch {
       return { status: "offline" };
     }
   }

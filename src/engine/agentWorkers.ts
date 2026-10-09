@@ -1,5 +1,5 @@
 // src/engine/agentWorkers.ts
-import { primaryBrain, secondaryBrain, logicBrain } from '../config/brains';
+import { secondaryBrain, logicBrain } from '../config/brains';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 export interface AgentTaskResult {

@@ -36,7 +36,7 @@ export async function registerReasoningRoutes(fastify: FastifyInstance): Promise
   fastify.get('/api/reason', async () => ({ status: 'active' }));
 
   // 2. Standard Execution Route
-  fastify.post("/api/reasoning/execute", async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post("/api/reasoning/execute", async (_request: FastifyRequest, _reply: FastifyReply) => {
     return { success: true, message: "Reasoning pipeline executed successfully." };
   });
 

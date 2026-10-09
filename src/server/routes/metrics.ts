@@ -1,26 +1,12 @@
+import { requireAdmin } from './auth.js';
 import { FastifyPluginAsync } from 'fastify';
-import { checkpointer } from '../../agent/approvalEngine';
 
 export const metricsRoutes: FastifyPluginAsync = async (fastify) => {
-  // Apply JWT verification middleware to restrict access to authenticated admins
-  fastify.addHook('preHandler', async (request, reply) => {
-    try {
-      await request.jwtVerify();
-    } catch (err) {
-      reply.status(401);
-      return reply.send({ error: 'Unauthorized' });
-    }
-  });
+  fastify.addHook('preHandler', requireAdmin);
 
-  fastify.get('/api/admin/metrics', async (request, reply) => {
-    let dbStatus = 'healthy';
-    try {
-      // Test PostgreSQL checkpointer connection
-      // LangGraph checkpointer doesn't have a direct ping, but we can verify its connection pool or a basic query
-      // For demonstration, we assume if checkpointer is defined, it's operational.
-    } catch (err) {
-      dbStatus = 'unhealthy';
-    }
+  fastify.get('/api/admin/metrics', async () => {
+    // This endpoint reports process metrics; dependency health is available at /health.
+    const dbStatus = 'unknown';
 
     const memory = process.memoryUsage();
 

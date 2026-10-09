@@ -47,14 +47,15 @@ export class RyanAISandbox {
         output: trimmedStdout,
         error: trimmedStderr ? trimmedStderr : undefined,
       };
-    } catch (error: any) {
-      const stdout = error.stdout ? error.stdout.trim() : '';
-      const stderr = error.stderr ? error.stderr.trim() : error.message;
+    } catch (error: unknown) {
+      const failure = error as { stdout?: string; stderr?: string; code?: number | string };
+      const stdout = failure.stdout?.trim() || '';
+      const stderr = failure.stderr?.trim() || (error instanceof Error ? error.message : String(error));
 
       return {
         stdout,
         stderr,
-        exitCode: error.code || 1,
+        exitCode: typeof failure.code === 'number' ? failure.code : 1,
         success: false,
         output: stdout,
         error: stderr,

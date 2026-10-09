@@ -1,12 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, LogOut, Terminal } from 'lucide-react';
-import type { Conversation, ModelId, ToolStep, SystemStatus } from '@/lib/types';
+import type {
+  Conversation,
+  ModelId,
+  ToolStep,
+  SystemStatus,
+} from '@/lib/types';
 import { DEFAULT_MODEL, modelMeta, MODELS } from '@/lib/models';
-import { createConversation, createMessage, generateTitle, loadConversations as loadLocalConversations, saveConversations } from '@/lib/storage';
+import {
+  createConversation,
+  createMessage,
+  generateTitle,
+  loadConversations as loadLocalConversations,
+  saveConversations,
+} from '@/lib/storage';
 import { streamReasoning } from '@/lib/reasoning';
 import { useVoiceRecognition, VOICE_COMMANDS } from '@/lib/useVoiceRecognition';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import Sidebar from '@/components/Sidebar';
 import ChatPanel from '@/components/ChatPanel';
 import TelemetryPanel from '@/components/TelemetryPanel';
@@ -19,11 +30,17 @@ import Modal from '@/components/Modal';
 
 interface CommandCenterProps {
   onSignOut: () => void;
+  userId: string;
   userEmail?: string;
   userFullName?: string;
 }
 
-export default function CommandCenter({ onSignOut, userEmail, userFullName }: CommandCenterProps) {
+export default function CommandCenter({
+  onSignOut,
+  userId,
+  userEmail,
+  userFullName,
+}: CommandCenterProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
@@ -39,22 +56,37 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   const [status, setStatus] = useState<SystemStatus>({
-    cpu: null, memory: null, latency: null, tokensIn: 0, tokensOut: 0,
-    uptime: '00:00:00', model: DEFAULT_MODEL, state: 'idle',
+    cpu: null,
+    memory: null,
+    latency: null,
+    tokensIn: 0,
+    tokensOut: 0,
+    uptime: '00:00:00',
+    model: DEFAULT_MODEL,
+    state: 'idle',
   });
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const startTimeRef = useRef(Date.now());
   const requestStartRef = useRef<number | null>(null);
   const voiceStopRef = useRef<() => void>(() => undefined);
 
   const loadConversations = useCallback(async () => {
-    if (!isSupabaseConfigured) {
-      const localConversations = loadLocalConversations();
+    const client = supabase;
+    if (!client) {
+      const localConversations = loadLocalConversations(userId);
       const supportedConversations = localConversations.map((conversation) => ({
         ...conversation,
         model: MODELS[conversation.model] ? conversation.model : DEFAULT_MODEL,
         messages: conversation.messages.map((message) => ({
           ...message,
-          model: message.model && MODELS[message.model] ? message.model : undefined,
+          model:
+            message.model && MODELS[message.model] ? message.model : undefined,
         })),
       }));
       setConversations(supportedConversations);
@@ -65,9 +97,10 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('conversations')
       .select('*')
+      .eq('user_id', userId)
       .order('updated_at', { ascending: false });
 
     if (error) {
@@ -80,10 +113,10 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
       return;
     }
 
-    // Load messages for each conversation with explicit any typing resolved
+    // Load messages for each conversation.
     const convsWithMessages: Conversation[] = await Promise.all(
-      data.map(async (conv: any) => {
-        const { data: msgs } = await supabase
+      data.map(async (conv) => {
+        const { data: msgs } = await client
           .from('messages')
           .select('*')
           .eq('conversation_id', conv.id)
@@ -92,8 +125,10 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
         return {
           id: conv.id,
           title: conv.title,
-          model: MODELS[conv.model as ModelId] ? conv.model as ModelId : DEFAULT_MODEL,
-          messages: (msgs ?? []).map((m: any) => ({
+          model: MODELS[conv.model as ModelId]
+            ? (conv.model as ModelId)
+            : DEFAULT_MODEL,
+          messages: (msgs ?? []).map((m) => ({
             id: m.id,
             role: m.role,
             content: m.content,
@@ -104,7 +139,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
           createdAt: new Date(conv.created_at).getTime(),
           updatedAt: new Date(conv.updated_at).getTime(),
         };
-      })
+      }),
     );
 
     setConversations(convsWithMessages);
@@ -112,12 +147,14 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
       setActiveId(convsWithMessages[0].id);
       setModel(convsWithMessages[0].model);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     loadConversations();
-    setGithubConnected(localStorage.getItem('ryanai_github_connected') === 'true');
-  }, [loadConversations]);
+    setGithubConnected(
+      localStorage.getItem(`ryanai_github_connected:${userId}`) === 'true',
+    );
+  }, [loadConversations, userId]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -141,11 +178,11 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
   const activeMessages = activeConversation?.messages ?? [];
 
   const newConversation = useCallback(async () => {
-    if (!isSupabaseConfigured) {
+    if (!supabase) {
       const conv = createConversation(model);
       setConversations((prev) => {
         const next = [conv, ...prev];
-        saveConversations(next);
+        saveConversations(next, userId);
         return next;
       });
       setActiveId(conv.id);
@@ -157,7 +194,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
 
     const { data, error } = await supabase
       .from('conversations')
-      .insert({ title: 'New Thread', model })
+      .insert({ title: 'New Thread', model, user_id: userId })
       .select()
       .single();
 
@@ -181,175 +218,237 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     setLiveSteps([]);
     setLeftOpen(false);
     return conv.id;
-  }, [model]);
+  }, [model, userId]);
 
-  const selectConversation = useCallback((id: string) => {
-    setActiveId(id);
-    setLeftOpen(false);
-    setLiveText('');
-    setLiveSteps([]);
-    const conv = conversations.find((c) => c.id === id);
-    if (conv) setModel(conv.model);
-  }, [conversations]);
+  const selectConversation = useCallback(
+    (id: string) => {
+      setActiveId(id);
+      setLeftOpen(false);
+      setLiveText('');
+      setLiveSteps([]);
+      const conv = conversations.find((c) => c.id === id);
+      if (conv) setModel(conv.model);
+    },
+    [conversations],
+  );
 
-  const deleteConversation = useCallback(async (id: string) => {
-    if (isSupabaseConfigured) {
-      await supabase.from('conversations').delete().eq('id', id);
-    }
-    setConversations((prev) => {
-      const remaining = prev.filter((c) => c.id !== id);
-      if (!isSupabaseConfigured) saveConversations(remaining);
-      if (activeId === id) {
-        if (remaining.length > 0) {
-          setActiveId(remaining[0].id);
-          setModel(remaining[0].model);
-        } else {
-          setActiveId(null);
-        }
+  const deleteConversation = useCallback(
+    async (id: string) => {
+      if (supabase) {
+        await supabase.from('conversations').delete().eq('id', id);
       }
-      return remaining;
-    });
-  }, [activeId]);
-
-  const sendMessage = useCallback(async (text: string) => {
-    let convId = activeId;
-    if (!convId) {
-      convId = await newConversation();
-      if (!convId) return;
-    }
-
-    const userMsg = createMessage('user', text);
-    setConversations((prev) => {
-      const next = prev.map((c) =>
-        c.id === convId
-          ? { ...c, messages: [...c.messages, userMsg], updatedAt: Date.now(), title: c.messages.length === 0 ? generateTitle(text) : c.title }
-          : c
-      );
-      if (!isSupabaseConfigured) saveConversations(next);
-      return next;
-    });
-
-    if (isSupabaseConfigured) {
-      await supabase.from('messages').insert({
-        conversation_id: convId,
-        role: 'user',
-        content: text,
-      });
-    }
-
-    // Update conversation title if first message
-    const conv = conversations.find((c) => c.id === convId);
-    if (conv && conv.messages.length === 0) {
-      const title = generateTitle(text);
-      if (isSupabaseConfigured) {
-        await supabase.from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', convId);
-      }
-    }
-
-    setSending(true);
-    requestStartRef.current = performance.now();
-    setLiveText('');
-    setLiveSteps([]);
-    setLiveModel(model);
-
-    let accText = '';
-    const accSteps: ToolStep[] = [];
-
-    try {
-      await streamReasoning(text, model, {
-        onToken: (t) => {
-          accText += t;
-          setLiveText(accText);
-        },
-        onStep: (step) => {
-          accSteps.push(step);
-          setLiveSteps([...accSteps]);
-        },
-        onTitle: (title) => {
-          setConversations((prev) => {
-            const next = prev.map((c) => c.id === convId ? { ...c, title } : c);
-            if (!isSupabaseConfigured) saveConversations(next);
-            return next;
-          });
-          if (isSupabaseConfigured) {
-            supabase.from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', convId);
-          }
-        },
-        onDone: () => {
-          const assistantMsg = createMessage('assistant', accText, model, accSteps);
-          setConversations((prev) => {
-            const next = prev.map((c) =>
-              c.id === convId
-                ? { ...c, messages: [...c.messages, assistantMsg], updatedAt: Date.now() }
-                : c
-            );
-            if (!isSupabaseConfigured) saveConversations(next);
-            return next;
-          });
-          setLiveText('');
-          setLiveSteps([]);
-
-          if (isSupabaseConfigured) {
-            supabase.from('messages').insert({
-              conversation_id: convId,
-              role: 'assistant',
-              content: accText,
-              model,
-              steps: accSteps.length > 0 ? accSteps : null,
-            });
-          }
-
-          setStatus((prev) => ({
-            ...prev,
-            latency: requestStartRef.current === null ? prev.latency : Math.round(performance.now() - requestStartRef.current),
-            tokensIn: prev.tokensIn + Math.floor(text.length / 4),
-            tokensOut: prev.tokensOut + Math.floor(accText.length / 4),
-            state: 'idle',
-          }));
-          requestStartRef.current = null;
-        },
-        onError: (msg) => {
-          console.error('Reasoning error:', msg);
-          const errorMessage = createMessage('assistant', `Reasoning request failed: ${msg}`, model, accSteps);
-          setConversations((prev) => {
-            const next = prev.map((c) =>
-              c.id === convId
-                ? { ...c, messages: [...c.messages, errorMessage], updatedAt: Date.now() }
-                : c
-            );
-            if (!isSupabaseConfigured) saveConversations(next);
-            return next;
-          });
-          setLiveText('');
-          setLiveSteps([]);
-          setStatus((prev) => ({
-            ...prev,
-            latency: requestStartRef.current === null ? prev.latency : Math.round(performance.now() - requestStartRef.current),
-            state: 'error',
-          }));
-          requestStartRef.current = null;
-        },
-      });
-    } catch {
-      console.error('Stream failed');
-    } finally {
-      setSending(false);
-    }
-  }, [activeId, model, newConversation, conversations]);
-
-  const changeModel = useCallback((m: ModelId) => {
-    setModel(m);
-    if (activeId) {
       setConversations((prev) => {
-        const next = prev.map((c) => c.id === activeId ? { ...c, model: m } : c);
-        if (!isSupabaseConfigured) saveConversations(next);
+        const remaining = prev.filter((c) => c.id !== id);
+        if (!supabase) saveConversations(remaining, userId);
+        if (activeId === id) {
+          if (remaining.length > 0) {
+            setActiveId(remaining[0].id);
+            setModel(remaining[0].model);
+          } else {
+            setActiveId(null);
+          }
+        }
+        return remaining;
+      });
+    },
+    [activeId, userId],
+  );
+
+  const sendMessage = useCallback(
+    async (text: string) => {
+      let convId = activeId;
+      if (!convId) {
+        convId = await newConversation();
+        if (!convId) return;
+      }
+
+      if (!mountedRef.current) return;
+      const userMsg = createMessage('user', text);
+      setConversations((prev) => {
+        const next = prev.map((c) =>
+          c.id === convId
+            ? {
+                ...c,
+                messages: [...c.messages, userMsg],
+                updatedAt: Date.now(),
+                title: c.messages.length === 0 ? generateTitle(text) : c.title,
+              }
+            : c,
+        );
+        if (!supabase) saveConversations(next, userId);
         return next;
       });
-      if (isSupabaseConfigured) {
-        supabase.from('conversations').update({ model: m }).eq('id', activeId);
+
+      if (supabase) {
+        await supabase.from('messages').insert({
+          conversation_id: convId,
+          role: 'user',
+          content: text,
+        });
       }
-    }
-  }, [activeId]);
+
+      if (!mountedRef.current) return;
+      // Update conversation title if first message
+      const conv = conversations.find((c) => c.id === convId);
+      if (conv && conv.messages.length === 0) {
+        const title = generateTitle(text);
+        if (supabase) {
+          await supabase
+            .from('conversations')
+            .update({ title, updated_at: new Date().toISOString() })
+            .eq('id', convId);
+        }
+      }
+
+      if (!mountedRef.current) return;
+      setSending(true);
+      requestStartRef.current = performance.now();
+      setLiveText('');
+      setLiveSteps([]);
+      setLiveModel(model);
+
+      let accText = '';
+      const accSteps: ToolStep[] = [];
+
+      try {
+        await streamReasoning(text, model, {
+          onToken: (t) => {
+            if (!mountedRef.current) return;
+            accText += t;
+            setLiveText(accText);
+          },
+          onStep: (step) => {
+            if (!mountedRef.current) return;
+            accSteps.push(step);
+            setLiveSteps([...accSteps]);
+          },
+          onTitle: (title) => {
+            if (!mountedRef.current) return;
+            setConversations((prev) => {
+              const next = prev.map((c) =>
+                c.id === convId ? { ...c, title } : c,
+              );
+              if (!supabase) saveConversations(next, userId);
+              return next;
+            });
+            if (supabase) {
+              supabase
+                .from('conversations')
+                .update({ title, updated_at: new Date().toISOString() })
+                .eq('id', convId);
+            }
+          },
+          onDone: () => {
+            if (!mountedRef.current) return;
+            const assistantMsg = createMessage(
+              'assistant',
+              accText,
+              model,
+              accSteps,
+            );
+            setConversations((prev) => {
+              const next = prev.map((c) =>
+                c.id === convId
+                  ? {
+                      ...c,
+                      messages: [...c.messages, assistantMsg],
+                      updatedAt: Date.now(),
+                    }
+                  : c,
+              );
+              if (!supabase) saveConversations(next, userId);
+              return next;
+            });
+            setLiveText('');
+            setLiveSteps([]);
+
+            if (supabase) {
+              supabase.from('messages').insert({
+                conversation_id: convId,
+                role: 'assistant',
+                content: accText,
+                model,
+                steps: accSteps.length > 0 ? accSteps : null,
+              });
+            }
+
+            setStatus((prev) => ({
+              ...prev,
+              latency:
+                requestStartRef.current === null
+                  ? prev.latency
+                  : Math.round(performance.now() - requestStartRef.current),
+              tokensIn: prev.tokensIn + Math.floor(text.length / 4),
+              tokensOut: prev.tokensOut + Math.floor(accText.length / 4),
+              state: 'idle',
+            }));
+            requestStartRef.current = null;
+          },
+          onError: (msg) => {
+            if (!mountedRef.current) return;
+            console.error('Reasoning error:', msg);
+            const errorMessage = createMessage(
+              'assistant',
+              `Reasoning request failed: ${msg}`,
+              model,
+              accSteps,
+            );
+            setConversations((prev) => {
+              const next = prev.map((c) =>
+                c.id === convId
+                  ? {
+                      ...c,
+                      messages: [...c.messages, errorMessage],
+                      updatedAt: Date.now(),
+                    }
+                  : c,
+              );
+              if (!supabase) saveConversations(next, userId);
+              return next;
+            });
+            setLiveText('');
+            setLiveSteps([]);
+            setStatus((prev) => ({
+              ...prev,
+              latency:
+                requestStartRef.current === null
+                  ? prev.latency
+                  : Math.round(performance.now() - requestStartRef.current),
+              state: 'error',
+            }));
+            requestStartRef.current = null;
+          },
+        });
+      } catch {
+        console.error('Stream failed');
+      } finally {
+        setSending(false);
+      }
+    },
+    [activeId, model, newConversation, conversations, userId],
+  );
+
+  const changeModel = useCallback(
+    (m: ModelId) => {
+      setModel(m);
+      if (activeId) {
+        setConversations((prev) => {
+          const next = prev.map((c) =>
+            c.id === activeId ? { ...c, model: m } : c,
+          );
+          if (!supabase) saveConversations(next, userId);
+          return next;
+        });
+        if (supabase) {
+          supabase
+            .from('conversations')
+            .update({ model: m })
+            .eq('id', activeId);
+        }
+      }
+    },
+    [activeId, userId],
+  );
 
   const exportThread = useCallback(() => {
     const conv = conversations.find((c) => c.id === activeId);
@@ -371,37 +470,64 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${title.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40)}.md`;
+    a.download = `${title
+      .replace(/[^a-z0-9]+/gi, '-')
+      .toLowerCase()
+      .slice(0, 40)}.md`;
     a.click();
     URL.revokeObjectURL(url);
   }, [activeId, conversations]);
 
   // Voice command handler
-  const handleVoiceCommand = useCallback((command: string, args: string) => {
-    void args;
-    switch (command) {
-      case 'new_thread': newConversation(); break;
-      case 'switch_gemini': changeModel('gemini-3.1-pro'); break;
-      case 'switch_claude': changeModel('claude-sonnet-4.6'); break;
-      case 'switch_gpt': changeModel('gpt-5.4'); break;
-      case 'export': exportThread(); break;
-      case 'open_memory': setMemoryOpen(true); break;
-      case 'open_about': setAboutOpen(true); break;
-      case 'open_github': setGithubOpen(true); break;
-      case 'stop': voiceStopRef.current(); break;
-    }
-  }, [newConversation, changeModel, exportThread]);
+  const handleVoiceCommand = useCallback(
+    (command: string, args: string) => {
+      void args;
+      switch (command) {
+        case 'new_thread':
+          newConversation();
+          break;
+        case 'switch_gemini':
+          changeModel('gemini-3.1-pro');
+          break;
+        case 'switch_claude':
+          changeModel('claude-sonnet-4.6');
+          break;
+        case 'switch_gpt':
+          changeModel('gpt-5.4');
+          break;
+        case 'export':
+          exportThread();
+          break;
+        case 'open_memory':
+          setMemoryOpen(true);
+          break;
+        case 'open_about':
+          setAboutOpen(true);
+          break;
+        case 'open_github':
+          setGithubOpen(true);
+          break;
+        case 'stop':
+          voiceStopRef.current();
+          break;
+      }
+    },
+    [newConversation, changeModel, exportThread],
+  );
 
-  const handleVoiceTranscript = useCallback((text: string, isFinal: boolean) => {
-    if (!isFinal) return;
-    const lower = text.toLowerCase().trim();
-    const isCommand = Object.values(VOICE_COMMANDS).some((def) =>
-      def.keywords.some((kw) => lower.startsWith(kw))
-    );
-    if (!isCommand && text.trim()) {
-      sendMessage(text.trim());
-    }
-  }, [sendMessage]);
+  const handleVoiceTranscript = useCallback(
+    (text: string, isFinal: boolean) => {
+      if (!isFinal) return;
+      const lower = text.toLowerCase().trim();
+      const isCommand = Object.values(VOICE_COMMANDS).some((def) =>
+        def.keywords.some((kw) => lower.startsWith(kw)),
+      );
+      if (!isCommand && text.trim()) {
+        sendMessage(text.trim());
+      }
+    },
+    [sendMessage],
+  );
 
   const voice = useVoiceRecognition({
     onTranscript: handleVoiceTranscript,
@@ -409,7 +535,9 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
   });
   voiceStopRef.current = voice.stop;
 
-  const lastAssistant = [...activeMessages].reverse().find((m) => m.role === 'assistant');
+  const lastAssistant = [...activeMessages]
+    .reverse()
+    .find((m) => m.role === 'assistant');
   const traceSteps = sending ? liveSteps : (lastAssistant?.steps ?? []);
 
   const sidebar = (
@@ -444,7 +572,7 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
     activeTitle: activeConversation?.title,
     onOpenLeft: () => setLeftOpen(true),
     onOpenRight: () => setRightOpen(true),
-    voiceState: voice.state as "listening" | "processing" | "idle",
+    voiceState: voice.state as 'listening' | 'processing' | 'idle',
     voiceInterim: voice.interimText,
     voiceSupported: voice.isSupported,
     onVoiceToggle: voice.toggle,
@@ -486,24 +614,39 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
       {/* Mobile layout */}
       <div className="h-full lg:hidden flex flex-col relative z-10">
         <div className="flex items-center gap-2 px-3 py-2.5 border-b border-cyan-500/15 glass">
-          <button onClick={() => setLeftOpen(true)} className="p-1.5 rounded-lg hover:bg-cyan-500/10 text-ink-400">
+          <button
+            onClick={() => setLeftOpen(true)}
+            className="p-1.5 rounded-lg hover:bg-cyan-500/10 text-ink-400"
+          >
             <Menu size={18} />
           </button>
           <div className="flex items-center gap-2 flex-1">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center">
-              <span className="font-display font-black text-ink-950 text-xs">R</span>
+              <span className="font-display font-black text-ink-950 text-xs">
+                R
+              </span>
             </div>
-            <span className="font-display font-bold text-cyan-300 text-sm tracking-wider">RYANAI</span>
+            <span className="font-display font-bold text-cyan-300 text-sm tracking-wider">
+              RYANAI
+            </span>
           </div>
           <div className="flex items-center gap-2">
             {userEmail && (
-              <span className="text-[10px] text-ink-500 font-mono hidden sm:inline">{userFullName || userEmail}</span>
+              <span className="text-[10px] text-ink-500 font-mono hidden sm:inline">
+                {userFullName || userEmail}
+              </span>
             )}
-            <button onClick={onSignOut} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-ink-400 hover:text-rose-400 transition-colors">
+            <button
+              onClick={onSignOut}
+              className="p-1.5 rounded-lg hover:bg-rose-500/10 text-ink-400 hover:text-rose-400 transition-colors"
+            >
               <LogOut size={16} />
             </button>
           </div>
-          <button onClick={() => setRightOpen(true)} className="p-1.5 rounded-lg hover:bg-cyan-500/10 text-ink-400">
+          <button
+            onClick={() => setRightOpen(true)}
+            className="p-1.5 rounded-lg hover:bg-cyan-500/10 text-ink-400"
+          >
             <Menu size={18} className="rotate-180" />
           </button>
         </div>
@@ -560,13 +703,26 @@ export default function CommandCenter({ onSignOut, userEmail, userFullName }: Co
 
       {/* Modals */}
       <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
-      <MemoryVault open={memoryOpen} onClose={() => setMemoryOpen(false)} />
-      <Modal open={consoleOpen} onClose={() => setConsoleOpen(false)} title="Inference Console" icon={<Terminal size={16} />}>
+      <MemoryVault
+        userId={userId}
+        open={memoryOpen}
+        onClose={() => setMemoryOpen(false)}
+      />
+      <Modal
+        open={consoleOpen}
+        onClose={() => setConsoleOpen(false)}
+        title="Inference Console"
+        icon={<Terminal size={16} />}
+      >
         <div className="h-[26rem] -m-2 overflow-hidden rounded-lg">
           <ChatInterface />
         </div>
       </Modal>
-      <GithubModal open={githubOpen} onClose={() => setGithubOpen(false)} connected={githubConnected} />
+      <GithubModal
+        open={githubOpen}
+        onClose={() => setGithubOpen(false)}
+        connected={githubConnected}
+      />
     </div>
   );
 }
