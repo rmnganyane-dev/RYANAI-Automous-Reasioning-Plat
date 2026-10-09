@@ -30,12 +30,14 @@ import Modal from '@/components/Modal';
 
 interface CommandCenterProps {
   onSignOut: () => void;
+  userId: string;
   userEmail?: string;
   userFullName?: string;
 }
 
 export default function CommandCenter({
   onSignOut,
+  userId,
   userEmail,
   userFullName,
 }: CommandCenterProps) {
@@ -63,6 +65,13 @@ export default function CommandCenter({
     model: DEFAULT_MODEL,
     state: 'idle',
   });
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const startTimeRef = useRef(Date.now());
   const requestStartRef = useRef<number | null>(null);
   const voiceStopRef = useRef<() => void>(() => undefined);
@@ -70,7 +79,7 @@ export default function CommandCenter({
   const loadConversations = useCallback(async () => {
     const client = supabase;
     if (!client) {
-      const localConversations = loadLocalConversations();
+      const localConversations = loadLocalConversations(userId);
       const supportedConversations = localConversations.map((conversation) => ({
         ...conversation,
         model: MODELS[conversation.model] ? conversation.model : DEFAULT_MODEL,
@@ -91,6 +100,7 @@ export default function CommandCenter({
     const { data, error } = await client
       .from('conversations')
       .select('*')
+      .eq('user_id', userId)
       .order('updated_at', { ascending: false });
 
     if (error) {
@@ -103,9 +113,9 @@ export default function CommandCenter({
       return;
     }
 
-    // Load messages for each conversation with explicit any typing resolved
+    // Load messages for each conversation.
     const convsWithMessages: Conversation[] = await Promise.all(
-      data.map(async (conv: any) => {
+      data.map(async (conv) => {
         const { data: msgs } = await client
           .from('messages')
           .select('*')
@@ -118,7 +128,7 @@ export default function CommandCenter({
           model: MODELS[conv.model as ModelId]
             ? (conv.model as ModelId)
             : DEFAULT_MODEL,
-          messages: (msgs ?? []).map((m: any) => ({
+          messages: (msgs ?? []).map((m) => ({
             id: m.id,
             role: m.role,
             content: m.content,
@@ -137,14 +147,14 @@ export default function CommandCenter({
       setActiveId(convsWithMessages[0].id);
       setModel(convsWithMessages[0].model);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     loadConversations();
     setGithubConnected(
-      localStorage.getItem('ryanai_github_connected') === 'true',
+      localStorage.getItem(`ryanai_github_connected:${userId}`) === 'true',
     );
-  }, [loadConversations]);
+  }, [loadConversations, userId]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -172,7 +182,7 @@ export default function CommandCenter({
       const conv = createConversation(model);
       setConversations((prev) => {
         const next = [conv, ...prev];
-        saveConversations(next);
+        saveConversations(next, userId);
         return next;
       });
       setActiveId(conv.id);
@@ -184,7 +194,7 @@ export default function CommandCenter({
 
     const { data, error } = await supabase
       .from('conversations')
-      .insert({ title: 'New Thread', model })
+      .insert({ title: 'New Thread', model, user_id: userId })
       .select()
       .single();
 
@@ -208,7 +218,7 @@ export default function CommandCenter({
     setLiveSteps([]);
     setLeftOpen(false);
     return conv.id;
-  }, [model]);
+  }, [model, userId]);
 
   const selectConversation = useCallback(
     (id: string) => {
@@ -229,7 +239,7 @@ export default function CommandCenter({
       }
       setConversations((prev) => {
         const remaining = prev.filter((c) => c.id !== id);
-        if (!supabase) saveConversations(remaining);
+        if (!supabase) saveConversations(remaining, userId);
         if (activeId === id) {
           if (remaining.length > 0) {
             setActiveId(remaining[0].id);
@@ -241,7 +251,7 @@ export default function CommandCenter({
         return remaining;
       });
     },
-    [activeId],
+    [activeId, userId],
   );
 
   const sendMessage = useCallback(
@@ -252,6 +262,7 @@ export default function CommandCenter({
         if (!convId) return;
       }
 
+      if (!mountedRef.current) return;
       const userMsg = createMessage('user', text);
       setConversations((prev) => {
         const next = prev.map((c) =>
@@ -264,7 +275,7 @@ export default function CommandCenter({
               }
             : c,
         );
-        if (!supabase) saveConversations(next);
+        if (!supabase) saveConversations(next, userId);
         return next;
       });
 
@@ -276,6 +287,7 @@ export default function CommandCenter({
         });
       }
 
+      if (!mountedRef.current) return;
       // Update conversation title if first message
       const conv = conversations.find((c) => c.id === convId);
       if (conv && conv.messages.length === 0) {
@@ -288,6 +300,7 @@ export default function CommandCenter({
         }
       }
 
+      if (!mountedRef.current) return;
       setSending(true);
       requestStartRef.current = performance.now();
       setLiveText('');
@@ -300,19 +313,22 @@ export default function CommandCenter({
       try {
         await streamReasoning(text, model, {
           onToken: (t) => {
+            if (!mountedRef.current) return;
             accText += t;
             setLiveText(accText);
           },
           onStep: (step) => {
+            if (!mountedRef.current) return;
             accSteps.push(step);
             setLiveSteps([...accSteps]);
           },
           onTitle: (title) => {
+            if (!mountedRef.current) return;
             setConversations((prev) => {
               const next = prev.map((c) =>
                 c.id === convId ? { ...c, title } : c,
               );
-              if (!supabase) saveConversations(next);
+              if (!supabase) saveConversations(next, userId);
               return next;
             });
             if (supabase) {
@@ -323,6 +339,7 @@ export default function CommandCenter({
             }
           },
           onDone: () => {
+            if (!mountedRef.current) return;
             const assistantMsg = createMessage(
               'assistant',
               accText,
@@ -339,7 +356,7 @@ export default function CommandCenter({
                     }
                   : c,
               );
-              if (!supabase) saveConversations(next);
+              if (!supabase) saveConversations(next, userId);
               return next;
             });
             setLiveText('');
@@ -368,6 +385,7 @@ export default function CommandCenter({
             requestStartRef.current = null;
           },
           onError: (msg) => {
+            if (!mountedRef.current) return;
             console.error('Reasoning error:', msg);
             const errorMessage = createMessage(
               'assistant',
@@ -385,7 +403,7 @@ export default function CommandCenter({
                     }
                   : c,
               );
-              if (!supabase) saveConversations(next);
+              if (!supabase) saveConversations(next, userId);
               return next;
             });
             setLiveText('');
@@ -407,7 +425,7 @@ export default function CommandCenter({
         setSending(false);
       }
     },
-    [activeId, model, newConversation, conversations],
+    [activeId, model, newConversation, conversations, userId],
   );
 
   const changeModel = useCallback(
@@ -418,7 +436,7 @@ export default function CommandCenter({
           const next = prev.map((c) =>
             c.id === activeId ? { ...c, model: m } : c,
           );
-          if (!supabase) saveConversations(next);
+          if (!supabase) saveConversations(next, userId);
           return next;
         });
         if (supabase) {
@@ -429,7 +447,7 @@ export default function CommandCenter({
         }
       }
     },
-    [activeId],
+    [activeId, userId],
   );
 
   const exportThread = useCallback(() => {
@@ -685,7 +703,11 @@ export default function CommandCenter({
 
       {/* Modals */}
       <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
-      <MemoryVault open={memoryOpen} onClose={() => setMemoryOpen(false)} />
+      <MemoryVault
+        userId={userId}
+        open={memoryOpen}
+        onClose={() => setMemoryOpen(false)}
+      />
       <Modal
         open={consoleOpen}
         onClose={() => setConsoleOpen(false)}

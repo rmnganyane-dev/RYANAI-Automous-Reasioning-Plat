@@ -8,7 +8,7 @@ export interface MissionResult {
   objective: string;
   status: string;
   stepsCompleted: number;
-  manifest: any[];
+  manifest: unknown[];
 }
 
 export class RyanAIAutonomousLoop {

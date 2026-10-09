@@ -79,14 +79,14 @@ export class PipelineOrchestrator {
         durationMs: Date.now() - p1Start,
         logs: p1Logs,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       phases.push({
         phase: 1,
         name: 'Context & Dependency Analysis',
         status: 'FAILED',
         durationMs: Date.now() - p1Start,
         logs: p1Logs,
-        error: err.message,
+        error: (err instanceof Error ? err.message : String(err)),
       });
       return this.finalizeRun(runId, 'FAILED', startTime, phases, config, violations);
     }
@@ -109,14 +109,16 @@ export class PipelineOrchestrator {
         durationMs: Date.now() - p2Start,
         logs: p2Logs,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       phases.push({
         phase: 2,
         name: 'Generation & Build',
         status: 'FAILED',
         durationMs: Date.now() - p2Start,
         logs: p2Logs,
-        error: err.stdout || err.message,
+        error: (err !== null && typeof err === 'object' && 'stdout' in err &&
+          typeof err.stdout === 'string' && err.stdout) ||
+          (err instanceof Error ? err.message : String(err)),
       });
       return this.finalizeRun(runId, 'FAILED', startTime, phases, config, violations);
     }
@@ -155,14 +157,14 @@ export class PipelineOrchestrator {
         durationMs: Date.now() - p3Start,
         logs: p3Logs,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       phases.push({
         phase: 3,
         name: 'Transcend Policy Audit',
         status: 'FAILED',
         durationMs: Date.now() - p3Start,
         logs: p3Logs,
-        error: err.message,
+        error: (err instanceof Error ? err.message : String(err)),
       });
       return this.finalizeRun(runId, 'BLOCKED', startTime, phases, config, violations);
     }
@@ -184,14 +186,14 @@ export class PipelineOrchestrator {
         durationMs: Date.now() - p4Start,
         logs: p4Logs,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       phases.push({
         phase: 4,
         name: 'Verification & Test Harness',
         status: 'FAILED',
         durationMs: Date.now() - p4Start,
         logs: p4Logs,
-        error: err.message,
+        error: (err instanceof Error ? err.message : String(err)),
       });
       return this.finalizeRun(runId, 'FAILED', startTime, phases, config, violations);
     }
@@ -224,14 +226,14 @@ export class PipelineOrchestrator {
         durationMs: Date.now() - p5Start,
         logs: p5Logs,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       phases.push({
         phase: 5,
         name: 'Automated Shipping',
         status: 'FAILED',
         durationMs: Date.now() - p5Start,
         logs: p5Logs,
-        error: err.message,
+        error: (err instanceof Error ? err.message : String(err)),
       });
       overallStatus = 'FAILED';
     }

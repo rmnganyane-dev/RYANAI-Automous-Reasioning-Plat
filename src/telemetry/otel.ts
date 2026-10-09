@@ -1,11 +1,11 @@
 // File path: ./src/telemetry/otel.ts
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { Resource } from '@opentelemetry/resources';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 
 export const sdk = new NodeSDK({
-  resource: new Resource({
+  resource: resourceFromAttributes({
     [ATTR_SERVICE_NAME]: 'ryanai-autonomous-reasoning-engine',
   }),
   instrumentations: [
@@ -14,7 +14,7 @@ export const sdk = new NodeSDK({
       '@opentelemetry/instrumentation-http': { enabled: true },
       '@opentelemetry/instrumentation-fs': { enabled: false },
     }),
-  ] as any,
+  ],
 });
 
 export function startTelemetry() {

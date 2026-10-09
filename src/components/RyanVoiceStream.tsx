@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 
 export const RyanVoiceStream = () => {
   const [isListening, setIsListening] = useState(false);

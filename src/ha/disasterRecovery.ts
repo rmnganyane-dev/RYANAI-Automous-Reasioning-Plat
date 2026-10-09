@@ -23,7 +23,7 @@ export class DisasterRecoveryEngine {
         activeProvider: 'OPENAI',
         latencyMs: Date.now() - start,
       };
-    } catch (err) {
+    } catch {
       console.warn('⚠️ Primary LLM Cloud Endpoint degraded. Activating Local CUDA Inference Fallback...');
 
       // Fallback verification
@@ -34,7 +34,7 @@ export class DisasterRecoveryEngine {
           activeProvider: 'LOCAL_CUDA_FALLBACK',
           latencyMs: Date.now() - start,
         };
-      } catch (localErr) {
+      } catch {
         throw new Error('CRITICAL: All reasoning providers (Cloud and Local CUDA) are unreachable.');
       }
     }

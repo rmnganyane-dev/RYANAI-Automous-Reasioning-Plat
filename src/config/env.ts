@@ -15,7 +15,7 @@ export const getEnvVar = (key: string, defaultValue = ''): string => {
   // 1. Check Vite / Client environment
   // Safely cast import.meta to avoid TS errors in strict Node contexts
   if (typeof import.meta !== 'undefined' && 'env' in import.meta) {
-    const viteEnv = (import.meta as any).env;
+    const viteEnv = (import.meta as ImportMeta & { env: Record<string, unknown> }).env;
     if (viteEnv[viteKey] !== undefined) return String(viteEnv[viteKey]);
     if (viteEnv[key] !== undefined) return String(viteEnv[key]);
   }

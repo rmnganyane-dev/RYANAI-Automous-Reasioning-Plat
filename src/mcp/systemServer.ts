@@ -90,12 +90,12 @@ export class SystemMcpServer {
               },
             ],
           };
-        } catch (err: any) {
+        } catch (err: unknown) {
           return {
             content: [
               {
                 type: "text",
-                text: `Error fetching logs for container ${container}: ${err.message}`,
+                text: `Error fetching logs for container ${container}: ${(err instanceof Error ? err.message : String(err))}`,
               },
             ],
             isError: true,

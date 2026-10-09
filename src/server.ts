@@ -37,10 +37,10 @@ dotenv.config();
 declare module 'fastify' {
   interface FastifyInstance {
     cppEngine?: {
-      evaluate: (prompt: string) => any;
+      evaluate: (prompt: string) => unknown;
     };
     transcend?: {
-      evaluate: (payload: Record<string, any>) => any;
+      evaluate: (payload: Record<string, unknown>) => { allow: boolean; requires_human_approval: boolean; violations: string[] };
     };
   }
 }
@@ -66,7 +66,7 @@ const RyanAICheckpointer = {
   getLatestCheckpoint: async (_threadId: string) => {
     return null;
   },
-  saveCheckpoint: async (_threadId: string, _step: number, _state: any) => {
+  saveCheckpoint: async (_threadId: string, _step: number, _state: unknown) => {
     // Persists checkpoint state
   },
 };
@@ -382,7 +382,7 @@ async function buildApp(): Promise<FastifyInstance> {
       if (!app.transcend) {
         return reply.status(503).send({ success: false, error: "Governance engine is not configured." });
       }
-      const result = app.transcend.evaluate(req.body as Record<string, any>);
+      const result = app.transcend.evaluate(req.body as Record<string, unknown>);
       return reply.send(result);
     }
   );
@@ -542,7 +542,7 @@ async function buildApp(): Promise<FastifyInstance> {
      ========================================================================== */
 
   app.get('/ws/telemetry', { websocket: true }, (connection, _req) => {
-    const socket = (connection as any).socket || connection;
+    const socket = connection;
     app.log.info('HUD Client connected to telemetry stream');
 
     // 1. Broadcast telemetry every 1.5 seconds

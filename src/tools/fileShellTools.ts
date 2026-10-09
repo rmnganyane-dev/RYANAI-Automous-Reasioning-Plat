@@ -21,8 +21,8 @@ export const readFileTool = tool(
       }
       const content = await fs.readFile(safePath, 'utf-8');
       return `File Content (${filePath}):\n${content}`;
-    } catch (error: any) {
-      return `Failed to read file: ${error.message}`;
+    } catch (error: unknown) {
+      return `Failed to read file: ${(error instanceof Error ? error.message : String(error))}`;
     }
   },
   {
@@ -46,8 +46,8 @@ export const executeShellTool = tool(
       }
       const { stdout, stderr } = await execAsync(command, { cwd: WORKSPACE_ROOT });
       return `Command Output:\n${stdout}\n${stderr ? `Errors/Warnings:\n${stderr}` : ''}`;
-    } catch (error: any) {
-      return `Command execution failed: ${error.message}`;
+    } catch (error: unknown) {
+      return `Command execution failed: ${(error instanceof Error ? error.message : String(error))}`;
     }
   },
   {

@@ -12,13 +12,13 @@ export class TauriBridge {
     try {
       const response = await invoke<AgentResponse>("trigger_agent_objective", { objective });
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[Tauri IPC Error]:", error);
-      throw new Error(error || "Unknown Tauri IPC execution failure.");
+      throw new Error(String(error || "Unknown Tauri IPC execution failure."));
     }
   }
 
-  public static async checkSystemHealth(): Promise<any> {
+  public static async checkSystemHealth(): Promise<unknown> {
     return await invoke("get_system_status");
   }
 }

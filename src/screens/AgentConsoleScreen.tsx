@@ -27,8 +27,8 @@ export function AgentConsoleScreen() {
     try {
       const res = await MobileApiClient.executeObjective(objective);
       setOutput(res.result);
-    } catch (error: any) {
-      setOutput(`Execution Failed: ${error.message}`);
+    } catch (error: unknown) {
+      setOutput(`Execution Failed: ${(error instanceof Error ? error.message : String(error))}`);
     } finally {
       setLoading(false);
     }
