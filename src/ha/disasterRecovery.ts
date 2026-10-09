@@ -10,6 +10,11 @@ export class DisasterRecoveryEngine {
   private primaryEndpoint = 'https://api.openai.com/v1/models';
   private localCudaEndpoint = process.env.LOCAL_CUDA_INFERENCE_URL || 'http://localhost:8000/v1/models';
 
+  /**
+   * Probe OpenAI, then the local CUDA endpoint if the primary probe fails.
+   * Returns the available provider and total elapsed milliseconds without changing routing.
+   * Rejects if both probes fail; their request timeouts are 2500 ms and 1500 ms.
+   */
   async evaluateHealthAndFailover(): Promise<HealthCheckResult> {
     const start = Date.now();
     try {

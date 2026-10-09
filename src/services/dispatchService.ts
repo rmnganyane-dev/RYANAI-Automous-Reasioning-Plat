@@ -63,7 +63,11 @@ export class DispatchService {
      ========================================================================== */
 
   /**
-   * Send WhatsApp text update for pipeline completion
+   * Send WhatsApp text update for pipeline completion.
+   * @param targetPhone - Recipient with or without whatsapp:; blank/omitted values
+   * use DEFAULT_RECIPIENT_PHONE. Configuration is read at send time.
+   * @returns The Twilio message SID.
+   * @throws For missing configuration, provider failures, or a missing message SID.
    */
   async sendWhatsAppPipelineUpdate(
     payload: PipelineReportPayload,
@@ -89,7 +93,11 @@ export class DispatchService {
   }
 
   /**
-   * Send urgent WhatsApp security alert for eBPF or Transcend blocks
+   * Send urgent WhatsApp security alert for eBPF or Transcend blocks.
+   * @param targetPhone - Recipient with or without whatsapp:; blank/omitted values
+   * use DEFAULT_RECIPIENT_PHONE. Configuration is read at send time.
+   * @returns The Twilio message SID.
+   * @throws For missing configuration, provider failures, or a missing message SID.
    */
   async sendWhatsAppSecurityAlert(
     payload: SecurityAlertPayload,
@@ -113,7 +121,12 @@ export class DispatchService {
      ========================================================================== */
 
   /**
-   * Dispatch full dark-mode HTML email report
+   * Dispatch full dark-mode HTML email report.
+   * @param payload - Report data; executionTimeMs is rendered in seconds and logUrl
+   * must be an absolute HTTP or HTTPS URL.
+   * @param targetEmail - Recipient; blank/omitted values use DEFAULT_RECIPIENT_EMAIL.
+   * @returns The Resend email ID.
+   * @throws For missing configuration, invalid log URLs, provider failures, or a missing ID.
    */
   async sendPipelineEmailReport(
     payload: PipelineReportPayload,
@@ -141,7 +154,8 @@ export class DispatchService {
   }
 
   /**
-   * High-density Cyber/Matrix dark-mode HTML email template generator
+   * Generate a dark-mode HTML report with escaped text fields and a validated log link.
+   * @throws If logUrl cannot be parsed as an absolute URL or uses a non-HTTP(S) scheme.
    */
   private renderEmailTemplate(payload: PipelineReportPayload): string {
     const escapeHtml = (value: string): string =>

@@ -11,7 +11,10 @@ export interface SubTask {
 
 export class RyanAIDispatcher {
   /**
-   * Decomposes a complex objective into parallel sub-tasks and dispatches them across the cluster
+   * Decomposes a complex objective into parallel sub-tasks and dispatches them across the cluster.
+   * Invalid plan JSON falls back to one primary-brain task. Returns the raw plan
+   * and task outputs with durations in seconds, formatted as strings.
+   * Model invocation errors and unusable parsed plans propagate to the caller.
    */
   static async decomposeAndExecute(masterObjective: string) {
     console.log("[Dispatcher] Decomposing master objective across cluster...");

@@ -42,6 +42,11 @@ const healthChecks: HealthCheck[] = [
   },
 ];
 
+/**
+ * Probe HTTP or run the Redis/PostgreSQL CLI check with a timeout in milliseconds.
+ * Redis and PostgreSQL endpoints select the CLI check, not its connection settings.
+ * Return false for unknown protocols, unsuccessful checks, or caught errors.
+ */
 async function checkHealth(check: HealthCheck): Promise<boolean> {
   try {
     if (check.endpoint.startsWith('http')) {

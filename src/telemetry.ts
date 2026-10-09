@@ -4,6 +4,7 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { resourceFromAttributes, type Resource } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 
+/** Create an OpenTelemetry service-name resource without starting instrumentation. */
 export function initializeTelemetry(serviceName: string = "ryanai-autonomous-reasoning-engine"): Resource {
   return resourceFromAttributes({
     [ATTR_SERVICE_NAME]: serviceName,
@@ -12,6 +13,11 @@ export function initializeTelemetry(serviceName: string = "ryanai-autonomous-rea
 
 let sdk: NodeSDK | null = null;
 
+/**
+ * Create and cache the telemetry SDK, start instrumentation, and install SIGTERM shutdown.
+ * Later calls return the same SDK, including after a caught synchronous start failure.
+ * SDK construction errors propagate; SIGTERM attempts shutdown and then exits with zero.
+ */
 export function startTelemetry(serviceName: string = "ryanai-autonomous-reasoning-engine") {
   if (sdk) {
     return sdk;

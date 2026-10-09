@@ -14,6 +14,10 @@ try {
 }
 
 export class CudaInferenceEngine {
+  /**
+   * Return native CUDA inference output, or a simulated response when the
+   * addon is unavailable or its inference call throws.
+   */
   public static async generate(prompt: string): Promise<string> {
     if (nativeCudaModule && typeof nativeCudaModule.runCudaInference === "function") {
       try {

@@ -10,6 +10,12 @@ export interface PlatformHealth {
   activeGraph?: string;
 }
 
+/**
+ * Fetch API health with a five-second deadline and optional caller cancellation.
+ * @returns The parsed health response only when its status is online.
+ * @throws For unsuccessful HTTP status, invalid responses, timeouts, or transport
+ * errors. Caller cancellation preserves the underlying abort error.
+ */
 export async function getPlatformHealth(
   signal?: AbortSignal,
 ): Promise<PlatformHealth> {

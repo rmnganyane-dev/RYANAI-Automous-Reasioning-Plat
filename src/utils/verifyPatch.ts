@@ -24,6 +24,10 @@ type VerificationResult = { success: boolean; error?: string };
 /**
  * Validate an immutable staging tree, never the live workspace. Docker and an
  * operator-provisioned, digest-pinned image are mandatory; there is no host fallback.
+ * @param cwd - Staging directory mounted read-only for validation in a temporary copy.
+ * @param testScript - Optional JavaScript source run after npm run validate succeeds.
+ * @returns A success flag; configuration, validation, and cleanup failures become
+ * failure results with sanitized errors. Success requires container removal.
  */
 export async function runVerificationPipeline(
   cwd: string,

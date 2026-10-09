@@ -15,6 +15,9 @@ export class RyanWorkspaceScanner {
 
   /**
    * Objective 1: Scans key workspace files and delegates analysis to specialized agent workers.
+   * Reads immediate .ts and .js files in directories resolved against the workspace;
+   * subdirectories are not traversed. Read failures skip the rest of that directory.
+   * Returns the file count and both audit results; agent failures propagate.
    */
   static async runFullWorkspaceScan(targetDirs: string[] = ['src/engine', 'src/mcp']): Promise<WorkspaceAuditReport> {
     console.log("[Objective 1] Initializing static workspace scan...");

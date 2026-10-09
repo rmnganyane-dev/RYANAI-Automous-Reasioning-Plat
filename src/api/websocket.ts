@@ -23,6 +23,11 @@ interface ConnectionContext {
 const connections = new Map<string, ConnectionContext>();
 const channels = new Map<string, Set<string>>();
 
+/**
+ * Register the admin-only /ws bridge; websocket and rate-limit plugins must be installed.
+ * Connections expire after five minutes and close after more than 60 messages per
+ * minute. The reasoning channel emits simulated progress rather than invoking a model.
+ */
 export async function registerWebSocketRoutes(fastify: FastifyInstance) {
   logger.info('Registering WebSocket routes');
 
@@ -213,6 +218,10 @@ function handleReasoningRequest(
   });
 }
 
+/**
+ * Send an event to open connections subscribed to channel.
+ * JSON serialization and synchronous socket-send errors propagate.
+ */
 export function broadcast(channel: string, data: unknown) {
   const event: WebSocketMessage = {
     id: uuid(),

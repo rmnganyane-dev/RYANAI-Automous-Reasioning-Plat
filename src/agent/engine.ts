@@ -22,6 +22,11 @@ const allowedModels = new Set(
 allowedModels.add(defaultModel);
 const reasoningAgents = new Map<string, ReturnType<typeof createReactAgent>>();
 
+/**
+ * Return the cached reasoning agent for a trimmed, enabled model name.
+ * Omitting the name uses the configured default model.
+ * @throws If the model is disabled or model/agent initialization fails.
+ */
 export function getReasoningAgent(requestedModel = defaultModel) {
   const model = requestedModel.trim();
   if (!allowedModels.has(model)) {

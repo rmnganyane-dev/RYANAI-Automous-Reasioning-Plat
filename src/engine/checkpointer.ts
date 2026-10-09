@@ -9,7 +9,8 @@ export interface ThreadCheckpoint {
 
 export class RyanAICheckpointer {
   /**
-   * Saves or updates a graph execution checkpoint for a specific thread ID
+   * Insert a checkpoint record for the thread; existing records are retained.
+   * Serialization and database errors are caught, so resolution does not confirm a save.
    */
   static async saveCheckpoint(threadId: string, step: number, state: unknown): Promise<void> {
     try {
@@ -28,7 +29,9 @@ export class RyanAICheckpointer {
   }
 
   /**
-   * Retrieves the latest checkpoint state for a thread to resume execution
+   * Read the newest memory record for the thread as checkpoint state.
+   * Return null when no record exists or the query or JSON parsing fails;
+   * a missing or falsy step is returned as zero.
    */
   static async getLatestCheckpoint(threadId: string): Promise<{ step: number; state: unknown } | null> {
     try {

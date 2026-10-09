@@ -7,7 +7,9 @@ export class EbpfSentinelService {
   private mapPath = '/sys/fs/bpf/blocked_pids';
 
   /**
-   * Register PID into eBPF kernel map to trigger immediate kernel-level SIGKILL
+   * Mark the PID in the pinned blocked_pids map for the eBPF consumer.
+   * If the map update fails, attempt SIGKILL directly. Both failures are caught,
+   * so resolution does not confirm that the process was terminated.
    */
   async terminatePidInKernel(pid: number): Promise<void> {
     try {

@@ -15,6 +15,11 @@ export interface StackOverflowQueryResult {
 
 const SO_AGENTS_BASE_URL = 'https://agents.stackoverflow.com/v1';
 
+/**
+ * Query Stack Overflow Agents with an optional bearer token and a ten-second timeout.
+ * Returns the provider data on success; request failures become success: false,
+ * data: null results, preferring the provider's message when available.
+ */
 export async function queryStackOverflow(
   payload: StackOverflowQueryPayload,
   apiToken?: string
