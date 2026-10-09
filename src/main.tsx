@@ -1,12 +1,6 @@
-import { authenticatedFetch } from '@/lib/authenticatedFetch';
-/**
- * RyanAI Command Center - Main Frontend Entry Point
- * Integrates React frontend with Fastify backend
- * Version: 4.5.0-matrix
- */
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Analytics } from '@vercel/analytics/react';
 import App from './App';
 import './index.css';
 import { API_BASE_URL } from './lib/apiBaseUrl';
@@ -18,15 +12,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 // ============================================================================
 
 const APP_VERSION = '4.5.0-matrix';
-const APP_ENV = import.meta.env.MODE || 'development';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-// ============================================================================
-// GLOBAL API CLIENT
-// ============================================================================
-
-/**
- * Global API client for backend communication
- */
 class RyanAIClient {
   private baseURL: string;
   private version: string;
@@ -49,25 +36,14 @@ class RyanAIClient {
     const url = `${this.baseURL}${endpoint}`;
     const method = options.method || 'GET';
 
+  }
+
+  async healthCheck(): Promise<boolean> {
     try {
-      const response = await authenticatedFetch(url, {
-        ...options,
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-App-Version': this.version,
-          ...options.headers,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
-      }
-
-      return (await response.json()) as T;
-    } catch (error) {
-      console.error(`API Request Failed: ${method} ${endpoint}`, error);
-      throw error;
+      const res = await fetch(`${this.baseURL}/health`);
+      return res.ok;
+    } catch {
+      return false;
     }
   }
 
@@ -142,27 +118,14 @@ class RyanAIClient {
   }
 }
 
-// ============================================================================
-// INITIALIZE GLOBAL CLIENT
-// ============================================================================
-
 const apiClient = new RyanAIClient(API_BASE_URL, APP_VERSION);
 
-// Attach to window for global access with complete TypeScript declarations
 declare global {
   interface Window {
     ryanai: {
       client: RyanAIClient;
       version: string;
-      environment: string;
       apiUrl: string;
-    };
-    __DEV__?: {
-      apiClient: RyanAIClient;
-      logs: Console;
-      simulatePipeline: () => Promise<any>;
-      simulateError: (errorId: string) => Promise<any>;
-      checkHealth: () => Promise<boolean>;
     };
   }
 }
@@ -170,7 +133,6 @@ declare global {
 window.ryanai = {
   client: apiClient,
   version: APP_VERSION,
-  environment: APP_ENV,
   apiUrl: API_BASE_URL,
 };
 
@@ -322,3 +284,11 @@ if (APP_ENV === 'development') {
 // ============================================================================
 
 export { apiClient, APP_VERSION, API_BASE_URL, APP_ENV };
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}
