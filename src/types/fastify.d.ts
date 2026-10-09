@@ -3,10 +3,10 @@ import 'fastify';
 declare module 'fastify' {
   interface FastifyInstance {
     cppEngine?: {
-      evaluate: (prompt: string) => any;
+      evaluate: (prompt: string) => unknown;
     };
     transcend?: {
-      evaluate: (payload: Record<string, any>) => any;
+      evaluate: (payload: Record<string, unknown>) => { allow: boolean; requires_human_approval: boolean; violations: string[] };
     };
   }
 }

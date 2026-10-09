@@ -9,7 +9,7 @@ interface EmergencyTwimlQuery {
 
 export async function voiceEmergencyRoutes(fastify: FastifyInstance) {
   fastify.get('/api/v1/voice/emergency-twiml', async (req: FastifyRequest<{ Querystring: EmergencyTwimlQuery }>, reply: FastifyReply) => {
-    const { pid = '0', reason = 'Kernel Violation', message } = req.query;
+    const { pid = '0', message } = req.query;
 
     const response = new twilio.twiml.VoiceResponse();
 

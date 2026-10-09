@@ -6,8 +6,8 @@ const REALTIME_MODEL = 'gpt-4o-realtime-preview-2024-10-01';
 
 export async function voiceRealtimeGateway(fastify: FastifyInstance) {
   // Register Fastify WebSocket endpoint
-  fastify.get('/api/v1/realtime/voice', { websocket: true }, (connection, req: FastifyRequest) => {
-    const ws = (connection as any).socket || connection;
+  fastify.get('/api/v1/realtime/voice', { websocket: true }, (connection, _req: FastifyRequest) => {
+    const ws = connection;
     fastify.log.info('Client connected to Realtime Voice Stream Gateway');
 
     if (!OPENAI_API_KEY) {

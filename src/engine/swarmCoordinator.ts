@@ -44,7 +44,7 @@ export class RyanAISwarmCoordinator extends EventEmitter {
           });
           this.emit('peer_updated', payload.nodeId);
         }
-      } catch (err) {
+      } catch {
         // Ignore malformed broadcast packets
       }
     });

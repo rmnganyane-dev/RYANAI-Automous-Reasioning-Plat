@@ -2,8 +2,13 @@
 import { AppConfig } from './types.js';
 
 function validateConfig(config: Partial<AppConfig>): AppConfig {
+  const environment = process.env.NODE_ENV;
+  const defaultNodeEnv: AppConfig['nodeEnv'] =
+    environment === 'production' || environment === 'staging'
+      ? environment
+      : 'development';
   const {
-    nodeEnv = 'development',
+    nodeEnv = defaultNodeEnv,
     port = 3000,
     host = '0.0.0.0',
     database = {},
@@ -23,7 +28,7 @@ function validateConfig(config: Partial<AppConfig>): AppConfig {
   const sentryDsn = process.env.SENTRY_DSN || '';
 
   return {
-    nodeEnv: (nodeEnv as any) || 'development',
+    nodeEnv: nodeEnv || 'development',
     port: parseInt(process.env.PORT || String(port), 10),
     host,
     database: {

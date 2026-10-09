@@ -1,12 +1,11 @@
 // File path: ./src/telemetry.ts
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import opentelemetryResources from '@opentelemetry/resources';
-const { Resource } = opentelemetryResources as any;
+import { resourceFromAttributes, type Resource } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 
 export function initializeTelemetry(serviceName: string = "ryanai-autonomous-reasoning-engine"): Resource {
-  return new Resource({
+  return resourceFromAttributes({
     [ATTR_SERVICE_NAME]: serviceName,
   });
 }
@@ -28,7 +27,7 @@ export function startTelemetry(serviceName: string = "ryanai-autonomous-reasonin
         '@opentelemetry/instrumentation-pino': { enabled: true },
         '@opentelemetry/instrumentation-http': { enabled: true },
       }),
-    ] as any,
+    ],
   });
 
   try {

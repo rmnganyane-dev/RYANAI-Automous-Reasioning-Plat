@@ -1,11 +1,7 @@
-import 'dotenv/config';
+import { apiUrl, webUrl, apiHealthUrl, mcpHealthUrl } from './health-config.mjs';
 import { Pool } from 'pg';
 import { createClient } from 'redis';
 
-const apiUrl = (process.env.API_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
-const webUrl = (process.env.WEB_BASE_URL || 'http://localhost:9090').replace(/\/+$/, '');
-const apiHealthUrl = process.env.API_HEALTH_URL || `${apiUrl}/health`;
-const mcpHealthUrl = process.env.MCP_HEALTH_URL;
 const databaseUrl = process.env.DATABASE_URL;
 const redisUrl = process.env.REDIS_URL;
 const timeoutMs = Number(process.env.INTEGRATION_TIMEOUT_MS || 5000);
@@ -43,9 +39,13 @@ async function main(): Promise<void> {
   const pool = new Pool({
     connectionString: databaseUrl,
     connectionTimeoutMillis: timeoutMs,
+    query_timeout: timeoutMs,
     max: 1,
   });
-  const redis = createClient({ url: redisUrl, socket: { connectTimeout: timeoutMs } });
+  const redis = createClient({
+    url: redisUrl,
+    socket: { connectTimeout: timeoutMs, reconnectStrategy: false },
+  });
   redis.on('error', (error) => console.error(`Redis client error: ${error.message}`));
 
   try {
@@ -54,9 +54,22 @@ async function main(): Promise<void> {
     });
 
     await check('Redis connection', async () => {
-      await redis.connect();
-      const response = await redis.ping();
-      if (response !== 'PONG') throw new Error(`Unexpected Redis response: ${response}`);
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          (async () => {
+            await redis.connect();
+            const response = await redis.ping();
+            if (response !== 'PONG') throw new Error(`Unexpected Redis response: ${response}`);
+          })(),
+          new Promise<never>((_resolve, reject) => {
+            timeout = setTimeout(() => reject(new Error('Redis connection or PING timed out')), timeoutMs);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timeout);
+        if (redis.isOpen) redis.destroy();
+      }
     });
 
     await checkHttp('API health endpoint', apiHealthUrl, 'application/json');
@@ -94,7 +107,7 @@ async function main(): Promise<void> {
       });
     });
   } finally {
-    if (redis.isOpen) await redis.quit();
+    if (redis.isOpen) redis.destroy();
     await pool.end();
   }
 

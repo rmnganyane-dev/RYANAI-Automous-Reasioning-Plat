@@ -56,9 +56,9 @@ export const commsPlugin: FastifyPluginAsync = async (fastify) => {
         body: message,
       });
       return { success: true, sid: res.sid, channel: 'whatsapp' };
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to dispatch WhatsApp message via Twilio');
-      return reply.status(500).send({ success: false, error: err.message });
+      return reply.status(500).send({ success: false, error: (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -81,9 +81,9 @@ export const commsPlugin: FastifyPluginAsync = async (fastify) => {
         from: process.env.TWILIO_PHONE_NUMBER!,
       });
       return { success: true, sid: res.sid, channel: 'voice_call' };
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to initiate outbound voice call via Twilio');
-      return reply.status(500).send({ success: false, error: err.message });
+      return reply.status(500).send({ success: false, error: (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -103,9 +103,9 @@ export const commsPlugin: FastifyPluginAsync = async (fastify) => {
         html,
       });
       return { success: true, messageId: info.messageId, channel: 'email' };
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to dispatch email via SMTP transporter');
-      return reply.status(500).send({ success: false, error: err.message });
+      return reply.status(500).send({ success: false, error: (err instanceof Error ? err.message : String(err)) });
     }
   });
 };
