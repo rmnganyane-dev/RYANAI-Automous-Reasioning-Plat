@@ -97,6 +97,34 @@ The frontend route manifest lives in [`app/routes.json`](./app/routes.json); the
 - Python 3.10+ only for Python tooling and workflow tests
 - CMake and a C++17 compiler only for `native/local-inference`
 
+### Optional CS-Script VS Code extension
+
+CS-Script is optional editor tooling; the platform does not require .NET. If the
+extension reports missing tools, install the [.NET SDK](https://dotnet.microsoft.com/en-us/download)
+on the machine where the extension runs. For a remote VS Code window, that means
+the remote host or development container.
+
+From the repository root, run:
+
+```bash
+npm run setup:cs-script
+```
+
+This checks for an SDK, installs missing global `cs-script.cli` and `cs-syntaxer`
+tools, and updates tools already installed. It requires network access to NuGet
+and permission to write to your user's .NET tools directory. It is opt-in and
+does not run during `npm install` or container creation.
+
+Ensure `$HOME/.dotnet/tools` (Linux/macOS) or `%USERPROFILE%\.dotnet\tools`
+(Windows) is on PATH. Restart VS Code, then run **CS-Script: Detect and integrate
+CS-Script** from the Command Palette.
+
+The `MD034/no-bare-urls` warning in the extension's generated `integration-error.md`
+is a separate Markdown formatting issue. Use a Markdown link such as
+`[Download the .NET SDK](https://dotnet.microsoft.com/en-us/download)` to fix it.
+The file lives in your VS Code user configuration, outside this repository.
+
+
 ### Windows command entry
 
 Paste only the command, without a trailing `# description`. Command Prompt does not
@@ -315,6 +343,26 @@ vite.config.ts             # Vite config
 
 ## 🛠️ Development
 
+### Load only the UI
+
+```bash
+npm ci --legacy-peer-deps
+npm run dev:web
+```
+
+Open http://localhost:1420. The React UI mounts without waiting for the API,
+PostgreSQL, Redis, MCP, or model credentials. Health checks use `/api/health` and
+time out after five seconds; unavailable services are reported in the UI.
+Navigation and the local workspace remain available, while live reasoning needs
+the configured API. For a built UI, run `npm run build` then `npm run preview`.
+
+Keep `index.html` at the project root and `App.tsx` under `src/`. The supported
+API entrypoint is `src/server/launcher.ts` (`npm run dev:api`); the standalone
+`server.ts` and `src/server.ts` scripts are legacy alternatives and do not serve
+the React UI. Docker Compose serves the UI through `Dockerfile.web`/Nginx on
+http://localhost:9090. Preserve the repository's full `.dockerignore` when
+integrating standalone file copies.
+
 ### All Services at Once
 ```bash
 npm run dev
@@ -430,6 +478,9 @@ npm run ship
 
 For Vercel, set `VITE_API_BASE_URL` to the HTTPS origin of a separately hosted RyanAI API. Vercel hosts the static web frontend; it does not host this repository's API, PostgreSQL, or Redis services.
 
+If reasoning reports `404 NOT_FOUND` with a Vercel request ID, check the request URL in the browser Network panel. It must target the Fastify API's `/api/reasoning/stream`, not the Vercel frontend. Set `VITE_API_BASE_URL` in the Vercel project's environment settings for the affected deployment environment, then rebuild/redeploy (Vite embeds this value at build time). Use only the API's HTTPS origin, without `/api` or a route suffix. Verify that origin's `/api/health` returns the RyanAI gateway JSON; a degraded response indicates backend dependencies need attention. Vercel builds now reject a missing or invalid API origin, including the deployment's own Vercel hostname. `VITE_API_URL` remains a legacy fallback. Running or changing `src/server/launcher.ts` alone does not create API routes on Vercel.
+
+
 GitHub Actions publishes production images after validation on the configured default branch. To enable the GitHub Actions Vercel deployment, configure repository secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`, plus repository variables `VERCEL_DEPLOY_ENABLED=true` and `VITE_API_BASE_URL` (the deployed API origin). The repository's [`vercel.json`](./vercel.json) sets `npm ci --legacy-peer-deps` as the install command and `npm run build:web` as the build command. Do not set `npm run build:web` as Vercel's install command. Older commits do not contain these configuration changes; deploy a commit that includes them.
 
 The scheduled and manually triggered smoke tests require `PROD_GATEWAY_URL` (the full API health URL, e.g. the API origin plus `/health`) and `PROD_FRONTEND_URL` secrets. Preview checks additionally require `PREVIEW_GATEWAY_URL` and `PREVIEW_FRONTEND_URL`.
@@ -453,6 +504,23 @@ npm run release
 | `npm run test:platform` | Platform-specific tests |
 
 `npm run test` runs the local Vitest suite. `npm run test:e2e` and `npm run test:integration` require the API and web stack to be running; integration tests also need reachable PostgreSQL and Redis configured with `DATABASE_URL` and `REDIS_URL`. These are commands to execute in your environment, not a claim that production deployment has been verified.
+
+Both smoke scripts load `.env` (existing shell values take precedence). For a local
+API/Vite session, use `npm run test:e2e -- --local` or
+`npm run test:integration -- --local`; these use `PORT` (default 3001) and
+`VITE_PORT` (default 1420) instead of the Compose URLs. Otherwise configure
+`API_BASE_URL`, `WEB_BASE_URL`, and optionally `API_HEALTH_URL`.
+
+Anonymous reasoning requests and WebSocket upgrades must return HTTP 401.
+To also check authenticated behavior, supply short-lived Supabase access tokens
+in your local environment: `TEST_USER_ACCESS_TOKEN` for the end-to-end empty-prompt
+check (HTTP 400), and `TEST_ADMIN_ACCESS_TOKEN` for successful WebSocket upgrades
+in both scripts. The latter account must have trusted `app_metadata.role=admin`.
+Tokens are sent only in authorization headers; do not commit them. Use trusted
+API targets when supplying tokens. Missing tokens produce explicit `SKIP` lines
+and a separate skipped count; supplied invalid/expired tokens or a non-admin
+WebSocket token fail the checks. A pass with skipped checks does not validate
+sign-in, authenticated reasoning, or administrator access.
 
 ### Sandbox Test Console
 Open http://localhost:9090/sandbox.html to test:
@@ -896,3 +964,9 @@ Built with:
 - LangGraph + MCP
 
 **Ready to deploy. Start now!** 🚀
+
+### Workspace patch safety
+
+The `self_patch_workspace` tool requires an approved isolated verifier and exclusive
+workspace ownership. See [workspace patching and recovery](docs/workspace-patching.md)
+and [verifier provisioning](docs/patch-verifier.md) before enabling it.
