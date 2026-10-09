@@ -189,7 +189,6 @@ export class RyanMCPServer {
     });
   }
 
-  /** Validate patch arguments and map patch outcomes to MCP results; the caller formats thrown errors. */
   private async applyPatchTool(args: Record<string, unknown> | undefined) {
     const { filePath, patchContent, testScript } = args ?? {};
     if (
