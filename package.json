@@ -140,7 +140,7 @@
     "fastify-raw-body": "^5.0.0",
     "framer-motion": "^13.2.0",
     "google-auth-library": "^11.1.0",
-    "googleapis": "^181.0.0",
+    "googleapis": "^183.0.0",
     "ioredis": "^6.0.0",
     "lucide-react": "^1.52.0",
     "nodemailer": "^10.0.10",
