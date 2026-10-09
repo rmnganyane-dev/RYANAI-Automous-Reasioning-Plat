@@ -179,3 +179,7 @@ build/
 *.sh
 *.gguf
 *.md
+
+# Private workspace patch ownership, staging, and crash-recovery journal
+.ryan-patch/
+.ryan-patch-*.tmp

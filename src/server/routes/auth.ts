@@ -1,65 +1,143 @@
-import { FastifyPluginAsync } from 'fastify';
-import jwt from '@fastify/jwt';
-import cookie from '@fastify/cookie';
+import type {
+  FastifyInstance,
+  FastifyPluginAsync,
+  FastifyReply,
+  FastifyRequest,
+} from 'fastify';
+import { createContextClient } from '@supabase/server/core';
 
-export const authPlugin: FastifyPluginAsync = async (fastify) => {
-  await fastify.register(jwt, {
-    secret: process.env.JWT_SECRET || 'super_secret_jwt_key_change_in_prod',
-  });
-  await fastify.register(cookie);
+export interface AuthenticatedUser {
+  id: string;
+  email?: string;
+  role: 'user' | 'admin';
+}
 
-  // 1. Admin Login Route with strict rate limit (5 attempts per 5 minutes)
-  fastify.post(
-    '/api/auth/login',
-    {
-      config: {
-        rateLimit: {
-          max: 5,
-          timeWindow: '5 minutes',
+declare module 'fastify' {
+  interface FastifyRequest {
+    authUser: AuthenticatedUser | null;
+  }
+}
+
+/** Verify with Supabase Auth; never trust a decoded token or browser metadata. */
+export async function requireUser(
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  if (request.authUser) return;
+  const token = /^Bearer ([^\s]+)$/i.exec(
+    request.headers.authorization || '',
+  )?.[1];
+  if (!token) {
+    return reply.code(401).send({ error: 'Sign in to continue.' });
+  }
+
+  const url = process.env.SUPABASE_URL?.trim();
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY?.trim();
+  if (!url || !key) {
+    return reply.code(503).send({ error: 'Authentication is not configured.' });
+  }
+
+  try {
+    const client = createContextClient({
+      env: { url, publishableKeys: { default: key } },
+      auth: { token },
+      supabaseOptions: {
+        global: {
+          fetch: (input, init) =>
+            fetch(input, { ...init, signal: AbortSignal.timeout(5000) }),
         },
       },
-    },
-    async (request, reply) => {
-      const { username, password } = (request.body as { username?: string; password?: string }) || {};
-
-      const validUser = username === (process.env.ADMIN_USERNAME || 'admin');
-      const validPass = password === (process.env.ADMIN_PASSWORD || 'securepassword123');
-
-      if (!validUser || !validPass) {
-        reply.status(401);
-        return { success: false, error: 'Invalid credentials' };
-      }
-
-      // Sign JWT token valid for 8 hours
-      const token = fastify.jwt.sign({ username }, { expiresIn: '8h' });
-
-      // Set HttpOnly cookie for security
-      reply.setCookie('ryanai_token', token, {
-        path: '/',
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 60 * 60 * 8, // 8 hours
+    });
+    const { data, error } = await client.auth.getUser(token);
+    if (error || !data.user || data.user.is_anonymous) {
+      const status =
+        error && (!error.status || error.status >= 500) ? 503 : 401;
+      return reply.code(status).send({
+        error:
+          status === 503
+            ? 'Authentication is temporarily unavailable.'
+            : 'Invalid or expired session. Please sign in again.',
       });
-
-      return { success: true, message: 'Authenticated successfully' };
     }
+    request.authUser = {
+      id: data.user.id,
+      email: data.user.email,
+      // app_metadata can only be assigned by a trusted server/admin.
+      role: data.user.app_metadata?.role === 'admin' ? 'admin' : 'user',
+    };
+  } catch {
+    return reply
+      .code(503)
+      .send({ error: 'Authentication is temporarily unavailable.' });
+  }
+}
+
+export async function requireAdmin(
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  await requireUser(request, reply);
+  if (reply.sent) return;
+  if (request.authUser?.role !== 'admin') {
+    return reply.code(403).send({ error: 'Administrator access is required.' });
+  }
+}
+
+/** Install before any routes, including websocket upgrades. Deny by default. */
+export function installAuthentication(fastify: FastifyInstance) {
+  fastify.decorateRequest('authUser', null);
+  // Run after onRequest rate limits, before route handlers or websocket upgrades.
+  fastify.addHook('preValidation', async (request, reply) => {
+    const path = request.url.split('?')[0];
+    if (request.method === 'OPTIONS') return;
+    if (
+      ['GET', 'HEAD'].includes(request.method) &&
+      ['/', '/health', '/api/health'].includes(path)
+    )
+      return;
+    // These routes perform their own provider-signature verification.
+    if (
+      request.method === 'POST' &&
+      ['/api/slack/interactions', '/api/webhooks/twilio/whatsapp'].includes(
+        path,
+      )
+    )
+      return;
+    if (
+      request.method === 'POST' &&
+      ['/api/auth/login', '/api/auth/logout'].includes(path)
+    )
+      return;
+    if (
+      (request.method === 'POST' &&
+        ['/api/reason', '/api/reasoning/stream'].includes(path)) ||
+      (request.method === 'GET' && path === '/api/auth/verify')
+    ) {
+      return requireUser(request, reply);
+    }
+    // Approvals, communications, metrics and shared websocket channels are admin-only.
+    return requireAdmin(request, reply);
+  });
+}
+
+export const authPlugin: FastifyPluginAsync = async (fastify) => {
+  fastify.get(
+    '/api/auth/verify',
+    { preHandler: requireUser },
+    async (request) => ({
+      authenticated: true,
+      user: request.authUser,
+    }),
   );
 
-  // 2. Token Validation Check Route
-  fastify.get('/api/auth/verify', async (request, reply) => {
-    try {
-      await request.jwtVerify();
-      return { authenticated: true };
-    } catch (err) {
-      reply.status(401);
-      return { authenticated: false, error: 'Unauthorized' };
-    }
-  });
-
-  // 3. Admin Logout Route
-  fastify.post('/api/auth/logout', async (_request, reply) => {
-    reply.clearCookie('ryanai_token', { path: '/' });
-    return { success: true, message: 'Logged out successfully' };
-  });
+  // Retire the separate shared-password/cookie identity. Accounts and sign-out
+  // now use Supabase Auth directly, including its refresh-token lifecycle.
+  for (const path of ['/api/auth/login', '/api/auth/logout']) {
+    fastify.post(path, async (_request, reply) =>
+      reply.code(410).send({
+        error:
+          'Use the application sign-in and sign-out controls (Supabase Auth).',
+      }),
+    );
+  }
 };

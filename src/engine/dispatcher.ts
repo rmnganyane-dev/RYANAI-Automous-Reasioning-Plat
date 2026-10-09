@@ -13,7 +13,7 @@ export class RyanAIDispatcher {
   /**
    * Decomposes a complex objective into parallel sub-tasks and dispatches them across the cluster
    */
-  static async decomposeAndExecute(masterObjective: string): Promise<{ plan: string; results: any[] }> {
+  static async decomposeAndExecute(masterObjective: string) {
     console.log("[Dispatcher] Decomposing master objective across cluster...");
 
     // 1. Logic Brain breaks the objective into structured sub-tasks JSON
@@ -32,7 +32,7 @@ export class RyanAIDispatcher {
       // Clean up markdown code blocks if the model wrapped the JSON
       const rawText = planResponse.content.toString().replace(/```json/g, '').replace(/```/g, '').trim();
       subTasks = JSON.parse(rawText);
-    } catch (error) {
+    } catch {
       console.warn("[Dispatcher Warning] Failed to parse sub-task JSON. Falling back to single-node execution.");
       subTasks = [{ id: "task-1", title: "Direct Execution", targetBrain: "nvidia", payload: masterObjective }];
     }

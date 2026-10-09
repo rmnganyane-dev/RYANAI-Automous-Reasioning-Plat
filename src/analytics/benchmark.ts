@@ -36,9 +36,9 @@ export class RyanAIBenchmarkEngine {
       try {
         const response = await b.model.invoke([new HumanMessage(testPrompt)]);
         responseContent = response.content.toString();
-      } catch (err: any) {
+      } catch (err: unknown) {
         success = false;
-        errorMsg = err.message;
+        errorMsg = (err instanceof Error ? err.message : String(err));
       }
 
       const endTime = performance.now();

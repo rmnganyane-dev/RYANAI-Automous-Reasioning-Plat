@@ -3,7 +3,7 @@ import nodemailer from 'nodemailer';
 interface ApprovalNotification {
   threadId: string;
   tool: string;
-  args: Record<string, any>;
+  args: Record<string, unknown>;
 }
 
 export async function notifyPendingApproval({ threadId, tool, args }: ApprovalNotification) {

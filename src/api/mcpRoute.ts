@@ -40,8 +40,8 @@ export async function registerMcpRoutes(fastify: FastifyInstance): Promise<void>
 
         const { stdout, stderr } = await execAsync(`docker logs --tail 50 ${container}`);
         return reply.send({ success: true, result: stdout || stderr });
-      } catch (err: any) {
-        return reply.code(500).send({ success: false, error: err.message });
+      } catch (err: unknown) {
+        return reply.code(500).send({ success: false, error: (err instanceof Error ? err.message : String(err)) });
       }
     }
 

@@ -1,4 +1,10 @@
-import { airGapCache, VectorEntry, saveVector, loadVector, deleteVector } from './airGapCache';
+import {
+  clearCache,
+  VectorEntry,
+  saveVector,
+  loadVector,
+  deleteVector,
+} from './airGapCache';
 
 export interface SearchResult {
   id: string;
@@ -23,7 +29,10 @@ export class AirGapVectorStore {
     this.ids.delete(id);
   }
 
-  async similaritySearch(queryVector: number[], topK = 5): Promise<SearchResult[]> {
+  async similaritySearch(
+    queryVector: number[],
+    topK = 5,
+  ): Promise<SearchResult[]> {
     const results: SearchResult[] = [];
 
     for (const id of this.ids) {
@@ -34,9 +43,7 @@ export class AirGapVectorStore {
       }
     }
 
-    return results
-      .sort((a, b) => b.score - a.score)
-      .slice(0, topK);
+    return results.sort((a, b) => b.score - a.score).slice(0, topK);
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {
@@ -44,19 +51,19 @@ export class AirGapVectorStore {
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
-    
+
     for (let i = 0; i < a.length; i++) {
       dotProduct += a[i] * b[i];
       normA += a[i] * a[i];
       normB += b[i] * b[i];
     }
-    
+
     const denominator = Math.sqrt(normA) * Math.sqrt(normB);
     return denominator === 0 ? 0 : dotProduct / denominator;
   }
 
-  clear(): void {
-    airGapCache.clear();
+  async clear(): Promise<void> {
+    await clearCache();
     this.ids.clear();
   }
 }

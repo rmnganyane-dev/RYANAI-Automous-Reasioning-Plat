@@ -25,7 +25,7 @@ const transcendGovernancePlugin: FastifyPluginAsync<TranscendPluginOptions> = as
   /**
    * Synchronous WASM policy evaluation against the loaded entrypoint
    */
-  const evaluateInput = (input: Record<string, any>): TranscendEvaluationResult => {
+  const evaluateInput = (input: Record<string, unknown>): TranscendEvaluationResult => {
     const results = policy.evaluate(input);
 
     if (!results || results.length === 0) {
@@ -58,7 +58,7 @@ const transcendGovernancePlugin: FastifyPluginAsync<TranscendPluginOptions> = as
       );
 
       if (isMonitored && request.body) {
-        const evaluation = evaluateInput(request.body as Record<string, any>);
+        const evaluation = evaluateInput(request.body as Record<string, unknown>);
 
         if (!evaluation.allow) {
           fastify.log.warn(
