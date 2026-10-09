@@ -94,11 +94,16 @@
       const API_BASE_URL = window.location.origin;
 
       class RyanAIClient {
+        /** Store the base URL and version header used by subsequent requests. */
         constructor(baseURL, version) {
           this.baseURL = baseURL;
           this.version = version;
         }
 
+        /**
+         * Fetch JSON from an endpoint appended to the base URL.
+         * Request, HTTP, and JSON decoding failures return an offline status object.
+         */
         async request(endpoint, options = {}) {
           const url = `${this.baseURL}${endpoint}`;
           try {
@@ -118,6 +123,7 @@
           }
         }
 
+        /** Return a synthetic healthy status and timestamp without contacting the API. */
         async healthCheck() {
           return { status: 'healthy', timestamp: new Date().toISOString() };
         }
@@ -127,6 +133,7 @@
       window.ryanai = { client: apiClient, version: APP_VERSION, apiUrl: API_BASE_URL };
 
       // Root App Component
+      /** Render the local reasoning/workspace tabs and refresh their Lucide icons. */
       const App = () => {
         const [activeTab, setActiveTab] = React.useState('reasoning');
 

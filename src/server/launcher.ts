@@ -110,6 +110,10 @@ const serviceStatus = {
 // MIDDLEWARE & PLUGINS INITIALIZATION
 // ============================================================================
 
+/**
+ * Connect Redis, install rate limiting and WebSocket support, and register routes.
+ * Readiness and plugin-registration failures propagate to startup.
+ */
 async function registerPlugins() {
   // Check readiness before Avvio's plugin timeout obscures connection failures.
   const redis = await connectRedis(config.redis.url);
@@ -143,6 +147,11 @@ async function registerPlugins() {
 // INITIALIZATION FUNCTIONS
 // ============================================================================
 
+/**
+ * Open the database pool and initialize agent checkpoint storage.
+ * Return false on database initialization failure. A checkpoint setup failure is
+ * caught separately and still returns true after a successful database probe.
+ */
 async function initializeDatabase() {
   console.log('📡 Initializing Database...');
   try {
@@ -179,6 +188,7 @@ async function initializeDatabase() {
   }
 }
 
+/** Ping Redis and mark it available on success; caught failures return false. */
 async function verifyRedis() {
   console.log('⚡ Initializing Redis...');
   try {
@@ -239,11 +249,17 @@ fastify.get(API_ROUTES.healthPath, healthCheck);
     };
   });
 
+  /** Return text content unchanged, otherwise JSON or a string fallback; serialization errors propagate. */
   function contentToText(content: unknown): string {
     if (typeof content === 'string') return content;
     return JSON.stringify(content) ?? String(content);
   }
 
+  /**
+   * Invoke the requested reasoning agent and return its messages as a text trace.
+   * The final trace entry supplies output and response. Model selection, invocation,
+   * and content serialization errors propagate.
+   */
   async function runReasoning(prompt: string, model?: string) {
     const result = await getReasoningAgent(model).invoke({
       messages: [{ role: 'user', content: prompt }],
@@ -430,6 +446,11 @@ fastify.post<{ Body: { prompt?: string; sessionId?: string; model?: string } }>(
 // SERVER STARTUP
 // ============================================================================
 
+/**
+ * Register plugins, probe services, and start listening on the configured address.
+ * Database/checkpointer probe failures can leave the API running in a degraded state;
+ * uncaught plugin or listener failures terminate the process with exit code 1.
+ */
 async function start() {
   try {
     console.log('\n🔧 Registering Plugins...\n');

@@ -5,6 +5,7 @@ import querystring from 'querystring';
 import { verifySlackSignature } from '../../utils/slackVerification.js';
 import { humanInTheLoopAgent } from '../../agent/approvalEngine.js';
 
+/** Return string content or its JSON representation, defaulting to empty text; serialization errors propagate. */
 const extractContent = (content: unknown): string =>
   typeof content === 'string' ? content : JSON.stringify(content) ?? '';
 

@@ -3,6 +3,10 @@ import twilio from 'twilio';
 import formbody from '@fastify/formbody';
 import { humanInTheLoopAgent } from '../../agent/approvalEngine.js';
 
+/**
+ * Return string content unchanged or JSON-encode other values.
+ * Unserializable values can return undefined or throw despite the declared return type.
+ */
 const extractContent = (content: unknown): string =>
   typeof content === 'string' ? content : JSON.stringify(content);
 
@@ -87,6 +91,7 @@ export const twilioWebhookPlugin: FastifyPluginAsync = async (fastify) => {
   );
 };
 
+/** Escape the five XML metacharacters for message text in a TwiML response. */
 function escapeXml(unsafe: string): string {
   return unsafe.replace(/[<>&'"]/g, (c) => {
     switch (c) {

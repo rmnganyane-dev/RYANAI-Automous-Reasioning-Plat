@@ -25,15 +25,19 @@ interface Snapshot {
   files: Map<string, { content: Buffer; mode: number }>;
 }
 
+/** Return the hexadecimal SHA-256 digest of the supplied content. */
 function hash(content: Buffer | string) {
   return createHash("sha256").update(content).digest("hex");
 }
+/** Return the temporary staging path for a workspace root and transaction id. */
 function stageDirectory(root: string, id: string) {
   return path.join("/tmp", `ryan-patch-stage-${hash(root)}-${id}`);
 }
+/** Return an Error message or stringify another thrown value. */
 function message(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
+/** Check whether a filesystem error reports a missing file or directory. */
 function isMissing(error: unknown) {
   return (error as NodeJS.ErrnoException).code === "ENOENT";
 }
@@ -63,7 +67,11 @@ function allowed(relative: string) {
   );
 }
 
-/** Reject links throughout the path; the final file may be absent, parents may not. */
+/**
+ * Reject links throughout the path; the final file may be absent, parents may not.
+ * Return file metadata or null for a missing final file. Reject disallowed paths,
+ * nonregular or multiply linked files, and files larger than 32 MiB; I/O errors propagate.
+ */
 async function inspect(root: string, relative: string) {
   if (!allowed(relative))
     throw new Error("Patch path is outside the permitted workspace files.");
@@ -101,6 +109,7 @@ async function readTarget(root: string, relative: string) {
     ? fs.readFile(path.join(root, relative))
     : null;
 }
+/** Flush a directory's metadata and close its handle; filesystem errors propagate. */
 async function syncDirectory(directory: string) {
   const handle = await fs.open(directory, "r");
   try {
@@ -158,6 +167,10 @@ async function stateDirectory(root: string) {
   await syncDirectory(root);
   return state;
 }
+/**
+ * Run Git in root with a restricted environment and return stdout.
+ * Command failures, the 30-second timeout, and output beyond 16 MiB reject.
+ */
 async function git(root: string, args: string[]) {
   const result = await execFileAsync(
     "/usr/bin/git",

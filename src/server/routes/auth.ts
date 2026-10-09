@@ -22,7 +22,8 @@ declare module 'fastify' {
  * Verify with Supabase Auth; never trust a decoded token or browser metadata.
  * Attach a non-anonymous authUser after bearer-token verification.
  * Reuses an existing authUser. Roles come from app_metadata. Missing or invalid
- * sessions receive 401; missing configuration or provider failures receive 503.
+ * sessions receive 401. Missing configuration, provider errors with no status or
+ * status >= 500, and caught exceptions receive 503.
  * Provider exceptions are converted to responses, with a five-second fetch timeout.
  */
 export async function requireUser(

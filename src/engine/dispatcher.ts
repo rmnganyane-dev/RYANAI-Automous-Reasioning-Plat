@@ -14,6 +14,7 @@ export class RyanAIDispatcher {
    * Decompose an objective and execute the resulting tasks concurrently across the cluster.
    * Invalid plan JSON falls back to one primary-model task. Returns the original plan
    * text and task outputs with durations in seconds as strings; model errors propagate.
+   * Valid JSON with an unusable task shape can still throw.
    */
   static async decomposeAndExecute(masterObjective: string) {
     console.log("[Dispatcher] Decomposing master objective across cluster...");
