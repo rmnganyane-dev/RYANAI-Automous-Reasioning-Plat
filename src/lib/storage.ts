@@ -108,7 +108,10 @@ export function saveMemory(entries: MemoryEntry[], userId: string): void {
   }
 }
 
-/** Append a timestamped memory entry for userId and return it even if saving fails. */
+/**
+ * Append a timestamped memory entry for userId and return it even if saving fails.
+ * Previously stored JSON with a non-array shape can cause this call to throw.
+ */
 export function addMemoryEntry(
   content: string,
   userId: string,
@@ -128,7 +131,10 @@ export function addMemoryEntry(
   return entry;
 }
 
-/** Remove matching entries from userId's stored memory; storage failures are caught. */
+/**
+ * Remove matching entries from userId's stored memory; storage failures are caught.
+ * Previously stored JSON with a non-array shape can cause this call to throw.
+ */
 export function deleteMemoryEntry(id: string, userId: string): void {
   const entries = loadMemory(userId);
   const filtered = entries.filter((e) => e.id !== id);
