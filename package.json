@@ -121,6 +121,7 @@
     "@prisma/adapter-pg": "6.19.3",
     "@prisma/client": "6.19.3",
     "@renderinc/sdk": "^1.2.0",
+    "@segment/analytics-node": "^3.1.0",
     "@sentry/node": "11.4.0",
     "@sentry/profiling-node": "11.4.0",
     "@supabase/server": "^1.6.1",

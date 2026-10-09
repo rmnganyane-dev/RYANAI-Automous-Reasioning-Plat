@@ -27,6 +27,10 @@ describe('AirGapCache and Vector Operations', () => {
       id: 'vec-1',
       vector: [0.1, 0.2, 0.3],
       metadata: { source: 'test' },
+      label: 'custom field',
+      attributes: { tags: ['offline'], score: 0.9 },
+      iv: 'user field with a storage-key name',
+      ciphertext: 'another user field',
     };
 
     await saveVector(entry);
