@@ -110,6 +110,7 @@ const serviceStatus = {
 // MIDDLEWARE & PLUGINS INITIALIZATION
 // ============================================================================
 
+/** Connect Redis, install rate limiting and WebSocket support, then register API routes. */
 async function registerPlugins() {
   // Check readiness before Avvio's plugin timeout obscures connection failures.
   const redis = await connectRedis(config.redis.url);
@@ -162,6 +163,10 @@ async function registerPlugins() {
 // INITIALIZATION FUNCTIONS
 // ============================================================================
 
+/**
+ * Probe PostgreSQL and initialize agent checkpoints, updating readiness flags.
+ * Return database connectivity and log sanitized diagnostics for initialization failures.
+ */
 async function initializeDatabase() {
   console.log('📡 Initializing Database...');
   try {
@@ -220,7 +225,9 @@ async function verifyRedis() {
 // API ROUTES
 // ============================================================================
 
+/** Register gateway health, diagnostics, and JSON and streaming reasoning endpoints. */
 function registerCoreRoutes() {
+  /** Return the service snapshot with HTTP 503 unless database, Redis, and API are ready. */
   const healthCheck = async (_request: FastifyRequest, reply: FastifyReply) => {
     const healthy =
       serviceStatus.database && serviceStatus.redis && serviceStatus.api;
@@ -270,11 +277,13 @@ fastify.get(API_ROUTES.healthPath, healthCheck);
     };
   });
 
+  /** Convert agent message content to text, using JSON for non-string values when possible. */
   function contentToText(content: unknown): string {
     if (typeof content === 'string') return content;
     return JSON.stringify(content) ?? String(content);
   }
 
+  /** Invoke the selected reasoning agent and return its final output and textual message trace. */
   async function runReasoning(prompt: string, model?: string) {
     const result = await getReasoningAgent(model).invoke({
       messages: [{ role: 'user', content: prompt }],

@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 type Route = (typeof appManifest.routes)[number]['id'];
 
+/** Resolve the URL hash and legacy auth aliases to a route, falling back to the default. */
 const routeFromHash = (): Route => {
   const segment = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   const route =
@@ -48,6 +49,7 @@ const destinations = appManifest.routes.map((route) => ({
   icon: routeIcons[route.id],
 }));
 
+/** Render navigation and gate private views on a restored, non-anonymous user session. */
 export default function App() {
   const [route, setRoute] = useState<Route>(routeFromHash);
   const { session, loading, error, signingOut, signOut } = useAuth();
@@ -57,6 +59,7 @@ export default function App() {
     typeof user?.user_metadata?.full_name === 'string'
       ? user.user_metadata.full_name
       : user?.email;
+  /** Navigate to sign-in only after the session has been successfully signed out. */
   const handleSignOut = async () => {
     if (await signOut()) window.location.hash = '/signin';
   };
@@ -85,38 +88,6 @@ export default function App() {
           aria-label="Main navigation"
           className="flex items-center gap-1 overflow-x-auto"
         >
-          {destinations.map(({ id, path, label, icon: Icon }) => (
-            <a
-              key={id}
-              href={id === 'landing' ? '#/' : `#${path}`}
-              aria-label={label}
-              aria-current={route === id ? 'page' : undefined}
-              className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors sm:text-sm ${
-                route === id
-                  ? 'bg-cyan-400/10 text-cyan-200'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              <span className="hidden sm:inline">{label}</span>
-            </a>
-          ))}
-        </nav>
-      </header>
-
-      <main className="min-h-0 flex-1 overflow-y-auto">
-        {route === 'landing' && <LandingPage />}
-        {route === 'dashboard' && <DashboardPage />}
-        {route === 'cockpit' && <RyanAICockpit />}
-        {route === 'workspace' && (
-          <div className="h-full min-h-[calc(100vh-3.5rem)]">
-            <CommandCenter
-              onSignOut={() => {
-                window.location.hash = '/';
-              }}
-              userFullName="Operator"
-            />
-          </div>
           {destinations
             .filter(({ id }) => !user || (id !== 'signin' && id !== 'signup'))
             .map(({ id, path, label, icon: Icon }) => (

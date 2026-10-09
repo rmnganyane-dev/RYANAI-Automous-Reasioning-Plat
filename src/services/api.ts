@@ -28,6 +28,7 @@ export async function fetchSystemHealth(): Promise<SystemHealth> {
   return response.json();
 }
 
+/** Submit an authenticated reasoning prompt and return JSON, throwing on HTTP failure. */
 export async function executeAgentReasoning(
   prompt: string,
 ): Promise<ReasonResponse> {
