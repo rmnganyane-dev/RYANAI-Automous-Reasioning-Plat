@@ -85,6 +85,77 @@ npm run docker:down        # Stop all containers
 For local development, use `npm run dev:api` (API on port 3001) and `npm run dev:web` (Vite on port 1420). Override ports portably in PowerShell with `$env:PORT='3002'; npm.cmd run dev:api` and `$env:VITE_PORT='5174'; npm.cmd run dev:web`; on bash, use `PORT=3002 npm run dev:api` and `VITE_PORT=5174 npm run dev:web`.
 
 For local Vite development, do not set `NODE_ENV=production` in `.env`; Vite controls development/production mode itself. Docker Compose defaults the API to production without requiring this setting in `.env`. `npm run dev:tunnel` requires ngrok account authentication; set `NGROK_AUTHTOKEN` and it forwards to the local API port (3001 by default).
+If `startup:verify` is missing or `dev` cannot find `scripts/dev-all.mjs`, inspect
+`git status` and synchronize your intended branch after preserving local changes.
+`npm run` lists available scripts; `npm run3` is not an npm command.
+
+The dev container includes Node 22 and Docker Compose. After updating its
+configuration, run **Codespaces: Rebuild Container** from the command palette.
+An existing container will not gain Docker until it is rebuilt. Confirm readiness:
+
+```bash
+node --version
+docker info
+docker compose version
+```
+
+Node must be 22.12 or newer. If `docker` is missing or its daemon is unavailable,
+resolve that before running any `docker:*` commands. Outside Codespaces, install
+and start Docker with Compose, or provide running PostgreSQL and Redis services
+and set their connection URLs in `.env`.
+
+For the API, Vite UI, and MCP development processes:
+
+```bash
+npm run install:all
+```
+
+Create `.env` from `.env.example` only if it does not already exist. Replace the
+four secret placeholders, and also replace the matching password portions of
+`DATABASE_URL` and `REDIS_URL`. Set `PORT=3001` and remove any old
+`NODE_ENV=production` line. Start only the database and cache containers, then
+keep this terminal running:
+
+```bash
+docker compose up -d --wait postgres redis
+npm run dev
+```
+
+Open http://localhost:1420 (or forward port 1420 in Codespaces). In a second terminal:
+
+```bash
+npm run startup:verify -- --local
+npm run test:integration -- --local
+npm run mcp:health
+```
+
+`--local` uses `PORT` (default 3001) and `VITE_PORT` (default 1420), overriding
+the Compose HTTP URLs in `.env`. Without it, checks use `API_BASE_URL` and
+`WEB_BASE_URL` (defaults 3000 and 9090). Both checks load `.env`; exported shell
+values take precedence. Redis must authenticate successfully before the API
+starts. A connection failure now exits with setup guidance instead of waiting
+for a Fastify plugin timeout. Integration checks fail if dependencies are down.
+
+Use Ctrl+C to stop development processes, then `npm run docker:down` to stop
+the database and cache containers. The Tauri desktop process is optional and
+should be started in its own terminal only when working on the desktop app.
+```
+
+The API and tunnel load the root `.env` before reading configuration. Existing
+shell and Docker Compose environment variables take precedence; `.env` is optional
+when those supply configuration. Local `REDIS_URL` must contain the Redis password
+(and ACL username if required); setting `REDIS_PASSWORD` alone only configures
+Compose. Use the actual password, URL-encoded when necessary, rather than a literal
+`${REDIS_PASSWORD}` reference in `REDIS_URL`. The startup banner reports configuration
+presence, not successful authentication. For local API + Vite development, set
+`PORT=3001` in an existing `.env` copied from an older example; Compose supplies
+port 3000 to its API container independently. `API_BASE_URL` remains the Compose
+integration-check target (3000); set it to `http://localhost:3001` only when running
+integration checks against the local API.
+
+For local development, use `npm run dev:api` (API on port 3001 by default) and `npm run dev:web` (Vite on port 1420). Override ports portably in PowerShell with `$env:PORT='3002'; npm.cmd run dev:api` and `$env:VITE_PORT='5174'; npm.cmd run dev:web`; on bash, use `PORT=3002 npm run dev:api` and `VITE_PORT=5174 npm run dev:web`.
+
+For local Vite development, do not set `NODE_ENV=production` in `.env`; Vite controls development/production mode itself. Docker Compose defaults the API to production without requiring this setting in `.env`. `npm run dev:tunnel` requires ngrok account authentication; set `NGROK_AUTHTOKEN` in the root `.env` or shell. The tunnel uses the same `PORT` value as the API (3001 by default for local development).
 
 ---
 
@@ -148,6 +219,26 @@ vite.config.ts             # Vite config
 ---
 
 ## 🛠️ Development
+
+### Load only the UI
+
+```bash
+npm ci --legacy-peer-deps
+npm run dev:web
+```
+
+Open http://localhost:1420. The React UI mounts without waiting for the API,
+PostgreSQL, Redis, MCP, or model credentials. Health checks use `/api/health` and
+time out after five seconds; unavailable services are reported in the UI.
+Navigation and the local workspace remain available, while live reasoning needs
+the configured API. For a built UI, run `npm run build` then `npm run preview`.
+
+Keep `index.html` at the project root and `App.tsx` under `src/`. The supported
+API entrypoint is `src/server/launcher.ts` (`npm run dev:api`); the standalone
+`server.ts` and `src/server.ts` scripts are legacy alternatives and do not serve
+the React UI. Docker Compose serves the UI through `Dockerfile.web`/Nginx on
+http://localhost:9090. Preserve the repository's full `.dockerignore` when
+integrating standalone file copies.
 
 ### All Services at Once
 ```bash
@@ -252,6 +343,9 @@ npm run ship                # validate, test, and build Docker images (does not 
 
 For Vercel, set `VITE_API_BASE_URL` to the HTTPS origin of a separately hosted RyanAI API. Vercel hosts the static web frontend; it does not host this repository's API, PostgreSQL, or Redis services.
 
+If reasoning reports `404 NOT_FOUND` with a Vercel request ID, check the request URL in the browser Network panel. It must target the Fastify API's `/api/reasoning/stream`, not the Vercel frontend. Set `VITE_API_BASE_URL` in the Vercel project's environment settings for the affected deployment environment, then rebuild/redeploy (Vite embeds this value at build time). Use only the API's HTTPS origin, without `/api` or a route suffix. Verify that origin's `/api/health` returns the RyanAI gateway JSON; a degraded response indicates backend dependencies need attention. Vercel builds now reject a missing or invalid API origin, including the deployment's own Vercel hostname. `VITE_API_URL` remains a legacy fallback. Running or changing `src/server/launcher.ts` alone does not create API routes on Vercel.
+
+
 GitHub Actions publishes production images after validation on the configured default branch. To enable the GitHub Actions Vercel deployment, configure repository secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`, plus repository variables `VERCEL_DEPLOY_ENABLED=true` and `VITE_API_BASE_URL` (the deployed API origin). The repository's [`vercel.json`](./vercel.json) sets `npm ci --legacy-peer-deps` as the install command and `npm run build:web` as the build command. Do not set `npm run build:web` as Vercel's install command. Older commits do not contain these configuration changes; deploy a commit that includes them.
 
 The scheduled and manually triggered smoke tests require `PROD_GATEWAY_URL` (the full API health URL, e.g. the API origin plus `/health`) and `PROD_FRONTEND_URL` secrets. Preview checks additionally require `PREVIEW_GATEWAY_URL` and `PREVIEW_FRONTEND_URL`.
@@ -275,6 +369,23 @@ npm run release             # Build Windows MSI + NSIS installers
 | `npm run test:platform` | Platform-specific tests |
 
 `npm run test` runs the local Vitest suite. `npm run test:e2e` and `npm run test:integration` require the API and web stack to be running; integration tests also need reachable PostgreSQL and Redis configured with `DATABASE_URL` and `REDIS_URL`. These are commands to execute in your environment, not a claim that production deployment has been verified.
+
+Both smoke scripts load `.env` (existing shell values take precedence). For a local
+API/Vite session, use `npm run test:e2e -- --local` or
+`npm run test:integration -- --local`; these use `PORT` (default 3001) and
+`VITE_PORT` (default 1420) instead of the Compose URLs. Otherwise configure
+`API_BASE_URL`, `WEB_BASE_URL`, and optionally `API_HEALTH_URL`.
+
+Anonymous reasoning requests and WebSocket upgrades must return HTTP 401.
+To also check authenticated behavior, supply short-lived Supabase access tokens
+in your local environment: `TEST_USER_ACCESS_TOKEN` for the end-to-end empty-prompt
+check (HTTP 400), and `TEST_ADMIN_ACCESS_TOKEN` for successful WebSocket upgrades
+in both scripts. The latter account must have trusted `app_metadata.role=admin`.
+Tokens are sent only in authorization headers; do not commit them. Use trusted
+API targets when supplying tokens. Missing tokens produce explicit `SKIP` lines
+and a separate skipped count; supplied invalid/expired tokens or a non-admin
+WebSocket token fail the checks. A pass with skipped checks does not validate
+sign-in, authenticated reasoning, or administrator access.
 
 ### Sandbox Test Console
 Open http://localhost:9090/sandbox.html to test:

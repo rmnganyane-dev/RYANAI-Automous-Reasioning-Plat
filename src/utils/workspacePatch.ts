@@ -194,9 +194,6 @@ interface PatchOwnership {
   promotionStarted: boolean;
 }
 
-/**
- * Acquire and persist exclusive ownership, recording it before directory sync so failures can clean up.
- */
 async function acquirePatchLock(root: string, ownership: PatchOwnership) {
   const state = await stateDirectory(root);
   const lock = path.join(state, "lock");
@@ -215,9 +212,6 @@ async function acquirePatchLock(root: string, ownership: PatchOwnership) {
   return lock;
 }
 
-/**
- * Copy the permitted snapshot and candidate into staging with verifier-readable permissions.
- */
 async function stageSnapshot(
   stage: string,
   baseline: Snapshot,
@@ -245,9 +239,6 @@ async function stageSnapshot(
   );
 }
 
-/**
- * Confirm the tracked snapshot and target still match the state that was verified.
- */
 async function revisionMatches(
   root: string,
   baseline: Snapshot,
@@ -261,9 +252,6 @@ async function revisionMatches(
   );
 }
 
-/**
- * Journal promotion intent, atomically replace the target, and retain ownership if commit durability is uncertain.
- */
 async function promotePatch(
   root: string,
   lock: string,
@@ -287,9 +275,6 @@ async function promotePatch(
   ownership.promotionStarted = false;
 }
 
-/**
- * Validate a tracked-file patch in isolation, then promote it only if the workspace revision is unchanged.
- */
 async function executePatch(
   workspace: string,
   request: PatchRequest,
@@ -352,9 +337,6 @@ async function executePatch(
   };
 }
 
-/**
- * Retire owned transaction state only when promotion is not uncertain; otherwise preserve it for recovery.
- */
 async function cleanupPatch(ownership: PatchOwnership) {
   const { lock, stagingRoot, promotionStarted } = ownership;
   // A crash or uncertain promotion leaves ownership/journal intact for explicit recovery.
@@ -393,9 +375,6 @@ export async function applyWorkspacePatch(
   return result;
 }
 
-/**
- * Check for a real recovery lock directory, rejecting links and unexpected filesystem objects.
- */
 async function recoveryLockExists(lock: string) {
   let stat;
   try {
@@ -409,9 +388,6 @@ async function recoveryLockExists(lock: string) {
   return true;
 }
 
-/**
- * Load persisted recovery state, allowing an absent journal from a crash before its first write.
- */
 async function readRecoveryJournal(lock: string) {
   try {
     return JSON.parse(
@@ -423,9 +399,6 @@ async function readRecoveryJournal(lock: string) {
   }
 }
 
-/**
- * Reject unsupported phases and paths that do not belong to the recorded patch transaction.
- */
 function validateRecoveryJournal(journal: Journal) {
   if (
     journal.version !== 1 ||
@@ -444,9 +417,6 @@ function validateRecoveryJournal(journal: Journal) {
   }
 }
 
-/**
- * Reconcile durable intent against target hashes without overwriting conflicting workspace changes.
- */
 async function recoverPromotion(root: string, journal: Journal) {
   if (journal.phase !== "promoting" && journal.phase !== "committed")
     return "aborted";
