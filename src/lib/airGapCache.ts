@@ -16,6 +16,10 @@ interface StoredVectorRecord {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * Open the shared vector database, creating its object store on upgrade.
+ * Rejects IndexedDB open errors; the caller owns closing the returned connection.
+ */
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -30,6 +34,10 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
+/**
+ * Derive the shared AES-GCM key used to obfuscate stored vectors.
+ * The fixed application-wide key is not a user secret. Web Crypto errors propagate.
+ */
 async function getKey(): Promise<CryptoKey> {
   // Preserve the existing on-disk format. This application-wide key provides
   // obfuscation, not protection against someone with access to this application.
@@ -55,6 +63,11 @@ async function getKey(): Promise<CryptoKey> {
   );
 }
 
+/**
+ * Run one object-store request and resolve its result only after transaction commit.
+ * Closes the connection on completion or failure; open, operation, and transaction
+ * errors reject the promise.
+ */
 async function withStore<T>(
   mode: IDBTransactionMode,
   operation: (store: IDBObjectStore) => IDBRequest<T>,
@@ -76,6 +89,11 @@ async function withStore<T>(
   }
 }
 
+/**
+ * Upsert an IndexedDB entry, encrypting its vector with the shared application key.
+ * Only id, vector, and metadata are persisted; metadata remains unencrypted.
+ * Resolves after commit and propagates serialization, crypto, and storage errors.
+ */
 export async function saveVector(entry: VectorEntry): Promise<void> {
   const key = await getKey();
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -94,6 +112,10 @@ export async function saveVector(entry: VectorEntry): Promise<void> {
   await withStore('readwrite', (store) => store.put(record));
 }
 
+/**
+ * Load and decrypt a persisted vector, returning null only when the ID is absent.
+ * Storage, crypto, and JSON parsing errors propagate.
+ */
 export async function loadVector(id: string): Promise<VectorEntry | null> {
   const record = await withStore<StoredVectorRecord | undefined>(
     'readonly',
@@ -116,14 +138,20 @@ export async function loadVector(id: string): Promise<VectorEntry | null> {
   };
 }
 
+/** Delete a persisted vector, including when the ID is absent; storage errors propagate. */
 export async function deleteVector(id: string): Promise<void> {
   await withStore('readwrite', (store) => store.delete(id));
 }
 
+/** Remove all persisted vectors, resolving after commit; storage errors propagate. */
 export async function clearVectorCache(): Promise<void> {
   await withStore('readwrite', (store) => store.clear());
 }
 
+/**
+ * Clear persisted vectors, then the shared memory cache.
+ * A storage failure rejects before the memory cache is cleared.
+ */
 export async function clearCache(): Promise<void> {
   await clearVectorCache();
   await airGapCache.clear();
@@ -138,10 +166,12 @@ export class AirGapCache {
   private store = new Map<string, CacheEntry>();
   private defaultTtl: number;
 
+  /** Create an independent memory cache with a default TTL in milliseconds (one hour). */
   constructor(options?: { ttl?: number; [key: string]: unknown }) {
     this.defaultTtl = options?.ttl ?? 3600000; // 1 hour default
   }
 
+  /** Return a cached value, or null if absent or at/past expiry; remove expired entries. */
   async get<T = unknown>(key: string): Promise<T | null> {
     const entry = this.store.get(key);
     if (!entry) return null;
@@ -152,11 +182,16 @@ export class AirGapCache {
     return entry.value as T;
   }
 
+  /**
+   * Replace a memory entry with a TTL in milliseconds, measured from this call.
+   * Omitted TTL uses the instance default; zero or negative TTL expires immediately.
+   */
   async set(key: string, value: unknown, ttl?: number): Promise<void> {
     const expiry = Date.now() + (ttl ?? this.defaultTtl);
     this.store.set(key, { value, expiry });
   }
 
+  /** Remove every entry from this instance's memory cache. */
   async clear(): Promise<void> {
     this.store.clear();
   }

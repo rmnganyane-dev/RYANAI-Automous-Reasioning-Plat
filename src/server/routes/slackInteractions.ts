@@ -8,6 +8,11 @@ import { humanInTheLoopAgent } from '../../agent/approvalEngine.js';
 const extractContent = (content: unknown): string =>
   typeof content === 'string' ? content : JSON.stringify(content) ?? '';
 
+/**
+ * Register signed Slack approval interactions using the original request body.
+ * Resume or reject the selected agent thread and return a replacement Slack message.
+ * Payload parsing and agent failures reach Fastify's error handler.
+ */
 export const slackInteractionsPlugin: FastifyPluginAsync = async (fastify) => {
   // 1. Register raw-body plugin to preserve original request string
   await fastify.register(fastifyRawBody, {

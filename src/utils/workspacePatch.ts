@@ -37,6 +37,10 @@ function message(error: unknown) {
 function isMissing(error: unknown) {
   return (error as NodeJS.ErrnoException).code === "ENOENT";
 }
+/**
+ * Check a relative path for traversal, reserved directories, and credential filename patterns.
+ * This checks names only; filesystem links and file types are checked by inspect.
+ */
 function allowed(relative: string) {
   const parts = relative.split("/");
   return (
@@ -88,6 +92,10 @@ async function inspect(root: string, relative: string) {
   }
   return null;
 }
+/**
+ * Read a permitted regular file, or return null if only the final path is absent.
+ * Path validation and filesystem errors propagate.
+ */
 async function readTarget(root: string, relative: string) {
   return (await inspect(root, relative))
     ? fs.readFile(path.join(root, relative))
@@ -101,6 +109,10 @@ async function syncDirectory(directory: string) {
     await handle.close();
   }
 }
+/**
+ * Exclusively create a file, apply its permission mode, and sync its contents.
+ * Existing paths and filesystem failures reject; a partial file may remain on failure.
+ */
 async function durableWrite(
   filename: string,
   content: string | Buffer,
@@ -115,12 +127,17 @@ async function durableWrite(
     await handle.close();
   }
 }
+/** Atomically replace and sync the transaction journal; filesystem errors propagate. */
 async function saveJournal(lock: string, journal: Journal) {
   const temporary = path.join(lock, `journal-${randomUUID()}.tmp`);
   await durableWrite(temporary, JSON.stringify(journal));
   await fs.rename(temporary, path.join(lock, "journal.json"));
   await syncDirectory(lock);
 }
+/**
+ * Create or validate a private patch-state directory owned by the current user.
+ * Return its path after syncing the workspace directory; validation and I/O errors reject.
+ */
 async function stateDirectory(root: string) {
   const state = path.join(root, STATE);
   await fs.mkdir(state, { mode: 0o700 }).catch((error) => {
@@ -158,7 +175,12 @@ async function git(root: string, args: string[]) {
   return result.stdout;
 }
 
-/** Only tracked source files enter the worker. Ignored/untracked credentials never do. */
+/**
+ * Snapshot permitted tracked working-tree files and hash their content, modes, HEAD, and index.
+ * Gitlinks and disallowed paths are skipped. Rejects a non-root workspace, index
+ * conflicts, missing or unsupported files, files over 32 MiB, and totals over 256 MiB.
+ * Git and filesystem errors propagate.
+ */
 async function snapshot(root: string): Promise<Snapshot> {
   const top = (await git(root, ["rev-parse", "--show-toplevel"])).trim();
   if ((await fs.realpath(top)) !== root)
@@ -194,6 +216,10 @@ interface PatchOwnership {
   promotionStarted: boolean;
 }
 
+/**
+ * Create the workspace patch lock and record ownership before syncing it.
+ * An existing lock rejects as busy or requiring recovery; filesystem errors propagate.
+ */
 async function acquirePatchLock(root: string, ownership: PatchOwnership) {
   const state = await stateDirectory(root);
   const lock = path.join(state, "lock");
@@ -212,6 +238,10 @@ async function acquirePatchLock(root: string, ownership: PatchOwnership) {
   return lock;
 }
 
+/**
+ * Materialize a snapshot with the requested replacement text for isolated validation.
+ * Normalize files to 0644 or 0755 based on executable bits; filesystem errors propagate.
+ */
 async function stageSnapshot(
   stage: string,
   baseline: Snapshot,
@@ -239,6 +269,10 @@ async function stageSnapshot(
   );
 }
 
+/**
+ * Compare current snapshot revision and target bytes with the pre-validation baseline.
+ * Snapshot, path validation, and read errors propagate rather than returning false.
+ */
 async function revisionMatches(
   root: string,
   baseline: Snapshot,
@@ -252,6 +286,11 @@ async function revisionMatches(
   );
 }
 
+/**
+ * Journal promotion intent, then atomically replace the live file with request.patchContent.
+ * Retain tracked permissions and sync the change. I/O errors propagate, leaving
+ * promotionStarted true after intent is saved until the committed journal is saved.
+ */
 async function promotePatch(
   root: string,
   lock: string,
@@ -275,6 +314,11 @@ async function promotePatch(
   ownership.promotionStarted = false;
 }
 
+/**
+ * Lock a Linux workspace, stage a tracked-file replacement, verify it, and promote it.
+ * Return rejected for validation failure, conflict for a changed workspace, or success.
+ * Input, locking, snapshot, and I/O failures propagate; the caller owns cleanup.
+ */
 async function executePatch(
   workspace: string,
   request: PatchRequest,
@@ -337,6 +381,10 @@ async function executePatch(
   };
 }
 
+/**
+ * Remove staging and retire an owned lock unless promotion remains uncertain.
+ * Filesystem errors propagate; recovery state is retained when promotionStarted is true.
+ */
 async function cleanupPatch(ownership: PatchOwnership) {
   const { lock, stagingRoot, promotionStarted } = ownership;
   // A crash or uncertain promotion leaves ownership/journal intact for explicit recovery.
@@ -348,7 +396,16 @@ async function cleanupPatch(ownership: PatchOwnership) {
   await fs.rm(retired, { recursive: true, force: true });
 }
 
-/** All cooperating writers must hold this lock; crashes deliberately leave it for recovery. */
+/**
+ * Verify and atomically replace an existing tracked file in a Linux Git repository root.
+ * request.filePath is a permitted relative path; patchContent is complete replacement
+ * text limited to 8 MiB, and testScript is optional JavaScript run during verification.
+ * All cooperating writers must honor the workspace lock; crashes leave it for recovery.
+ *
+ * Returns success, rejected (validation), conflict (workspace changed), or failed
+ * (input, lock, I/O, or cleanup errors). Errors are converted to results. A failed
+ * cleanup may follow a committed replacement, so failure does not guarantee unchanged bytes.
+ */
 export async function applyWorkspacePatch(
   workspace: string,
   request: PatchRequest,
@@ -375,6 +432,7 @@ export async function applyWorkspacePatch(
   return result;
 }
 
+/** Return whether a recovery lock exists; reject non-directory/symlink locks and I/O errors. */
 async function recoveryLockExists(lock: string) {
   let stat;
   try {
@@ -388,6 +446,10 @@ async function recoveryLockExists(lock: string) {
   return true;
 }
 
+/**
+ * Parse the recovery journal, returning undefined only when it is missing.
+ * Malformed JSON and other filesystem errors propagate.
+ */
 async function readRecoveryJournal(lock: string) {
   try {
     return JSON.parse(
@@ -399,6 +461,7 @@ async function readRecoveryJournal(lock: string) {
   }
 }
 
+/** Reject unsupported journal versions, paths, transaction IDs, or phases. */
 function validateRecoveryJournal(journal: Journal) {
   if (
     journal.version !== 1 ||
@@ -417,6 +480,11 @@ function validateRecoveryJournal(journal: Journal) {
   }
 }
 
+/**
+ * Classify an interrupted promotion as committed or aborted without rewriting target bytes.
+ * Remove its temporary file when promotion content is recognized; conflicts and I/O
+ * errors reject so the caller can preserve recovery state.
+ */
 async function recoverPromotion(root: string, journal: Journal) {
   if (journal.phase !== "promoting" && journal.phase !== "committed")
     return "aborted";
@@ -438,7 +506,13 @@ async function recoverPromotion(root: string, journal: Journal) {
   return status;
 }
 
-/** Operator-only: stop ALL writers first. Never expose this through the agent/MCP tools. */
+/**
+ * Operator-only: stop ALL writers first. Never expose this through the agent/MCP tools.
+ * confirmQuiescent must explicitly be true; the function does not stop writers itself.
+ * Returns nothing_to_recover, aborted, or committed and retires recovered lock/staging
+ * state without restoring target bytes. Invalid state, content conflicts, and I/O
+ * failures reject and may require manual investigation.
+ */
 export async function recoverWorkspacePatch(
   workspace: string,
   confirmQuiescent: boolean,

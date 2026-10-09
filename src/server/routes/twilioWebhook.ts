@@ -6,6 +6,12 @@ import { humanInTheLoopAgent } from '../../agent/approvalEngine.js';
 const extractContent = (content: unknown): string =>
   typeof content === 'string' ? content : JSON.stringify(content);
 
+/**
+ * Register the WhatsApp webhook with Twilio signature verification against its configured URL.
+ * Messages use a thread per sender phone number. Invalid payloads receive 400;
+ * agent failures become a fallback TwiML reply. Missing auth configuration receives
+ * 503 and invalid signatures receive 401.
+ */
 export const twilioWebhookPlugin: FastifyPluginAsync = async (fastify) => {
   await fastify.register(formbody);
 
