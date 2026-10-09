@@ -1,3 +1,4 @@
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
 // File path: ./src/services/apiClient.ts
 
 import { API_BASE_URL } from '../lib/apiBaseUrl';
@@ -19,16 +20,18 @@ export interface ReasoningChunk {
 export const apiClient = {
   async triggerReasoning(
     payload: ReasoningRequest,
-    onChunk: (chunk: ReasoningChunk) => void
+    onChunk: (chunk: ReasoningChunk) => void,
   ): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/reasoning`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/api/reasoning`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
     if (!response.ok || !response.body) {
-      throw new Error(`Reasoning API failed with status ${response.status}: ${response.statusText}`);
+      throw new Error(
+        `Reasoning API failed with status ${response.status}: ${response.statusText}`,
+      );
     }
 
     const reader = response.body.getReader();
