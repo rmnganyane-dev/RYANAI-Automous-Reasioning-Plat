@@ -1,6 +1,7 @@
 import { requireAdmin } from './auth.js';
 import { FastifyPluginAsync } from 'fastify';
 
+/** Register admin-only process metrics; database readiness is reported by the health endpoint. */
 export const metricsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', requireAdmin);
 

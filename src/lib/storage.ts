@@ -16,6 +16,7 @@ export function uid(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
+/** Create a timestamped conversation message with a generated ID and optional model steps. */
 export function createMessage(
   role: 'user' | 'assistant',
   content: string,
@@ -49,6 +50,7 @@ export function generateTitle(text: string): string {
   return words.join(' ').substring(0, 50) + (text.length > 50 ? '...' : '');
 }
 
+/** Load conversations for one user, returning an empty list if reading or parsing fails. */
 export function loadConversations(userId: string): Conversation[] {
   try {
     const data = localStorage.getItem(`${STORAGE_KEY}:${userId}`);
@@ -58,6 +60,7 @@ export function loadConversations(userId: string): Conversation[] {
   }
 }
 
+/** Persist conversations under the user storage key and log storage failures. */
 export function saveConversations(
   conversations: Conversation[],
   userId: string,
@@ -72,6 +75,7 @@ export function saveConversations(
   }
 }
 
+/** Load memories for one user, returning an empty list if reading or parsing fails. */
 export function loadMemory(userId: string): MemoryEntry[] {
   try {
     const data = localStorage.getItem(`${MEMORY_KEY}:${userId}`);
@@ -81,6 +85,7 @@ export function loadMemory(userId: string): MemoryEntry[] {
   }
 }
 
+/** Persist memories under the user storage key and log storage failures. */
 export function saveMemory(entries: MemoryEntry[], userId: string): void {
   try {
     localStorage.setItem(`${MEMORY_KEY}:${userId}`, JSON.stringify(entries));
@@ -89,6 +94,7 @@ export function saveMemory(entries: MemoryEntry[], userId: string): void {
   }
 }
 
+/** Create and append a timestamped memory to the user storage, then return the entry. */
 export function addMemoryEntry(
   content: string,
   userId: string,
@@ -108,6 +114,7 @@ export function addMemoryEntry(
   return entry;
 }
 
+/** Remove a memory by ID from the supplied user account and save the remaining entries. */
 export function deleteMemoryEntry(id: string, userId: string): void {
   const entries = loadMemory(userId);
   const filtered = entries.filter((e) => e.id !== id);

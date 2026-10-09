@@ -23,6 +23,10 @@ interface ConnectionContext {
 const connections = new Map<string, ConnectionContext>();
 const channels = new Map<string, Set<string>>();
 
+/**
+ * Register the admin WebSocket endpoint with upgrade and message rate limits.
+ * Expire connections after five minutes and remove subscriptions when sockets close.
+ */
 export async function registerWebSocketRoutes(fastify: FastifyInstance) {
   logger.info('Registering WebSocket routes');
 
@@ -103,6 +107,10 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance) {
   );
 }
 
+/**
+ * Dispatch a socket request to authentication, reasoning, or subscription handling.
+ * Send a correlated response containing the result or a structured handler error.
+ */
 async function handleMessage(
   context: ConnectionContext,
   message: WebSocketMessage,
@@ -178,6 +186,7 @@ async function handleMessage(
   sendMessage(context.ws, response);
 }
 
+/** Schedule simulated reasoning progress events for the requested session. */
 function handleReasoningRequest(
   context: ConnectionContext,
   request: ReasoningRequest,
@@ -213,6 +222,7 @@ function handleReasoningRequest(
   });
 }
 
+/** Send a channel event to each subscribed connection whose socket is still open. */
 export function broadcast(channel: string, data: unknown) {
   const event: WebSocketMessage = {
     id: uuid(),
@@ -250,6 +260,7 @@ function sendError(ws: WebSocket, code: string, message: string) {
   sendMessage(ws, msg);
 }
 
+/** Map the verified request user to a five-minute socket auth context, or return undefined. */
 function extractAuth(request: FastifyRequest): AuthContext | undefined {
   const user = request.authUser;
   if (!user) return undefined;
