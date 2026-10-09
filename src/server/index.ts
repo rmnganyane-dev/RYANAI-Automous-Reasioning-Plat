@@ -1,6 +1,7 @@
 import '../loadEnv.js';
 import Fastify from 'fastify';
 import fastifyRedis from '@fastify/redis';
+import fastifyRateLimit from '@fastify/rate-limit';
 import { installAuthentication, authPlugin } from './routes/auth.js';
 import { reasonPlugin } from './routes/reason.js';
 import { RyanMCPServer } from '../mcp/ryanMcpServer.js';
@@ -27,6 +28,7 @@ server.addHook('onRequest', (req, reply, done) => {
   done();
 });
 
+await server.register(fastifyRateLimit, { max: 100, timeWindow: '1 minute' });
 installAuthentication(server);
 server.register(authPlugin);
 

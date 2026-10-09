@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import websocket from '@fastify/websocket';
+import rateLimit from '@fastify/rate-limit';
 import { once } from 'node:events';
 import { registerWebSocketRoutes } from '../../api/websocket.js';
 import { authPlugin, installAuthentication } from './auth.js';
@@ -286,6 +287,33 @@ describe('Supabase API authentication', () => {
   });
 });
 
+it('limits protected HTTP requests before Supabase verification', async () => {
+  const app = Fastify();
+  applications.push(app);
+  // The guard is installed first, just like launcher.ts. onRequest limits must
+  // still run before the guard's preValidation hook.
+  installAuthentication(app);
+  await app.register(rateLimit, { max: 2, timeWindow: '1 minute' });
+  app.post('/api/reason', async () => ({ success: true }));
+  await app.ready();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/reason',
+          headers: bearer,
+        })
+      ).statusCode,
+    ).toBe(200);
+  }
+  expect(
+    (await app.inject({ method: 'POST', url: '/api/reason', headers: bearer }))
+      .statusCode,
+  ).toBe(429);
+  expect(getUser).toHaveBeenCalledTimes(2);
+});
+
 describe('approval plugin defense in depth', () => {
   it('fails closed when registered without the global hook or a JWT plugin', async () => {
     const app = await createApp(true);
@@ -316,6 +344,11 @@ describe('websocket upgrade authentication', () => {
     const app = Fastify();
     applications.push(app);
     // Exercise the route's own guard even if the global hook was not installed.
+    // injectWS uses in-memory streams without a remote IP; model one peer.
+    await app.register(rateLimit, {
+      global: false,
+      keyGenerator: () => 'test-peer',
+    });
     await app.register(websocket);
     await registerWebSocketRoutes(app);
     await app.ready();
@@ -334,6 +367,40 @@ describe('websocket upgrade authentication', () => {
     await expect(app.injectWS('/ws', { headers: bearer })).rejects.toThrow(
       'Unexpected server response: 403',
     );
+  });
+
+  it('rate-limits failed upgrades before performing more provider verification', async () => {
+    const app = await createSocketApp();
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await expect(app.injectWS('/ws', { headers: bearer })).rejects.toThrow(
+        'Unexpected server response: 403',
+      );
+    }
+    await expect(app.injectWS('/ws', { headers: bearer })).rejects.toThrow(
+      'Unexpected server response: 429',
+    );
+    expect(getUser).toHaveBeenCalledTimes(10);
+  });
+
+  it('closes connections that exceed the message budget', async () => {
+    getUser.mockResolvedValue({
+      data: { user: { ...user, app_metadata: { role: 'admin' } } },
+      error: null,
+    });
+    const app = await createSocketApp();
+    const socket = await app.injectWS('/ws', { headers: bearer });
+    const closed = once(socket, 'close');
+    for (let index = 0; index < 61; index++) {
+      socket.send(
+        JSON.stringify({
+          id: String(index),
+          type: 'request',
+          channel: 'auth.verify',
+        }),
+      );
+    }
+    const [code] = await closed;
+    expect(code).toBe(1008);
   });
 
   it('binds an accepted admin socket to the verified identity', async () => {
