@@ -55,7 +55,7 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance) {
         5 * 60 * 1000,
       );
       connections.set(connId, context);
-      logger.info({ connId, auth: auth?.email }, 'WebSocket connected');
+      logger.info({ connId, userId: auth?.userId }, 'WebSocket connected');
 
       let windowStartedAt = Date.now();
       let messageCount = 0;

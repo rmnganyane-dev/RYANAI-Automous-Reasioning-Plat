@@ -1,9 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { Analytics } from '@vercel/analytics/react';
 import App from './App';
 import './index.css';
 import { API_BASE_URL } from './lib/apiBaseUrl';
+import { authenticatedFetch } from './lib/authenticatedFetch';
 import { getPlatformHealth } from './lib/platformHealth';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -12,7 +12,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 // ============================================================================
 
 const APP_VERSION = '4.5.0-matrix';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+const APP_ENV = import.meta.env.MODE;
 
 class RyanAIClient {
   private baseURL: string;
@@ -33,18 +33,19 @@ class RyanAIClient {
     endpoint: string,
     options: RequestInit & { method?: string } = {},
   ): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
-    const method = options.method || 'GET';
-
-  }
-
-  async healthCheck(): Promise<boolean> {
-    try {
-      const res = await fetch(`${this.baseURL}/health`);
-      return res.ok;
-    } catch {
-      return false;
+    const headers = new Headers(options.headers);
+    if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
     }
+    headers.set('X-App-Version', this.version);
+    const response = await authenticatedFetch(`${this.baseURL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+    if (!response.ok) {
+      throw new Error(`API request failed (HTTP ${response.status})`);
+    }
+    return response.json() as Promise<T>;
   }
 
   /**
