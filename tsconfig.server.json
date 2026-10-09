@@ -66,6 +66,8 @@
     "src/utils/slackVerification.ts",
     "src/utils/verifyPatch.ts",
     "src/utils/workspacePatch.ts"
+    "src/server/launcher.ts",
+    "src/server/index.ts"
   ],
   "exclude": [
     "node_modules",
