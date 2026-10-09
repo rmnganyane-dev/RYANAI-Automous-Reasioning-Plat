@@ -1,3 +1,4 @@
+import { requireAdmin } from './auth.js';
 import { FastifyPluginAsync } from 'fastify';
 import { humanInTheLoopAgent } from '../../agent/approvalEngine.js';
 import { enterpriseMultiAgent } from '../../agent/supervisorGraph.js';
@@ -18,125 +19,129 @@ interface AdminResolveBody {
 }
 
 export const approvalRoutes: FastifyPluginAsync = async (fastify) => {
-  // Apply JWT verification middleware to all routes in this plugin
-  fastify.addHook('preHandler', async (request, reply) => {
-    try {
-      if (typeof request.jwtVerify === 'function') {
-        await request.jwtVerify();
-      }
-    } catch {
-      reply.status(401);
-      return reply.send({ error: 'Unauthorized: Missing or invalid authentication token' });
-    }
-  });
+  fastify.addHook('preHandler', requireAdmin);
 
   // 1. Initial Prompt Handler for Single Agent: Halts when a tool is called & triggers notification
-  fastify.post<{ Body: WithApprovalBody }>('/api/reason/with-approval', async (request, reply) => {
-    const { prompt, threadId } = request.body || {};
-    if (!threadId || !prompt) {
-      reply.status(400);
-      return { error: 'Both prompt and threadId are required.' };
-    }
+  fastify.post<{ Body: WithApprovalBody }>(
+    '/api/reason/with-approval',
+    async (request, reply) => {
+      const { prompt, threadId } = request.body || {};
+      if (!threadId || !prompt) {
+        reply.status(400);
+        return { error: 'Both prompt and threadId are required.' };
+      }
 
-    const config = { configurable: { thread_id: threadId } };
+      const config = { configurable: { thread_id: threadId } };
 
-    // Run agent up to the interrupt point
-    await humanInTheLoopAgent.invoke(
-      { messages: [{ role: 'user', content: prompt }] },
-      config
-    );
+      // Run agent up to the interrupt point
+      await humanInTheLoopAgent.invoke(
+        { messages: [{ role: 'user', content: prompt }] },
+        config,
+      );
 
-    // Inspect graph state to verify pending tool call
-    const currentState = await humanInTheLoopAgent.getState(config);
+      // Inspect graph state to verify pending tool call
+      const currentState = await humanInTheLoopAgent.getState(config);
 
-    if (currentState.next && currentState.next.includes('tools')) {
-      const lastMessage = currentState.values?.messages?.at(-1);
-      const pendingTool = lastMessage?.tool_calls?.[0];
+      if (currentState.next && currentState.next.includes('tools')) {
+        const lastMessage = currentState.values?.messages?.at(-1);
+        const pendingTool = lastMessage?.tool_calls?.[0];
 
-      // Dispatch notification asynchronously
-      try {
-        notifyPendingApproval({
+        // Dispatch notification asynchronously
+        try {
+          notifyPendingApproval({
+            threadId,
+            tool: pendingTool?.name || 'unknown_tool',
+            args: pendingTool?.args || {},
+          });
+        } catch (err) {
+          fastify.log.warn(
+            `Failed to dispatch notification: ${(err as Error).message}`,
+          );
+        }
+
+        return {
+          status: 'PENDING_APPROVAL',
           threadId,
-          tool: pendingTool?.name || 'unknown_tool',
-          args: pendingTool?.args || {},
-        });
-      } catch (err) {
-        fastify.log.warn(`Failed to dispatch notification: ${(err as Error).message}`);
+          pendingAction: {
+            tool: pendingTool?.name,
+            arguments: pendingTool?.args,
+          },
+          message: 'Tool execution paused. Notification sent to admin.',
+        };
       }
 
       return {
-        status: 'PENDING_APPROVAL',
-        threadId,
-        pendingAction: {
-          tool: pendingTool?.name,
-          arguments: pendingTool?.args,
-        },
-        message: 'Tool execution paused. Notification sent to admin.',
+        status: 'COMPLETED',
+        response: currentState.values?.messages?.at(-1)?.content,
       };
-    }
-
-    return {
-      status: 'COMPLETED',
-      response: (currentState.values?.messages?.at(-1))?.content,
-    };
-  });
+    },
+  );
 
   // 2. Resume Endpoint for Single Agent: Resumes or cancels tool execution based on user response
-  fastify.post<{ Body: ApproveBody }>('/api/reason/approve', async (request, reply) => {
-    const { threadId, approved } = request.body || {};
-    if (!threadId) {
-      reply.status(400);
-      return { error: 'threadId is required.' };
-    }
+  fastify.post<{ Body: ApproveBody }>(
+    '/api/reason/approve',
+    async (request, reply) => {
+      const { threadId, approved } = request.body || {};
+      if (!threadId) {
+        reply.status(400);
+        return { error: 'threadId is required.' };
+      }
 
-    const config = { configurable: { thread_id: threadId } };
+      const config = { configurable: { thread_id: threadId } };
 
-    if (!approved) {
-      // User rejected action: Feed rejection back into conversation without running tool
-      const rejectedResult = (await humanInTheLoopAgent.invoke(
-        {
-          messages: [
-            {
-              role: 'user',
-              content: 'Action rejected by admin. Do not execute the tool.',
-            },
-          ],
-        },
-        config
-      ));
+      if (!approved) {
+        // User rejected action: Feed rejection back into conversation without running tool
+        const rejectedResult = await humanInTheLoopAgent.invoke(
+          {
+            messages: [
+              {
+                role: 'user',
+                content: 'Action rejected by admin. Do not execute the tool.',
+              },
+            ],
+          },
+          config,
+        );
+
+        return {
+          status: 'REJECTED',
+          response: rejectedResult?.messages?.at(-1)?.content,
+        };
+      }
+
+      // User approved: Passing `null` resumes execution from the saved checkpoint
+      const approvedResult = await humanInTheLoopAgent.invoke(null, config);
 
       return {
-        status: 'REJECTED',
-        response: rejectedResult?.messages?.at(-1)?.content,
+        status: 'EXECUTED',
+        response: approvedResult?.messages?.at(-1)?.content,
       };
-    }
-
-    // User approved: Passing `null` resumes execution from the saved checkpoint
-    const approvedResult = (await humanInTheLoopAgent.invoke(null, config));
-
-    return {
-      status: 'EXECUTED',
-      response: approvedResult?.messages?.at(-1)?.content,
-    };
-  });
+    },
+  );
 
   // 3. Multi-Agent Supergraph: Check current thread state for pending worker interrupts
-  fastify.get<{ Params: { threadId: string } }>('/api/admin/threads/:threadId/pending', async (request) => {
-    const { threadId } = request.params;
-    const config = { configurable: { thread_id: threadId } };
+  fastify.get<{ Params: { threadId: string } }>(
+    '/api/admin/threads/:threadId/pending',
+    async (request) => {
+      const { threadId } = request.params;
+      const config = { configurable: { thread_id: threadId } };
 
-    const state = await enterpriseMultiAgent.getState(config);
+      const state = await enterpriseMultiAgent.getState(config);
 
-    if (!state.next || state.next.length === 0) {
-      return { paused: false, message: 'No active interruptions on this thread.' };
-    }
+      if (!state.next || state.next.length === 0) {
+        return {
+          paused: false,
+          message: 'No active interruptions on this thread.',
+        };
+      }
 
-    return {
-      paused: true,
-      nextNodes: state.next, // e.g., ['commsWorker']
-      pendingMessage: state.values?.messages?.at(-1),
-    };
-  });
+      return {
+        paused: true,
+        nextNodes: state.next, // e.g., ['commsWorker']
+        pendingMessage: state.values?.messages?.at(-1),
+      };
+    },
+  );
 
   // 4. Multi-Agent Supergraph: Resume graph execution upon admin approval or rejection
   fastify.post<{ Params: { threadId: string }; Body: AdminResolveBody }>(
@@ -159,11 +164,12 @@ export const approvalRoutes: FastifyPluginAsync = async (fastify) => {
               messages: [
                 {
                   role: 'user',
-                  content: 'Execution rejected by administrator. Halt task processing.',
+                  content:
+                    'Execution rejected by administrator. Halt task processing.',
                 },
               ],
             },
-            config
+            config,
           );
         }
 
@@ -172,6 +178,6 @@ export const approvalRoutes: FastifyPluginAsync = async (fastify) => {
         reply.status(500);
         return { success: false, error: (err as Error).message };
       }
-    }
+    },
   );
 };

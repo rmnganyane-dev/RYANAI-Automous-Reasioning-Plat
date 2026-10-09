@@ -25,7 +25,18 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=3000
 
+# Patch verification uses npm; keep its bundled dependencies patched too.
 RUN apk add --no-cache dumb-init libstdc++ libc6-compat wget \
+    && npm install --global npm@11.21.0 \
+    && npm install --prefix /tmp/npm-security-patches --install-strategy=nested \
+        --ignore-scripts --no-audit --no-fund \
+        brace-expansion@5.0.11 http-cache-semantics@4.3.0 undici@6.28.1 \
+    && rm -rf /usr/local/lib/node_modules/npm/node_modules/brace-expansion \
+        /usr/local/lib/node_modules/npm/node_modules/http-cache-semantics \
+        /usr/local/lib/node_modules/npm/node_modules/undici \
+    && cp -a /tmp/npm-security-patches/node_modules/. /usr/local/lib/node_modules/npm/node_modules/ \
+    && rm -rf /tmp/npm-security-patches \
+    && npm cache clean --force \
     && mkdir -p /app/logs \
     && chown -R node:node /app
 
